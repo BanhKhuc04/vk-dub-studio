@@ -54,7 +54,7 @@ def test_schema_five_preserves_legacy_data_without_rewriting(tmp_path, provider)
         ("voice_speed", "bad"),
         ("voice_speed", float("nan")),
         ("wizard_completed", "false"),
-        ("tts_backend", "vbee"),
+        ("tts_backend", "unsupported_backend"),
         ("workspace_root", []),
         ("gemini_model", "../../bad"),
         ("auto_update", 1),

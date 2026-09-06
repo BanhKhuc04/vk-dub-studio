@@ -32,7 +32,7 @@ class AppSettings:
     schema_version: int = 2
     wizard_completed: bool = False
     gemini_model: str = GEMINI_MODEL
-    tts_backend: str = "vieneu_local"  # "vieneu_local" | "capcut_tts"
+    tts_backend: str = "vieneu_local"  # "vieneu_local" | "capcut_tts" | "vbee"
     selected_voice: str = ""
     voice_speed: float = 1.0
     capcut_draft_root: str = ""
@@ -54,7 +54,7 @@ class AppSettings:
         for flag in (self.wizard_completed, self.auto_update, self.autosave):
             if type(flag) is not bool:
                 raise ValueError("Cài đặt bật/tắt không hợp lệ.")
-        if self.tts_backend not in ("vieneu_local", "capcut_tts"):
+        if self.tts_backend not in ("vieneu_local", "capcut_tts", "vbee"):
             raise ValueError("Voice Engine không hợp lệ.")
         if not isinstance(self.gemini_model, str) or not re.fullmatch(
             r"[A-Za-z0-9._-]{1,120}", self.gemini_model

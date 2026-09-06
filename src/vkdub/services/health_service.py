@@ -126,6 +126,41 @@ def check_tts_backend(backend: str) -> HealthResult:
             None if ready else "Cài đặt Voice",
             None if ready else "open_settings_voice",
         )
+    if backend == "vbee":
+        try:
+            import playwright  # noqa: F401
+
+            from vkdub.integrations.vbee.session import detect_browser_channel
+
+            channel = detect_browser_channel()
+            ready = channel is not None
+            browser_name = (
+                "Microsoft Edge"
+                if channel == "msedge"
+                else ("Google Chrome" if channel == "chrome" else "Trình duyệt")
+            )
+            return HealthResult(
+                ready,
+                "VBEE_READY" if ready else "VBEE_BROWSER_MISSING",
+                "Vbee Dubbing Studio",
+                (
+                    f"Trình duyệt {browser_name} & Playwright đã sẵn sàng. "
+                    "Bấm Mở / Kiểm tra để xem hoặc đăng nhập Vbee."
+                )
+                if ready
+                else "Chưa phát hiện Microsoft Edge hoặc Google Chrome để tự động hóa Vbee.",
+                None if ready else "Cài đặt Voice",
+                None if ready else "open_settings_voice",
+            )
+        except Exception as exc:
+            return HealthResult(
+                False,
+                "VBEE_ERROR",
+                "Vbee Dubbing Studio",
+                f"Lỗi kiểm tra Vbee: {exc}",
+                "Cài đặt Voice",
+                "open_settings_voice",
+            )
     title = "CapCut TTS" if backend == "capcut_tts" else "VieNeu Local"
     return HealthResult(
         False,

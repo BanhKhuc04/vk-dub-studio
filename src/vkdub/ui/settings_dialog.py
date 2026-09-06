@@ -422,9 +422,10 @@ class SettingsDialog(QDialog):
             "VieNeu — dùng offline, thêm được giọng riêng", "vieneu_local"
         )
         self.voice_backend_combo.addItem("CapCut — giọng có sẵn, cần Internet", "capcut_tts")
-        self.voice_backend_combo.setCurrentIndex(
-            0 if self.main_window.project.voice.provider == "vieneu_local" else 1
-        )
+        self.voice_backend_combo.addItem("Vbee — Dubbing Studio tự động (Edge/Chrome)", "vbee")
+        current_provider = self.main_window.project.voice.provider or self.app_settings.tts_backend
+        backend_idx = self.voice_backend_combo.findData(current_provider)
+        self.voice_backend_combo.setCurrentIndex(max(0, backend_idx))
         self.voice_backend_combo.currentIndexChanged.connect(self._on_voice_backend_changed)
         form.addRow("Dùng giọng từ:", self.voice_backend_combo)
 
@@ -536,17 +537,21 @@ class SettingsDialog(QDialog):
         )
         if hasattr(self, "btn_setup_voice"):
             local = backend == "vieneu_local"
+            is_vbee = backend == "vbee"
             idle = not self.main_window.busy
             self.voice_backend_combo.setEnabled(idle)
-            self.btn_setup_voice.setText(
-                "Cài / Kiểm tra VieNeu" if local else "Kết nối / Kiểm tra CapCut"
-            )
+            if is_vbee:
+                self.btn_setup_voice.setText("🌐 Mở / Kiểm tra Vbee Dubbing")
+            elif local:
+                self.btn_setup_voice.setText("Cài / Kiểm tra VieNeu")
+            else:
+                self.btn_setup_voice.setText("Kết nối / Kiểm tra CapCut")
             self.btn_setup_voice.setEnabled(idle)
-            self.btn_use_local.setVisible(not local)
+            self.btn_use_local.setVisible(not local and not is_vbee)
             self.btn_use_local.setEnabled(idle)
             ready = health.ok and idle and bool(self.voice_list_combo.currentData())
             self.voice_list_combo.setEnabled(ready)
-            self.btn_voice_preview.setEnabled(ready)
+            self.btn_voice_preview.setEnabled(ready and not is_vbee)
             self.btn_add_voice.setVisible(local)
             self.btn_rename_voice.setVisible(local)
             self.btn_delete_voice.setVisible(local)
@@ -626,7 +631,7 @@ class SettingsDialog(QDialog):
         if not self.main_window.tts.select_voice(
             self.voice_backend_combo.currentData(), self.voice_list_combo.currentData() or ""
         ):
-            self.lbl_voice_status.setText("Hãy kết nối / cài engine và chọn giọng trước khi lưu.")
+            self.lbl_voice_status.setText("Hãy kiểm tra engine và chọn giọng trước khi lưu.")
             return
         self.app_settings = load_app_settings()
         self.app_settings.tts_backend = self.voice_backend_combo.currentData()
@@ -645,7 +650,10 @@ class SettingsDialog(QDialog):
             self.main_window.dirty = True
         if not self._persist_settings():
             return
-        QMessageBox.information(self, "Thành công", "Đã lưu thiết lập Voice Engine.")
+        backend_title = self.voice_backend_combo.currentText()
+        QMessageBox.information(
+            self, "Thành công", f"Đã lưu thiết lập Voice Engine:\n{backend_title}"
+        )
 
     # -------------------------------------------------------------
     # 4. TAB CAPCUT (CapCut Draft Root & Compatibility)

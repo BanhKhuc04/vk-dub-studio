@@ -25,13 +25,31 @@ def engine_python(root: Path | None = None) -> Path:
     return root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+VBEE_DEFAULT_CATALOG: list[dict[str, Any]] = [
+    {"id": "vbee-studio-default", "name": "Vbee Studio — Tự động / Mặc định", "custom": False},
+    {"id": "vbee-ngoc-huyen", "name": "Ngọc Huyền (Nữ miền Bắc)", "custom": False},
+    {"id": "vbee-tuong-vy", "name": "Tường Vy (Nữ miền Nam)", "custom": False},
+    {"id": "vbee-mai-phuong", "name": "Mai Phương (Nữ miền Bắc)", "custom": False},
+    {"id": "vbee-lan-trinh", "name": "Lan Trinh (Nữ miền Nam)", "custom": False},
+    {"id": "vbee-manh-dung", "name": "Mạnh Dũng (Nam miền Bắc)", "custom": False},
+    {"id": "vbee-minh-hoang", "name": "Minh Hoàng (Nam miền Nam)", "custom": False},
+]
+
+
 def catalog_path(backend: str = "vieneu_local") -> Path:
-    return data_root() / "voices" / ("capcut.json" if backend == "capcut_tts" else "catalog.json")
+    if backend == "capcut_tts":
+        return data_root() / "voices" / "capcut.json"
+    if backend == "vbee":
+        return data_root() / "voices" / "vbee.json"
+    return data_root() / "voices" / "catalog.json"
 
 
 def read_catalog(backend: str = "vieneu_local") -> list[dict[str, Any]]:
     path = catalog_path(backend)
     if not path.is_file():
+        if backend == "vbee":
+            save_catalog(VBEE_DEFAULT_CATALOG, "vbee")
+            return [dict(r) for r in VBEE_DEFAULT_CATALOG]
         return []
     try:
         if path.stat().st_size > 2_000_000:

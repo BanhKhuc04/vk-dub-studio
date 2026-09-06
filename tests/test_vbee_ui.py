@@ -20,6 +20,7 @@ class DummyMainWindow(QObject):
         self.tools = MagicMock()
         self.tools.paths = {"ffmpeg": "ffmpeg", "ffprobe": "ffprobe"}
         self.left = MagicMock()
+        self.review = MagicMock()
         self.transcription = MagicMock()
 
     def log(self, msg: str) -> None:
@@ -86,3 +87,63 @@ def test_vbee_workflow_dialog_cancel_emitted(qtbot) -> None:
         dialog.stop_button.click()
 
     assert dialog.stop_button.isEnabled() is False
+
+
+def test_app_settings_vbee_backend() -> None:
+    """Verify AppSettings accepts 'vbee' as tts_backend without error."""
+    import pytest
+
+    from vkdub.services.app_settings import AppSettings
+
+    settings = AppSettings(tts_backend="vbee")
+    assert settings.tts_backend == "vbee"
+
+    with pytest.raises(ValueError, match="Voice Engine không hợp lệ"):
+        AppSettings(tts_backend="unsupported_engine")
+
+
+def test_vbee_voice_catalog() -> None:
+    """Verify voice_catalog loads default Vbee voices for 'vbee' backend."""
+    from vkdub.services.voice_catalog import read_catalog
+
+    rows = read_catalog("vbee")
+    assert len(rows) >= 5
+    ids = [r["id"] for r in rows]
+    assert "vbee-studio-default" in ids
+    assert "vbee-ngoc-huyen" in ids
+
+
+def test_vbee_health_check() -> None:
+    """Verify check_tts_backend returns valid HealthResult for 'vbee'."""
+    from vkdub.services.health_service import check_tts_backend
+
+    res = check_tts_backend("vbee")
+    assert res.title == "Vbee Dubbing Studio"
+    assert res.code in ("VBEE_READY", "VBEE_BROWSER_MISSING")
+
+
+def test_studio_voice_controller_vbee_delegation() -> None:
+    """Verify StudioVoiceController.start delegates to vbee_controller when provider is 'vbee'."""
+    from vkdub.ui.studio_voice_controller import StudioVoiceController
+
+    window = DummyMainWindow()
+    window.legacy_tts_enabled = False
+    window.vbee_controller = MagicMock()
+    window.vbee_controller.start_workflow.return_value = True
+
+    # Setup project with script and approved state
+    window.project.is_approved = True
+    window.project.require_approval = MagicMock()
+    window.project.script = MagicMock()
+    window.project.script.lines = [MagicMock(id="line-1")]
+    window.project.voice = MagicMock(provider="vbee", voice_id="vbee-studio-default")
+
+    controller = StudioVoiceController(window)
+    controller.configured = True
+    controller.backend = "vbee"
+    controller.catalog = [{"id": "vbee-studio-default", "name": "Default"}]
+
+    started = controller.start()
+    assert started is True
+    window.vbee_controller.start_workflow.assert_called_once()
+

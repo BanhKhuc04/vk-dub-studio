@@ -260,7 +260,7 @@ class ReviewController(QObject):
         if getattr(self.window, "legacy_tts_enabled", False) or self.window.tts.can_generate():
             self.window.tts.start()
         else:
-            self.window.log("Đã lưu phê duyệt. Mở Cài đặt Voice để cài và chọn giọng VieNeu.")
+            self.window.log("Đã lưu phê duyệt. Mở Cài đặt Voice để chọn và cấu hình giọng đọc.")
         return True
 
     def confirm_replace(self) -> bool:

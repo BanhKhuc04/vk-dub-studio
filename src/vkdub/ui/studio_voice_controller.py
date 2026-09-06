@@ -153,6 +153,13 @@ class StudioVoiceController(TTSController):
             self.window.left.stop_button.setEnabled(not self.job.cancel_event.is_set())
 
     def can_generate(self) -> bool:
+        if self.backend == "vbee":
+            return bool(
+                self.configured
+                and self.window.project.voice.provider == "vbee"
+                and self.window.tools.paths.get("ffmpeg")
+                and self.window.tools.paths.get("ffprobe")
+            )
         return bool(
             self.configured
             and self.window.project.voice.provider == self.backend
@@ -199,6 +206,14 @@ class StudioVoiceController(TTSController):
             self.window.open_settings(2)
             return False
         project = self.window.project
+
+        # If active voice provider is Vbee, run Vbee workflow automation!
+        if project.voice.provider == "vbee":
+            if hasattr(self.window, "vbee_controller") and self.window.vbee_controller:
+                return self.window.vbee_controller.start_workflow()
+            self.window.log("Chưa sẵn sàng bộ điều khiển Vbee.")
+            return False
+
         if line_id and (not project.script or line_id not in {r.id for r in project.script.lines}):
             return False
         if force and line_id:
@@ -254,6 +269,42 @@ class StudioVoiceController(TTSController):
     def setup_engine(self, backend: str = "vieneu_local") -> bool:
         if self.window.busy:
             return False
+        if backend == "vbee":
+            async def vbee_test_operation() -> list[dict]:
+                assert self.job
+                from playwright.async_api import async_playwright
+
+                from vkdub.integrations.vbee.automation import VbeeBrowserAutomation
+                from vkdub.integrations.vbee.session import create_vbee_browser_context
+                from vkdub.services.voice_catalog import read_catalog
+
+                self.job.progress.emit("Đang mở trình duyệt Vbee Dubbing Studio...")
+                async with async_playwright() as p:
+                    context = await create_vbee_browser_context(p, headless=False)
+                    try:
+                        automation = VbeeBrowserAutomation(context)
+                        await automation.open_dubbing_studio()
+                        self.job.progress.emit("Đang kiểm tra trạng thái đăng nhập Vbee...")
+                        logged_in = await automation.is_logged_in()
+                        if logged_in:
+                            self.job.progress.emit("✓ Vbee đã đăng nhập sẵn. Sẵn sàng sử dụng!")
+                        else:
+                            self.job.progress.emit(
+                                "Vbee chưa đăng nhập. Vui lòng đăng nhập trên cửa sổ vừa mở..."
+                            )
+                            await automation.wait_for_user_login(
+                                timeout_s=90,
+                                check_cancel=self.job.check_cancel,
+                                progress_callback=self.job.progress.emit,
+                            )
+                            self.job.progress.emit("✓ Đăng nhập Vbee thành công!")
+                    finally:
+                        await context.close()
+                return read_catalog("vbee")
+
+            self.setup_backend = backend
+            return self._local_job("setup", vbee_test_operation)
+
         if not self.window.tools.paths.get("ffmpeg") or not self.window.tools.paths.get("ffprobe"):
             self.window.log("Cần FFmpeg/ffprobe trước khi kiểm tra Voice Engine.")
             return False
@@ -286,6 +337,11 @@ class StudioVoiceController(TTSController):
 
     def preview_voice(self, identifier: str | None = None, backend: str | None = None) -> bool:
         backend = backend or self.window.project.voice.provider
+        if backend == "vbee":
+            self.window.log(
+                "Vbee tạo voice qua trình duyệt; bấm Duyệt kịch bản để tạo voice tự động."
+            )
+            return False
         if (
             not check_tts_backend(backend).ok
             or self.window.busy
@@ -340,7 +396,11 @@ class StudioVoiceController(TTSController):
             )
             self.read_credentials()
             self.window.dirty = True
-            self.window.log("Giọng đọc đã sẵn sàng. Bạn có thể chọn giọng và nghe thử.")
+            self.window.log(
+                "Vbee Dubbing Studio đã kết nối và sẵn sàng tạo voice tự động."
+                if backend == "vbee"
+                else "Giọng đọc đã sẵn sàng. Bạn có thể chọn giọng và nghe thử."
+            )
         elif self.kind == "preview":
             self.last_preview_path = result
             self.player.setSource(QUrl.fromLocalFile(str(result)))

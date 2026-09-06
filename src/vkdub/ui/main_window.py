@@ -487,7 +487,12 @@ class MainWindow(QMainWindow):
             )
         elif state == "APPROVED":
             available = self.tts.can_generate()
-            self.left.process_button.setToolTip("Tạo các câu voice còn thiếu bằng VieNeu Local.")
+            if self.project.voice.provider == "vbee":
+                self.left.process_button.setToolTip("Tự động tạo voice qua Vbee Dubbing Studio.")
+            elif self.project.voice.provider == "capcut_tts":
+                self.left.process_button.setToolTip("Tạo voice bằng CapCut TTS.")
+            else:
+                self.left.process_button.setToolTip("Tạo voice bằng VieNeu Local.")
         elif state == "VOICE_READY":
             has_ffmpeg = bool(self.tools.paths.get("ffmpeg"))
             has_ffprobe = bool(self.tools.paths.get("ffprobe"))
@@ -549,7 +554,14 @@ class MainWindow(QMainWindow):
         elif state == "REVIEW_REQUIRED":
             self.review_controller.approve()
         elif state == "APPROVED":
-            self.tts.start()
+            if (
+                self.project.voice.provider == "vbee"
+                and hasattr(self, "vbee_controller")
+                and self.vbee_controller
+            ):
+                self.vbee_controller.start_workflow()
+            else:
+                self.tts.start()
         elif state == "VOICE_READY":
             self.capcut_export.start()
 
@@ -605,6 +617,14 @@ class MainWindow(QMainWindow):
                 speed=defaults.voice_speed,
                 volume=min(1, defaults.voice_volume / 100),
             )
+        else:
+            if defaults.tts_backend and self.project.voice.provider != defaults.tts_backend:
+                self.project.voice = replace(
+                    self.project.voice,
+                    provider=defaults.tts_backend,
+                    voice_id=defaults.selected_voice or self.project.voice.voice_id,
+                )
+                self.dirty = True
         self.left.speed_combo.blockSignals(True)
         self.left.speed_combo.setCurrentIndex(self.left.speed_combo.findData(defaults.voice_speed))
         self.left.speed_combo.blockSignals(False)
