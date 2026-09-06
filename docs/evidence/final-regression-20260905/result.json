@@ -1,0 +1,20 @@
+{
+  "passed": false,
+  "platform": "windows",
+  "checks": [
+    "Real Gemini structured translation preserves timing and stops at review",
+    "Approve CTA synthesizes both lines with real local VieNeu",
+    "Second generation reuses validated audio cache without synthesis",
+    "Edit revokes approval; reapprove regenerates only the changed line",
+    "Voice preview creates real WAV; settings list actual SDK presets"
+  ],
+  "qt_ticks": 510,
+  "translation": [
+    "Xin chào mọi người.",
+    "Cảm ơn các bạn đã xem video này."
+  ],
+  "preview_audio": "D:\\ToolVideo\\docs\\evidence\\final-regression-20260905\\app-data\\cache\\voice-preview\\f53dc6afc484b0da8bbe0daca34febc3e5e8c0243001d5ef19a1d82bdc54c8ba.wav",
+  "elapsed_seconds": 32.42,
+  "synthesize_calls": 4,
+  "failure": "Traceback (most recent call last):\n  File \"D:\\ToolVideo\\scripts\\smoke_voice_v2.py\", line 190, in tick\n    assert not window.left.process_button.isEnabled()  # CapCut still gated.\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+}

@@ -1,0 +1,33 @@
+{
+  "capcut_version": "9.3.0.3970",
+  "opened_in_capcut": true,
+  "draft_path": "C:\\Users\\khucv\\AppData\\Local\\CapCut\\User Data\\Projects\\com.lveditor.draft\\VKDub 20260905-015631-5CFCB5A8",
+  "content_version": 360000,
+  "timeline_duration": 7933333,
+  "tracks": {
+    "video": 1,
+    "audio": 1,
+    "text": 1
+  },
+  "files_after_open": [
+    ".locked",
+    "draft.extra",
+    "draft_agency_config.json",
+    "draft_biz_config.json",
+    "draft_content.json",
+    "draft_content.json.bak",
+    "draft_meta_info.json",
+    "draft_settings",
+    "draft_virtual_store.json",
+    "key_value.json",
+    "template-2.tmp",
+    "timeline_layout.json"
+  ],
+  "verified_visible": [
+    "source video preview",
+    "editable caption track",
+    "editable WAV audio track",
+    "video track"
+  ],
+  "blur_editable_verified": false
+}

@@ -1,0 +1,26 @@
+{
+  "checks": [
+    "Separate process restart restores settings and does not open wizard",
+    "Missing Gemini/TTS produce truthful health results; legacy controls hidden",
+    "Real MP4 probed, decoded, played, paused and sought",
+    "Explicit review, schema-6 save/reopen, edit revocation; no TTS or CapCut dispatch",
+    "Six settings tabs; voice catalog and preview honestly unavailable"
+  ],
+  "passed": true,
+  "restart": true,
+  "qt_ticks": 34,
+  "decoded_frames": 20,
+  "tools": {
+    "ffmpeg": "C:\\Users\\khucv\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-essentials_build\\bin\\ffmpeg.EXE",
+    "ffprobe": "C:\\Users\\khucv\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-essentials_build\\bin\\ffprobe.EXE"
+  },
+  "health": [
+    "GEMINI_MISSING",
+    "TTS_NOT_INTEGRATED",
+    "FFMPEG_OK",
+    "FFPROBE_OK",
+    "CAPCUT_OK",
+    "WORKSPACE_OK",
+    "UPDATE_DISABLED"
+  ]
+}

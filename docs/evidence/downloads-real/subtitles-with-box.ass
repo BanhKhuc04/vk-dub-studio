@@ -1,0 +1,274 @@
+﻿[Script Info]
+Title: VK Dub Studio Subtitles
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: 768
+PlayResY: 576
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,50,&H00FFFFFF,&H000000FF,&H00000000,&H59000000,-1,0,0,0,100,100,0,0,3,3.0,1.0,2,30,30,163,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.36,Default,,0,0,0,,Con gái tôi cả đời không lấy được chồng.
+Dialogue: 0,0:00:02.36,0:00:04.12,Default,,0,0,0,,Tôi và mẹ nó nuôi nấng nó.
+Dialogue: 0,0:00:04.12,0:00:06.64,Default,,0,0,0,,Người khác nói bây giờ nó muốn lấy một người bình thường.
+Dialogue: 0,0:00:06.64,0:00:07.76,Default,,0,0,0,,Nó đồng ý.
+Dialogue: 0,0:00:07.76,0:00:09.00,Default,,0,0,0,,Tôi không đồng ý.
+Dialogue: 0,0:00:09.00,0:00:10.96,Default,,0,0,0,,Tôi không chấp nhận gia đình các người.
+Dialogue: 0,0:00:10.96,0:00:12.76,Default,,0,0,0,,Khi đối tượng của bạn là một chàng trai bám váy mẹ,
+Dialogue: 0,0:00:12.76,0:00:15.76,Default,,0,0,0,,và mẹ chồng tương lai là một người cực kỳ kiểm soát,
+Dialogue: 0,0:00:15.76,0:00:16.80,Default,,0,0,0,,bạn sẽ chọn thế nào?
+Dialogue: 0,0:00:16.80,0:00:18.72,Default,,0,0,0,,Hôm nay, hãy cùng theo dõi góc nhìn của Chủ tịch Đổng
+Dialogue: 0,0:00:18.72,0:00:21.64,Default,,0,0,0,,để xem mối quan hệ hôn nhân bất bình đẳng này.
+Dialogue: 0,0:00:21.64,0:00:24.00,Default,,0,0,0,,Tôi biết hôm nay các người đến đây có ý gì.
+Dialogue: 0,0:00:24.00,0:00:26.76,Default,,0,0,0,,Hôm nay lại muốn quay lại phải không?
+Dialogue: 0,0:00:26.76,0:00:29.76,Default,,0,0,0,,Lại muốn hòa giải với Hạo Vũ nhà chúng tôi phải không?
+Dialogue: 0,0:00:29.76,0:00:31.76,Default,,0,0,0,,Đâu có dễ dàng như vậy.
+Dialogue: 0,0:00:31.76,0:00:33.76,Default,,0,0,0,,Nhà chúng tôi đâu phải là vườn rau,
+Dialogue: 0,0:00:33.76,0:00:35.76,Default,,0,0,0,,muốn đến thì đến, muốn đi thì đi à?
+Dialogue: 0,0:00:35.76,0:00:38.76,Default,,0,0,0,,Bình Thiên Nguyệt phải đích thân xin lỗi tôi.
+Dialogue: 0,0:00:38.76,0:00:40.76,Default,,0,0,0,,Cha mẹ biết con gái và bạn trai chia tay,
+Dialogue: 0,0:00:40.76,0:00:42.76,Default,,0,0,0,,tưởng là con gái mình bướng bỉnh gây sự,
+Dialogue: 0,0:00:42.76,0:00:45.76,Default,,0,0,0,,nên chủ động đến nhà muốn nói chuyện tử tế với gia đình nhà trai.
+Dialogue: 0,0:00:45.76,0:00:48.76,Default,,0,0,0,,Kết quả, đối phương lại nghĩ là nữ chính muốn cầu xin hòa giải với con trai mình,
+Dialogue: 0,0:00:48.76,0:00:51.76,Default,,0,0,0,,nên lập tức tỏ ra vẻ cao ngạo.
+Dialogue: 0,0:00:51.76,0:00:52.76,Default,,0,0,0,,Từ đây có thể thấy,
+Dialogue: 0,0:00:52.76,0:00:55.76,Default,,0,0,0,,họ từ tận đáy lòng chưa bao giờ đối xử bình đẳng với nữ chính.
+Dialogue: 0,0:00:55.76,0:00:56.76,Default,,0,0,0,,Dương Hạo Vũ,
+Dialogue: 0,0:00:56.76,0:00:58.76,Default,,0,0,0,,con sai ở đâu?
+Dialogue: 0,0:00:58.76,0:01:00.56,Default,,0,0,0,,Con nói xem, con sai ở đâu?
+Dialogue: 0,0:01:00.56,0:01:01.96,Default,,0,0,0,,Con chia tay với Dương Hạo Vũ,
+Dialogue: 0,0:01:01.96,0:01:03.76,Default,,0,0,0,,đây là chuyện của hai đứa con.
+Dialogue: 0,0:01:03.76,0:01:05.96,Default,,0,0,0,,Hôm nay, vì gia đình hai bên đã ngồi lại với nhau,
+Dialogue: 0,0:01:05.96,0:01:07.56,Default,,0,0,0,,chúng ta hãy nói rõ mọi chuyện.
+Dialogue: 0,0:01:07.56,0:01:08.76,Default,,0,0,0,,Sau đó tôi sẽ nói với bạn
+Dialogue: 0,0:01:08.76,0:01:09.96,Default,,0,0,0,,lý do chúng tôi chia tay.
+Dialogue: 0,0:01:09.96,0:01:12.56,Default,,0,0,0,,Trước đây, việc chia tay là chuyện riêng của hai người.
+Dialogue: 0,0:01:12.56,0:01:14.56,Default,,0,0,0,,Nhưng hôm nay, trước mặt gia đình hai bên,
+Dialogue: 0,0:01:14.56,0:01:17.16,Default,,0,0,0,,nữ chính buộc phải chủ động yêu cầu nói rõ mọi chuyện.
+Dialogue: 0,0:01:17.16,0:01:17.76,Default,,0,0,0,,Tại sao?
+Dialogue: 0,0:01:17.76,0:01:19.76,Default,,0,0,0,,Vì đối phương liên tục bóp méo sự thật.
+Dialogue: 0,0:01:19.76,0:01:21.76,Default,,0,0,0,,Cô ấy không muốn cha mẹ mình bị lừa dối.
+Dialogue: 0,0:01:21.76,0:01:23.56,Default,,0,0,0,,Là bạn muốn chia tay tôi.
+Dialogue: 0,0:01:23.56,0:01:24.56,Default,,0,0,0,,Tôi làm sao biết được?
+Dialogue: 0,0:01:24.56,0:01:25.96,Default,,0,0,0,,Điều tôi biết là
+Dialogue: 0,0:01:25.96,0:01:28.16,Default,,0,0,0,,mẹ tôi đã chuẩn bị nhà cho chúng ta rồi.
+Dialogue: 0,0:01:28.16,0:01:30.16,Default,,0,0,0,,Đồ đạc cũng đã được vận chuyển đến rồi.
+Dialogue: 0,0:01:30.16,0:01:31.80,Default,,0,0,0,,Đám cưới cũng đã được sắp xếp xong rồi.
+Dialogue: 0,0:01:31.80,0:01:33.16,Default,,0,0,0,,Bạn không làm gì cả,
+Dialogue: 0,0:01:33.16,0:01:34.16,Default,,0,0,0,,chỉ biết nhìn mà không hài lòng,
+Dialogue: 0,0:01:34.16,0:01:35.16,Default,,0,0,0,,không vừa ý,
+Dialogue: 0,0:01:35.16,0:01:37.16,Default,,0,0,0,,khắp nơi đều chê bai.
+Dialogue: 0,0:01:37.16,0:01:38.66,Default,,0,0,0,,Ý của chàng trai rất rõ ràng:
+Dialogue: 0,0:01:38.66,0:01:41.16,Default,,0,0,0,,gia đình chúng tôi đã sắp xếp mọi thứ rồi,
+Dialogue: 0,0:01:41.16,0:01:42.66,Default,,0,0,0,,nên chúng tôi hoàn toàn không có lỗi.
+Dialogue: 0,0:01:42.66,0:01:43.16,Default,,0,0,0,,Nghe đến đây,
+Dialogue: 0,0:01:43.16,0:01:45.66,Default,,0,0,0,,bạn có nghĩ rằng nữ chính đang gây sự vô cớ không?
+Dialogue: 0,0:01:45.66,0:01:46.66,Default,,0,0,0,,Nhưng khoan đã,
+Dialogue: 0,0:01:46.66,0:01:47.66,Default,,0,0,0,,chúng ta hãy xem tiếp.
+Dialogue: 0,0:01:47.66,0:01:49.16,Default,,0,0,0,,Tôi có quyền chê bai không?
+Dialogue: 0,0:01:49.16,0:01:50.16,Default,,0,0,0,,Trong căn nhà mới đó,
+Dialogue: 0,0:01:50.16,0:01:52.16,Default,,0,0,0,,có một thứ gì đó liên quan đến tôi không?
+Dialogue: 0,0:01:53.16,0:01:54.66,Default,,0,0,0,,Đã ăn xong hết rồi
+Dialogue: 0,0:01:55.16,0:01:57.66,Default,,0,0,0,,Bộ sofa này không phải bộ tôi chọn
+Dialogue: 0,0:01:57.66,0:01:59.82,Default,,0,0,0,,Khi tôi và mẹ tôi nhận hàng
+Dialogue: 0,0:01:59.82,0:02:01.18,Default,,0,0,0,,Mẹ tôi nhìn thấy bộ này
+Dialogue: 0,0:02:01.18,0:02:03.10,Default,,0,0,0,,Và rẻ hơn bộ của bạn 4000 tệ
+Dialogue: 0,0:02:03.10,0:02:04.70,Default,,0,0,0,,Không phải vấn đề tiền bạc
+Dialogue: 0,0:02:04.70,0:02:06.94,Default,,0,0,0,,Tại sao bạn lại đổi mà không nói với tôi một tiếng?
+Dialogue: 0,0:02:06.94,0:02:09.46,Default,,0,0,0,,Nữ chính chưa bao giờ quan tâm đến giá sofa
+Dialogue: 0,0:02:09.46,0:02:11.50,Default,,0,0,0,,Mà là sở thích của mình bị thay đổi tùy tiện
+Dialogue: 0,0:02:11.50,0:02:13.10,Default,,0,0,0,,Cuối cùng còn không có một lời thông báo
+Dialogue: 0,0:02:13.10,0:02:14.94,Default,,0,0,0,,Tục ngữ có câu, việc nhỏ thấy nhân phẩm
+Dialogue: 0,0:02:14.94,0:02:17.26,Default,,0,0,0,,Ngay cả việc trang trí cần phải cùng nhau bàn bạc
+Dialogue: 0,0:02:17.26,0:02:18.18,Default,,0,0,0,,Cũng không được tôn trọng
+Dialogue: 0,0:02:18.18,0:02:20.26,Default,,0,0,0,,Trong cuộc sống hôn nhân của hai người
+Dialogue: 0,0:02:20.26,0:02:23.18,Default,,0,0,0,,Người đàn ông sẽ càng quen với việc bỏ qua ý kiến của nữ chính
+Dialogue: 0,0:02:23.18,0:02:26.54,Default,,0,0,0,,Màu đã chọn sao lại đổi thành màu tối?
+Dialogue: 0,0:02:26.54,0:02:27.54,Default,,0,0,0,,Mẹ tôi đổi đó
+Dialogue: 0,0:02:27.98,0:02:29.42,Default,,0,0,0,,Mẹ tôi nói màu này sang trọng
+Dialogue: 0,0:02:29.42,0:02:30.58,Default,,0,0,0,,Màu bạn chọn quá đơn giản
+Dialogue: 0,0:02:30.58,0:02:31.98,Default,,0,0,0,,Màu tôi chọn là đơn giản
+Dialogue: 0,0:02:31.98,0:02:34.42,Default,,0,0,0,,Nhưng màu này có vẻ hơi không hợp không?
+Dialogue: 0,0:02:34.42,0:02:35.38,Default,,0,0,0,,Không hợp cái gì?
+Dialogue: 0,0:02:35.38,0:02:36.54,Default,,0,0,0,,Không phải chỉ là một đứa con trai sao?
+Dialogue: 0,0:02:36.78,0:02:37.66,Default,,0,0,0,,Nếu bạn không thích
+Dialogue: 0,0:02:37.66,0:02:38.66,Default,,0,0,0,,Cũng không đổi nữa, chỉ thích thôi
+Dialogue: 0,0:02:39.82,0:02:40.90,Default,,0,0,0,,Mặc cái này vào
+Dialogue: 0,0:02:41.78,0:02:42.54,Default,,0,0,0,,Tại sao?
+Dialogue: 0,0:02:42.54,0:02:43.70,Default,,0,0,0,,Hở quá
+Dialogue: 0,0:02:43.94,0:02:45.18,Default,,0,0,0,,Thật là quá đáng
+Dialogue: 0,0:02:45.54,0:02:47.54,Default,,0,0,0,,Bạn là vợ của nhà họ Dương
+Dialogue: 0,0:02:47.54,0:02:49.34,Default,,0,0,0,,Đại diện cho thể diện nhà họ Dương
+Dialogue: 0,0:02:49.34,0:02:50.66,Default,,0,0,0,,Phải trang trọng, bắt chước
+Dialogue: 0,0:02:50.66,0:02:51.50,Default,,0,0,0,,Đi mạo phạm
+Dialogue: 0,0:02:51.98,0:02:53.50,Default,,0,0,0,,Từ nhỏ đến lớn, màu sắc quý phái
+Dialogue: 0,0:02:53.50,0:02:54.66,Default,,0,0,0,,Đến cách ăn mặc
+Dialogue: 0,0:02:54.66,0:02:57.34,Default,,0,0,0,,Chỉ cần ý kiến của mình xung đột với ý kiến của mẹ anh ta
+Dialogue: 0,0:02:57.34,0:02:59.06,Default,,0,0,0,,Người đàn ông đó vĩnh viễn chỉ có ba chữ
+Dialogue: 0,0:02:59.06,0:02:59.70,Default,,0,0,0,,Nghe lời mẹ
+Dialogue: 0,0:02:59.70,0:03:02.30,Default,,0,0,0,,Anh ta chưa bao giờ đứng ở góc độ của nữ chính để suy nghĩ dù chỉ một chút
+Dialogue: 0,0:03:02.30,0:03:03.62,Default,,0,0,0,,Càng không bao giờ bênh vực cô ấy
+Dialogue: 0,0:03:03.62,0:03:04.66,Default,,0,0,0,,Trong gia đình này
+Dialogue: 0,0:03:04.66,0:03:05.94,Default,,0,0,0,,Cô ấy vĩnh viễn đứng cuối cùng
+Dialogue: 0,0:03:05.94,0:03:07.14,Default,,0,0,0,,Nuôi dạy con cái không phân biệt đúng sai
+Dialogue: 0,0:03:07.14,0:03:08.38,Default,,0,0,0,,Một người mù quáng nghe lời mẹ
+Dialogue: 0,0:03:08.38,0:03:09.62,Default,,0,0,0,,Một người đàn ông không có chủ kiến
+Dialogue: 0,0:03:09.62,0:03:10.82,Default,,0,0,0,,Chắc chắn không thể cho người phụ nữ
+Dialogue: 0,0:03:10.82,0:03:12.30,Default,,0,0,0,,Dù chỉ một chút cảm giác an toàn và sự tôn trọng
+Dialogue: 0,0:03:12.70,0:03:13.66,Default,,0,0,0,,Hôm nay Nguyệt
+Dialogue: 0,0:03:13.98,0:03:14.94,Default,,0,0,0,,Con định
+Dialogue: 0,0:03:14.94,0:03:16.66,Default,,0,0,0,,Khi nào thì nghỉ việc?
+Dialogue: 0,0:03:16.66,0:03:18.46,Default,,0,0,0,,Tại sao con phải nghỉ việc?
+Dialogue: 0,0:03:18.46,0:03:19.94,Default,,0,0,0,,Đàn ông lo việc ngoài
+Dialogue: 0,0:03:19.94,0:03:21.30,Default,,0,0,0,,Con cũng không có chủ kiến
+Dialogue: 0,0:03:21.30,0:03:23.50,Default,,0,0,0,,Con người mà, đã kết hôn
+Dialogue: 0,0:03:23.50,0:03:26.14,Default,,0,0,0,,Con phải sinh con, chăm sóc gia đình
+Dialogue: 0,0:03:26.14,0:03:29.30,Default,,0,0,0,,Công việc, sớm muộn gì cũng phải nghỉ
+Dialogue: 0,0:03:29.30,0:03:30.22,Default,,0,0,0,,Con thật sự đã làm
+Dialogue: 0,0:03:30.22,0:03:33.73,Default,,0,0,0,,Tôi chưa từng nghĩ
+Dialogue: 0,0:03:33.73,0:03:35.77,Default,,0,0,0,,Kết hôn phải từ chức
+Dialogue: 0,0:03:35.77,0:03:36.81,Default,,0,0,0,,Sao lại phải trả giá
+Dialogue: 0,0:03:36.81,0:03:38.85,Default,,0,0,0,,Tôi không thể kết hôn được.
+Dialogue: 0,0:03:38.85,0:03:41.25,Default,,0,0,0,,Mẹ chồng nói đàn ông lo việc ngoài, phụ nữ lo việc nhà.
+Dialogue: 0,0:03:41.25,0:03:43.41,Default,,0,0,0,,Nói trắng ra là tước đoạt sự độc lập kinh tế của phụ nữ.
+Dialogue: 0,0:03:43.41,0:03:44.77,Default,,0,0,0,,Bề ngoài là tôi nuôi cô.
+Dialogue: 0,0:03:44.77,0:03:47.09,Default,,0,0,0,,Thực chất là dùng việc nuôi gia đình để đổi lấy sự phục tùng của cô.
+Dialogue: 0,0:03:47.09,0:03:48.33,Default,,0,0,0,,Một khi cô không còn thu nhập,
+Dialogue: 0,0:03:48.33,0:03:49.57,Default,,0,0,0,,cô sẽ không còn tiếng nói.
+Dialogue: 0,0:03:49.57,0:03:50.57,Default,,0,0,0,,Cô bị giam cầm trong nhà,
+Dialogue: 0,0:03:50.57,0:03:52.09,Default,,0,0,0,,cô chỉ có thể xoay quanh họ.
+Dialogue: 0,0:03:52.09,0:03:52.97,Default,,0,0,0,,Đây không phải là phân công lao động.
+Dialogue: 0,0:03:52.97,0:03:55.69,Default,,0,0,0,,Đây là tước đoạt hoàn toàn quyền lựa chọn của một người phụ nữ.
+Dialogue: 0,0:03:55.69,0:03:57.37,Default,,0,0,0,,Các bạn đã vất vả rồi.
+Dialogue: 0,0:03:57.37,0:03:59.33,Default,,0,0,0,,Các bạn đã chuẩn bị mọi thứ rồi.
+Dialogue: 0,0:03:59.33,0:04:01.73,Default,,0,0,0,,Nhưng các bạn quá chủ quan, quá đơn phương.
+Dialogue: 0,0:04:01.73,0:04:02.73,Default,,0,0,0,,Bởi vì trong lòng các bạn,
+Dialogue: 0,0:04:02.73,0:04:04.13,Default,,0,0,0,,hoàn toàn không coi đó là nhà của tôi.
+Dialogue: 0,0:04:04.13,0:04:05.53,Default,,0,0,0,,Đó là nhà của các bạn.
+Dialogue: 0,0:04:05.53,0:04:07.73,Default,,0,0,0,,Nữ chính một câu nói đã vạch trần mâu thuẫn cốt lõi.
+Dialogue: 0,0:04:07.73,0:04:10.09,Default,,0,0,0,,Mọi sự chuẩn bị của nhà trai đều dựa trên sở thích cá nhân,
+Dialogue: 0,0:04:10.09,0:04:11.77,Default,,0,0,0,,hoàn toàn bỏ qua cảm xúc của nữ chính.
+Dialogue: 0,0:04:11.77,0:04:14.57,Default,,0,0,0,,Từ gốc rễ đã không coi nữ chính là chủ nhân của gia đình nhỏ,
+Dialogue: 0,0:04:14.57,0:04:16.17,Default,,0,0,0,,mà là người ngoài đang chờ chuyển đến.
+Dialogue: 0,0:04:16.17,0:04:17.93,Default,,0,0,0,,Trong một cuộc hôn nhân không có cảm giác thuộc về,
+Dialogue: 0,0:04:17.93,0:04:19.73,Default,,0,0,0,,nhà tốt đến mấy cũng không giữ được người.
+Dialogue: 0,0:04:19.73,0:04:20.77,Default,,0,0,0,,Hôm nay Viễn,
+Dialogue: 0,0:04:20.77,0:04:21.77,Default,,0,0,0,,anh thừa nhận
+Dialogue: 0,0:04:21.77,0:04:23.57,Default,,0,0,0,,trước đây chúng ta đã không xem xét cảm xúc của em,
+Dialogue: 0,0:04:23.57,0:04:25.37,Default,,0,0,0,,không tôn trọng ý kiến của em.
+Dialogue: 0,0:04:25.37,0:04:27.97,Default,,0,0,0,,Nhưng em không thể vì những chuyện vặt vãnh này
+Dialogue: 0,0:04:27.97,0:04:29.17,Default,,0,0,0,,mà chúng ta chia tay được.
+Dialogue: 0,0:04:29.17,0:04:31.37,Default,,0,0,0,,Có ý kiến thì cứ nói.
+Dialogue: 0,0:04:31.37,0:04:34.17,Default,,0,0,0,,Có cần phải vì những chuyện này mà sau đó lật lọng không?
+Dialogue: 0,0:04:34.17,0:04:35.37,Default,,0,0,0,,Có ý nghĩa gì không?
+Dialogue: 0,0:04:35.37,0:04:38.17,Default,,0,0,0,,Người đàn ông đã nhẹ nhàng làm giảm nhẹ tất cả mâu thuẫn,
+Dialogue: 0,0:04:38.17,0:04:40.37,Default,,0,0,0,,cho rằng đây đều là chuyện nhỏ không đáng để chia tay.
+Dialogue: 0,0:04:40.37,0:04:41.77,Default,,0,0,0,,Tuy nhiên, điều anh ta không biết là,
+Dialogue: 0,0:04:41.77,0:04:44.17,Default,,0,0,0,,điều làm sụp đổ một mối quan hệ chưa bao giờ là một sự kiện lớn nào đó,
+Dialogue: 0,0:04:44.17,0:04:45.77,Default,,0,0,0,,mà là vô số chuyện nhỏ không được coi trọng,
+Dialogue: 0,0:04:45.77,0:04:47.17,Default,,0,0,0,,không được tôn trọng,
+Dialogue: 0,0:04:47.17,0:04:49.17,Default,,0,0,0,,từng chút một làm cạn kiệt tất cả hy vọng.
+Dialogue: 0,0:04:49.17,0:04:50.77,Default,,0,0,0,,Tôi đã nói ý kiến của mình rồi mà?
+Dialogue: 0,0:04:50.77,0:04:51.97,Default,,0,0,0,,Nhưng có ích gì không?
+Dialogue: 0,0:04:51.97,0:04:53.37,Default,,0,0,0,,Tôi thực sự rất sợ hãi,
+Dialogue: 0,0:04:53.37,0:04:55.17,Default,,0,0,0,,vì các người chưa bao giờ tôn trọng tôi.
+Dialogue: 0,0:04:55.17,0:04:56.57,Default,,0,0,0,,Tôi giống như những món đồ nội thất đó,
+Dialogue: 0,0:04:56.57,0:04:58.57,Default,,0,0,0,,các người muốn đặt tôi ở đâu thì đặt ở đó.
+Dialogue: 0,0:04:58.57,0:04:59.97,Default,,0,0,0,,Chưa kết hôn mà,
+Dialogue: 0,0:04:59.97,0:05:01.57,Default,,0,0,0,,tôi đã không thấy tương lai rồi.
+Dialogue: 0,0:05:01.57,0:05:02.97,Default,,0,0,0,,Tôi chỉ có thể chọn thuận theo.
+Dialogue: 0,0:05:02.97,0:05:04.97,Default,,0,0,0,,Điều đáng sợ nhất trong hôn nhân không phải là nghèo khó,
+Dialogue: 0,0:05:04.97,0:05:06.17,Default,,0,0,0,,mà là mất đi bản thân.
+Dialogue: 0,0:05:06.17,0:05:07.77,Default,,0,0,0,,Một gia đình chồng coi bạn như đồ nội thất,
+Dialogue: 0,0:05:07.77,0:05:09.17,Default,,0,0,0,,một người đàn ông luôn nghe lời mẹ,
+Dialogue: 0,0:05:09.17,0:05:10.97,Default,,0,0,0,,ngay cả khi rời đi mới là lối thoát duy nhất.
+Dialogue: 0,0:05:10.97,0:05:12.97,Default,,0,0,0,,Nhiều người nói nữ chính làm quá,
+Dialogue: 0,0:05:12.97,0:05:14.97,Default,,0,0,0,,nhưng nếu bạn thực sự đứng ở vị trí của cô ấy,
+Dialogue: 0,0:05:14.97,0:05:15.77,Default,,0,0,0,,bạn sẽ thấy,
+Dialogue: 0,0:05:15.77,0:05:16.97,Default,,0,0,0,,cô ấy không phải đang lựa chọn,
+Dialogue: 0,0:05:16.97,0:05:17.77,Default,,0,0,0,,mà là tự cứu mình.
+Dialogue: 0,0:05:17.77,0:05:19.37,Default,,0,0,0,,Đại sư vì bạn coi thường
+Dialogue: 0,0:05:19.37,0:05:21.17,Default,,0,0,0,,Tương lai của tôi sẽ tốt đẹp hơn
+Dialogue: 0,0:05:21.17,0:05:22.17,Default,,0,0,0,,Đó không phải là tương lai của tôi
+Dialogue: 0,0:05:22.17,0:05:23.77,Default,,0,0,0,,Đó là tương lai của anh và bố mẹ anh
+Dialogue: 0,0:05:23.77,0:05:25.57,Default,,0,0,0,,Trong ngôi nhà đó của mẹ anh
+Dialogue: 0,0:05:25.57,0:05:26.97,Default,,0,0,0,,Tôi chỉ là một người bình thường
+Dialogue: 0,0:05:26.97,0:05:27.57,Default,,0,0,0,,Tôi không dám nghĩ
+Dialogue: 0,0:05:27.57,0:05:29.17,Default,,0,0,0,,Nếu tôi thực sự kết hôn với anh
+Dialogue: 0,0:05:29.17,0:05:30.57,Default,,0,0,0,,Không chỉ phong cách trang trí nhà cửa
+Dialogue: 0,0:05:30.57,0:05:31.57,Default,,0,0,0,,Tôi không thể quyết định
+Dialogue: 0,0:05:31.57,0:05:33.77,Default,,0,0,0,,Đồ nội thất, ghế sofa đặt ở đâu
+Dialogue: 0,0:05:33.77,0:05:34.97,Default,,0,0,0,,Tôi cũng không thể quyết định
+Dialogue: 0,0:05:34.97,0:05:35.77,Default,,0,0,0,,Màu sắc của chúng
+Dialogue: 0,0:05:35.77,0:05:36.97,Default,,0,0,0,,Tôi cũng không thể quyết định
+Dialogue: 0,0:05:36.97,0:05:38.97,Default,,0,0,0,,Váy cưới tôi mặc khi chúng ta kết hôn
+Dialogue: 0,0:05:38.97,0:05:40.57,Default,,0,0,0,,Tôi vẫn không thể quyết định
+Dialogue: 0,0:05:40.57,0:05:41.77,Default,,0,0,0,,Đám cưới tổ chức ở đâu
+Dialogue: 0,0:05:41.77,0:05:43.97,Default,,0,0,0,,Mời ai, quy mô thế nào
+Dialogue: 0,0:05:43.97,0:05:45.17,Default,,0,0,0,,Tôi càng không thể quyết định
+Dialogue: 0,0:05:45.17,0:05:46.77,Default,,0,0,0,,Nhưng anh quên rồi sao?
+Dialogue: 0,0:05:46.77,0:05:48.57,Default,,0,0,0,,Tôi cũng có sở thích của mình
+Dialogue: 0,0:05:48.57,0:05:50.37,Default,,0,0,0,,Tôi là một người có nhân cách
+Dialogue: 0,0:05:50.37,0:05:52.17,Default,,0,0,0,,Đây không phải là cuộc hôn nhân tôi muốn
+Dialogue: 0,0:05:52.17,0:05:53.17,Default,,0,0,0,,Thấy chưa?
+Dialogue: 0,0:05:53.17,0:05:54.97,Default,,0,0,0,,Nữ chính theo đuổi quyền tự chủ lựa chọn
+Dialogue: 0,0:05:54.97,0:05:56.97,Default,,0,0,0,,Nhưng lại bị nam chính gán mác là người hay cằn nhằn
+Dialogue: 0,0:05:56.97,0:05:58.97,Default,,0,0,0,,Anh ta không phải là không hiểu nỗi ấm ức của nữ chính
+Dialogue: 0,0:05:58.97,0:06:00.77,Default,,0,0,0,,Chỉ là từ tận đáy lòng không muốn nhượng bộ cô ấy
+Dialogue: 0,0:06:00.77,0:06:02.77,Default,,0,0,0,,Câu nói
+Dialogue: 0,0:06:02.77,0:06:04.37,Default,,0,0,0,,Anh không xứng đáng có suy nghĩ của riêng mình
+Dialogue: 0,0:06:04.37,0:06:07.57,Default,,0,0,0,,Hãy nhớ, khi một người nói rằng nhu cầu chính đáng của bạn là cằn nhằn
+Dialogue: 0,0:06:07.57,0:06:08.97,Default,,0,0,0,,Bà ấy không đánh giá con
+Dialogue: 0,0:06:08.97,0:06:11.37,Default,,0,0,0,,mà là phủ nhận giá trị tồn tại của con.
+Dialogue: 0,0:06:11.37,0:06:14.97,Default,,0,0,0,,Hôm nay, con quá coi trọng tư cách của mình.
+Dialogue: 0,0:06:14.97,0:06:17.97,Default,,0,0,0,,Sở thích gì, nhân cách gì?
+Dialogue: 0,0:06:17.97,0:06:19.97,Default,,0,0,0,,Con dâu này còn chưa về nhà chồng,
+Dialogue: 0,0:06:19.97,0:06:22.97,Default,,0,0,0,,mà đã muốn có tiếng nói trong nhà rồi sao?
+Dialogue: 0,0:06:22.97,0:06:25.97,Default,,0,0,0,,Con dâu ngàn năm mới thành mẹ chồng.
+Dialogue: 0,0:06:25.97,0:06:27.97,Default,,0,0,0,,Con dâu này còn chưa làm,
+Dialogue: 0,0:06:27.97,0:06:30.97,Default,,0,0,0,,mà đã muốn cả nhà chúng tôi phải nhìn sắc mặt con sao?
+Dialogue: 0,0:06:30.97,0:06:33.97,Default,,0,0,0,,Con cũng không nhìn lại điều kiện của mình đi.
+Dialogue: 0,0:06:33.97,0:06:35.97,Default,,0,0,0,,Người đã gần 40 rồi,
+Dialogue: 0,0:06:35.97,0:06:37.97,Default,,0,0,0,,chỉ có con trai tôi
+Dialogue: 0,0:06:37.97,0:06:40.97,Default,,0,0,0,,mới muốn con thôi.
+Dialogue: 0,0:06:40.97,0:06:43.97,Default,,0,0,0,,Những lời này đã hoàn toàn bộc lộ quan điểm về hôn nhân của mẹ chồng tương lai.
+Dialogue: 0,0:06:43.97,0:06:46.97,Default,,0,0,0,,Chính vì bà ấy từng bị áp bức khi làm dâu,
+Dialogue: 0,0:06:46.97,0:06:48.45,Default,,0,0,0,,bây giờ cuối cùng cũng thành mẹ chồng,
+Dialogue: 0,0:06:48.45,0:06:49.97,Default,,0,0,0,,nên bà ấy muốn áp bức thế hệ sau.
+Dialogue: 0,0:06:49.97,0:06:51.33,Default,,0,0,0,,Tâm lý méo mó kiểu "tôi đã chịu khổ,
+Dialogue: 0,0:06:51.33,0:06:53.21,Default,,0,0,0,,cô cũng phải chịu một lần"
+Dialogue: 0,0:06:53.21,0:06:55.01,Default,,0,0,0,,chính là điển hình của việc kẻ yếu hại nhau.
+Dialogue: 0,0:06:55.01,0:06:56.85,Default,,0,0,0,,Thử hỏi, khi con gái bạn bị mẹ chồng tương lai
+Dialogue: 0,0:06:56.85,0:06:58.25,Default,,0,0,0,,sỉ nhục và chèn ép như vậy,
+Dialogue: 0,0:06:58.25,0:06:59.09,Default,,0,0,0,,bạn sẽ làm gì?
+Dialogue: 0,0:06:59.09,0:07:00.29,Default,,0,0,0,,Tiếp theo, chúng ta hãy xem
+Dialogue: 0,0:07:00.29,0:07:02.49,Default,,0,0,0,,cảnh người cha này bảo vệ con gái như trong sách giáo khoa.
+Dialogue: 0,0:07:02.49,0:07:03.69,Default,,0,0,0,,Gia Lệ Ân,
+Dialogue: 0,0:07:03.69,0:07:10.18,Default,,0,0,0,,con gái tôi có không lấy chồng cả đời,
+Dialogue: 0,0:07:10.18,0:07:11.94,Default,,0,0,0,,tôi và mẹ nó cũng nuôi được.
+Dialogue: 0,0:07:11.94,0:07:14.42,Default,,0,0,0,,Người khác nói nó bây giờ không muốn gả vào nhà chồng,
+Dialogue: 0,0:07:14.42,0:07:15.62,Default,,0,0,0,,nó chính là muốn.
+Dialogue: 0,0:07:15.62,0:07:16.94,Default,,0,0,0,,Tôi không đồng ý
+Dialogue: 0,0:07:16.94,0:07:18.94,Default,,0,0,0,,Tôi sẽ không bao giờ gả con gái cho nhà anh
+Dialogue: 0,0:07:18.94,0:07:20.02,Default,,0,0,0,,Được rồi
+Dialogue: 0,0:07:20.02,0:07:23.26,Default,,0,0,0,,Sau khi tận mắt chứng kiến con gái mình bị gia đình đối phương chèn ép trong chuyện hôn sự,
+Dialogue: 0,0:07:23.26,0:07:25.34,Default,,0,0,0,,người cha không còn giữ được sự khách sáo lịch sự nữa.
+Dialogue: 0,0:07:25.34,0:07:28.34,Default,,0,0,0,,Là một người cha, ông có thể chấp nhận con gái mình lấy một người bình thường,
+Dialogue: 0,0:07:28.34,0:07:30.34,Default,,0,0,0,,nhưng tuyệt đối không thể chấp nhận con gái mình phải chịu thiệt thòi.
+Dialogue: 0,0:07:30.34,0:07:32.18,Default,,0,0,0,,Ông có thể chịu đựng điều kiện của đối phương bình thường,
+Dialogue: 0,0:07:32.18,0:07:35.02,Default,,0,0,0,,nhưng tuyệt đối không thể chịu đựng đối phương không coi con gái mình ra gì.
+Dialogue: 0,0:07:35.02,0:07:36.94,Default,,0,0,0,,Câu nói của ông ấy, “Tôi và mẹ nó nuôi nó lớn khôn”,
+Dialogue: 0,0:07:36.94,0:07:38.90,Default,,0,0,0,,chính là sự ủng hộ lớn nhất mà cha mẹ dành cho con gái.
+Dialogue: 0,0:07:38.90,0:07:40.70,Default,,0,0,0,,Chính vì có cha mẹ ở phía sau ủng hộ,
+Dialogue: 0,0:07:40.70,0:07:43.38,Default,,0,0,0,,nên cô ấy mới không cần phải thỏa hiệp hay nhượng bộ vì hôn nhân.
+Dialogue: 0,0:07:43.38,0:07:44.62,Default,,0,0,0,,Một cuộc hôn nhân thực sự tốt đẹp
+Dialogue: 0,0:07:44.62,0:07:46.10,Default,,0,0,0,,cần có sự đối xử tốt đẹp từ cả hai phía,
+Dialogue: 0,0:07:46.10,0:07:48.58,Default,,0,0,0,,bao dung lẫn nhau chứ không phải là sự hy sinh đơn phương.
+Dialogue: 0,0:07:48.58,0:07:51.06,Default,,0,0,0,,Hôn nhân chất lượng thấp sẽ không bao giờ bằng việc độc thân một cách đàng hoàng.
+Dialogue: 0,0:07:51.06,0:07:52.94,Default,,0,0,0,,Cuối cùng, chúc mọi người xử lý mọi việc thấu đáo.
+Dialogue: 0,0:07:52.94,0:07:53.90,Default,,0,0,0,,Tôi là Dong Shigu.
+Dialogue: 0,0:07:53.90,0:07:54.86,Default,,0,0,0,,Hẹn gặp lại các bạn trong số tiếp theo.

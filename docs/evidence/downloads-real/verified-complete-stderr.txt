@@ -1,0 +1,82 @@
+ffmpeg version 8.1.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
+  built with gcc 15.2.0 (Rev13, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-cairo --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-openal --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      60. 26.101 / 60. 26.101
+  libavcodec     62. 28.101 / 62. 28.101
+  libavformat    62. 12.101 / 62. 12.101
+  libavdevice    62.  3.101 / 62.  3.101
+  libavfilter    11. 14.101 / 11. 14.101
+  libswscale      9.  5.101 /  9.  5.101
+  libswresample   6.  3.101 /  6.  3.101
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'C:\Users\khucv\Downloads\SaveTik.io_7663461279209671999.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    comment         : vid:v0d00fg10000d9d15rvog65jhehkbgp0
+    encoder         : Lavf58.76.100
+  Duration: 00:07:54.89, start: 0.000000, bitrate: 546 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 768x576 [SAR 1:1 DAR 4:3], 411 kb/s, 25 fps, 25 tbr, 12800 tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+  Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 128 kb/s (default)
+    Metadata:
+      handler_name    : SoundHandler
+[aist#1:0/pcm_s16le @ 000001a914660b80] Guessed Channel Layout: mono
+Input #1, wav, from 'D:\ToolVideo\docs\evidence\downloads-real\speech-track-fitted.wav':
+  Duration: 00:07:54.89, bitrate: 768 kb/s
+  Stream #1:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 48000 Hz, mono, s16, 768 kb/s
+[Parsed_ass_1 @ 000001a91271f000] libass API version: 0x1704000
+[Parsed_ass_1 @ 000001a91271f000] libass source: commit: 0.17.4-27-g1cbba0a8818c83495114b3c2b5730410eecbdb2c
+[Parsed_ass_1 @ 000001a91271f000] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.2.0 (COMPLEX)
+[Parsed_ass_1 @ 000001a91271f000] Using font provider directwrite (with GDI)
+[Parsed_ass_1 @ 000001a91271f000] Added subtitle file: 'D:/ToolVideo/docs/evidence/downloads-real/subtitles-with-box.ass' (2 styles, 260 events)
+Stream mapping:
+  Stream #0:1 (aac) -> volume:default
+  Stream #1:0 (pcm_s16le) -> volume:default
+  Stream #0:0 -> #0:0 (h264 (native) -> h264 (libx264))
+  amix:default -> Stream #0:1 (aac)
+[Parsed_ass_1 @ 000001a914c0e580] libass API version: 0x1704000
+[Parsed_ass_1 @ 000001a914c0e580] libass source: commit: 0.17.4-27-g1cbba0a8818c83495114b3c2b5730410eecbdb2c
+[Parsed_ass_1 @ 000001a914c0e580] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.2.0 (COMPLEX)
+[Parsed_ass_1 @ 000001a914c0e580] Using font provider directwrite (with GDI)
+[Parsed_ass_1 @ 000001a914c0e580] Added subtitle file: 'D:/ToolVideo/docs/evidence/downloads-real/subtitles-with-box.ass' (2 styles, 260 events)
+[Parsed_ass_1 @ 000001a914c0e580] fontselect: (Arial, 700, 0) -> Arial-BoldMT, 0, Arial-BoldMT
+[libx264 @ 000001a912770880] using SAR=1/1
+[libx264 @ 000001a912770880] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+[libx264 @ 000001a912770880] profile High, level 3.1, 4:2:0, 8-bit
+[libx264 @ 000001a912770880] 264 - core 165 r3223 0480cb0 - H.264/MPEG-4 AVC codec - Copyleft 2003-2025 - http://www.videolan.org/x264.html - options: cabac=1 ref=1 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=2 psy=1 psy_rd=1.00:0.00 mixed_ref=0 me_range=16 chroma_me=1 trellis=0 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=0 threads=18 lookahead_threads=4 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=1 keyint=250 keyint_min=25 scenecut=40 intra_refresh=0 rc_lookahead=10 rc=crf mbtree=1 crf=20.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+Output #0, mp4, to 'D:\ToolVideo\docs\evidence\downloads-real\verified-10s-mask-voice-sub.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    comment         : vid:v0d00fg10000d9d15rvog65jhehkbgp0
+    encoder         : Lavf62.12.101
+  Stream #0:0(und): Video: h264 (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 768x576 [SAR 1:1 DAR 4:3], q=2-31, 25 fps, 12800 tbn (default)
+    Metadata:
+      encoder         : Lavc62.28.101 libx264
+      handler_name    : VideoHandler
+    Side data:
+      CPB properties: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
+  Stream #0:1: Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 192 kb/s
+    Metadata:
+      encoder         : Lavc62.28.101 aac
+[out#0/mp4 @ 000001a912720640] video:943KiB audio:238KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.812059%
+frame=  250 fps=0.0 q=-1.0 Lsize=    1191KiB time=00:00:09.92 bitrate= 983.4kbits/s speed=20.4x elapsed=0:00:00.48    
+[libx264 @ 000001a912770880] frame I:2     Avg QP:19.66  size: 18208
+[libx264 @ 000001a912770880] frame P:79    Avg QP:20.01  size:  7400
+[libx264 @ 000001a912770880] frame B:169   Avg QP:21.53  size:  2035
+[libx264 @ 000001a912770880] consecutive B-frames:  4.4% 14.4%  6.0% 75.2%
+[libx264 @ 000001a912770880] mb I  I16..4: 18.0% 57.0% 24.9%
+[libx264 @ 000001a912770880] mb P  I16..4:  7.5% 23.6%  4.3%  P16..4: 18.5%  9.7%  3.8%  0.0%  0.0%    skip:32.6%
+[libx264 @ 000001a912770880] mb B  I16..4:  1.3%  3.7%  0.2%  B16..8: 16.9%  5.6%  0.4%  direct: 3.7%  skip:68.1%  L0:43.6% L1:46.7% BI: 9.7%
+[libx264 @ 000001a912770880] 8x8 transform intra:67.1% inter:41.5%
+[libx264 @ 000001a912770880] coded y,uvDC,uvAC intra: 54.7% 49.7% 8.5% inter: 4.0% 8.3% 0.2%
+[libx264 @ 000001a912770880] i16 v,h,dc,p: 57% 21% 10% 12%
+[libx264 @ 000001a912770880] i8 v,h,dc,ddl,ddr,vr,hd,vl,hu: 48% 13% 11%  3%  5%  7%  4%  5%  4%
+[libx264 @ 000001a912770880] i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 35% 21% 10%  5%  7%  7%  6%  6%  3%
+[libx264 @ 000001a912770880] i8c dc,h,v,p: 44% 18% 31%  7%
+[libx264 @ 000001a912770880] Weighted P-Frames: Y:0.0% UV:0.0%
+[libx264 @ 000001a912770880] kb/s:771.88
+[aac @ 000001a91465ae80] Qavg: 1503.255

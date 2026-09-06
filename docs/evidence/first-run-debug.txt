@@ -1,0 +1,12 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.12, pytest-9.1.1, pluggy-1.6.0 -- D:\ToolVideo\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.10.3 -- Qt runtime 6.10.3 -- Qt compiled 6.10.3
+rootdir: D:\ToolVideo
+configfile: pyproject.toml
+plugins: anyio-4.15.0, qt-4.5.0
+collecting ... collected 23 items / 22 deselected / 1 selected
+
+tests/test_v2_checkpoint.py::test_first_run_once_restart_silent_and_failure_banner PASSED [100%]
+
+====================== 1 passed, 22 deselected in 0.73s =======================

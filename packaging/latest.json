@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "published_at": "2026-09-04T00:00:00Z",
+  "installer_url": "https://github.com/vanhkhuc/vk-dub-studio/releases/download/v1.0.0/VK-Dub-Studio-Setup-x64.exe",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "file_size_bytes": 104857600,
+  "changelog": [
+    "Khởi tạo phiên bản phát hành chính thức VK Dub Studio 1.0.0",
+    "Bóc băng giọng nói offline tốc độ cao với Whisper",
+    "Dịch thuật ngữ cảnh thông minh tiếng Việt qua Gemini",
+    "Duyệt kịch bản an toàn (Script Review Gate)",
+    "Thuyết minh giọng đọc Vbee TTS chuẩn API chính thức",
+    "Kiểu dáng phụ đề chuyên nghiệp (Presets & Preview live)",
+    "Hệ thống vùng che video (Masking delogo / drawbox)",
+    "Xuất video hoàn chỉnh với ducking âm thanh gốc an toàn"
+  ]
+}\n

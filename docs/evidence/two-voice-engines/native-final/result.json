@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "platform": "windows",
+  "checks": [
+    "real CapCut preview before approval",
+    "real CapCut generation only after approval",
+    "repeat generation reuses verified audio cache",
+    "switch to VieNeu persists and creates real offline preview"
+  ],
+  "ticks": 211,
+  "capcut-preview": {
+    "seconds": 4.394666666666667,
+    "rate": 48000
+  },
+  "vieneu-preview": {
+    "seconds": 5.354041666666666,
+    "rate": 48000
+  },
+  "elapsed": 13.44,
+  "capcut_synthesis_calls": 2
+}

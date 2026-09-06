@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "filter": "delogo=x=115:y=389:w=730:h=97:show=0",
+  "output": "D:\\ToolVideo\\docs\\evidence\\erase\\erase-render.mp4",
+  "probe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 960,
+        "height": 540
+      },
+      {
+        "codec_name": "aac"
+      }
+    ],
+    "format": {
+      "duration": "7.880000"
+    }
+  }
+}

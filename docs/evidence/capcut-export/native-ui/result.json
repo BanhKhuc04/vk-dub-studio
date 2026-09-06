@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "platform": "windows",
+  "ticks": 21,
+  "draft": "D:\\ToolVideo\\docs\\evidence\\capcut-export\\native-ui\\drafts\\VKDub 20260905-170224-B6E7C71E",
+  "elapsed_seconds": 1.38,
+  "steps": [
+    "✓ Video  •  BƯỚC 1",
+    "○ Bóc băng  •  BƯỚC 2",
+    "○ Dịch  •  BƯỚC 3",
+    "✓ Chờ duyệt  •  BƯỚC 4",
+    "✓ Voice  •  BƯỚC 5",
+    "✓ CapCut  •  BƯỚC 6"
+  ],
+  "log": [
+    "17:02:23  +00:00  Sẵn sàng — VK Dub Studio 2.0.",
+    "17:02:23  +00:00  Đã kiểm tra công cụ video — sẵn sàng.",
+    "17:02:24  +00:01  Bắt đầu xuất CapCut: đang kiểm tra video, voice và caption…",
+    "17:02:25  +00:02  Đã tạo project CapCut: 1 video, 1 voice tiếng Việt, 1 caption.",
+    "17:02:25  +00:02  Đã áp dụng 1 vùng xóa chữ vào video trong CapCut."
+  ]
+}

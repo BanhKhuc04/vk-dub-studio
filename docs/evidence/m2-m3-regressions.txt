@@ -1,0 +1,62 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.12, pytest-9.1.1, pluggy-1.6.0 -- D:\ToolVideo\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.10.3 -- Qt runtime 6.10.3 -- Qt compiled 6.10.3
+rootdir: D:\ToolVideo
+configfile: pyproject.toml
+plugins: anyio-4.15.0, qt-4.5.0
+collecting ... collected 23 items
+
+tests/test_v2_checkpoint.py::test_schema_five_preserves_legacy_data_without_rewriting[vbee] PASSED [  4%]
+tests/test_v2_checkpoint.py::test_schema_five_preserves_legacy_data_without_rewriting[elevenlabs] PASSED [  8%]
+tests/test_v2_checkpoint.py::test_invalid_settings_preserve_original_and_allow_repair[voice_speed-bad] PASSED [ 13%]
+tests/test_v2_checkpoint.py::test_invalid_settings_preserve_original_and_allow_repair[voice_speed-nan] PASSED [ 17%]
+tests/test_v2_checkpoint.py::test_invalid_settings_preserve_original_and_allow_repair[wizard_completed-false] PASSED [ 21%]
+tests/test_v2_checkpoint.py::test_invalid_settings_preserve_original_and_allow_repair[tts_backend-vbee] PASSED [ 26%]
+tests/test_v2_checkpoint.py::test_invalid_settings_preserve_original_and_allow_repair[workspace_root-value4] PASSED [ 30%]
+tests/test_v2_checkpoint.py::test_invalid_settings_preserve_original_and_allow_repair[gemini_model-../../bad] PASSED [ 34%]
+tests/test_v2_checkpoint.py::test_invalid_settings_preserve_original_and_allow_repair[auto_update-1] PASSED [ 39%]
+tests/test_v2_checkpoint.py::test_workspace_is_used_and_preferences_survive PASSED [ 43%]
+tests/test_v2_checkpoint.py::test_gemini_errors_are_actionable_and_never_echo_secrets[400] PASSED [ 47%]
+tests/test_v2_checkpoint.py::test_gemini_errors_are_actionable_and_never_echo_secrets[401] PASSED [ 52%]
+tests/test_v2_checkpoint.py::test_gemini_errors_are_actionable_and_never_echo_secrets[403] PASSED [ 56%]
+tests/test_v2_checkpoint.py::test_gemini_errors_are_actionable_and_never_echo_secrets[404] PASSED [ 60%]
+tests/test_v2_checkpoint.py::test_gemini_errors_are_actionable_and_never_echo_secrets[429] PASSED [ 65%]
+tests/test_v2_checkpoint.py::test_gemini_errors_are_actionable_and_never_echo_secrets[500] PASSED [ 69%]
+tests/test_v2_checkpoint.py::test_gemini_checks_selected_model_header_timeout_and_structure PASSED [ 73%]
+tests/test_v2_checkpoint.py::test_directory_probes_never_overwrite_existing_files PASSED [ 78%]
+tests/test_v2_checkpoint.py::test_background_check_keeps_qt_responsive PASSED [ 82%]
+tests/test_v2_checkpoint.py::test_shell_applies_defaults_and_never_calls_legacy PASSED [ 86%]
+Timeout (0:00:15)!
+Thread 0x00007b7c (most recent call first):
+  File "D:\ToolVideo\src\vkdub\ui\main_window.py", line 527 in _confirm_discard
+  File "D:\ToolVideo\src\vkdub\ui\main_window.py", line 733 in closeEvent
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytestqt\qtbot.py", line 808 in _close_widgets
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytestqt\plugin.py", line 203 in pytest_runtest_teardown
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 116 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 250 in <lambda>
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 361 in from_call
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 249 in call_and_report
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 144 in runtestprotocol
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 118 in pytest_runtest_protocol
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 408 in pytest_runtestloop
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 384 in _main
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 330 in wrap_session
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 377 in pytest_cmdline_main
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\config\__init__.py", line 229 in _main
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\config\__init__.py", line 253 in _console_main
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytest\__main__.py", line 9 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 198 in _run_module_as_main
+tests/test_v2_checkpoint.py::test_primary_cta_single_dispatch_and_explicit_review PASSED [ 91%]

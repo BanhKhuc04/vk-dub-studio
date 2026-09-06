@@ -1,0 +1,18 @@
+{
+  "app_version": "2.0.0",
+  "checks": [
+    "✓ Branded 2.0 Shell with version v2.0.0",
+    "✓ HealthBanner widget integrated in MainWindow",
+    "✓ Legacy TTS cloud controls hidden from main view",
+    "✓ '+ Làm mờ' button present on video preview toolbar",
+    "✓ Dynamic CTA properly disabled when no video selected",
+    "✓ Dynamic CTA updates to '🚀 BẮT ĐẦU XỬ LÝ' when video present",
+    "✓ Dynamic CTA updates to '✓ DUYỆT & TẠO VOICE' for review",
+    "✓ 6-stage status pipeline indicators functioning",
+    "✓ CapCut destination folder display integrated",
+    "✓ Settings Dialog 2.0 verified with 6 tabs: ['Chung', 'AI', 'Voice', 'CapCut', 'Cập nhật', 'Nâng cao']",
+    "✓ SetupWizardDialog 5-step flow verified"
+  ],
+  "passed": true,
+  "errors": []
+}

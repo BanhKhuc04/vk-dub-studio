@@ -1,0 +1,224 @@
+F.F....................................FF..................F....F....... [ 80%]
+..................                                                       [100%]
+================================== FAILURES ===================================
+__________________ test_roundtrip_unicode_and_relative_paths __________________
+
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_roundtrip_unicode_and_rel0')
+
+    def test_roundtrip_unicode_and_relative_paths(tmp_path):
+        project = Project(video_path=tmp_path / "Tiếng Việt.mp4", output_directory=tmp_path / "Xuất")
+        target = tmp_path / "demo.vkdub"
+        save_project(project, target)
+        data = json.loads(target.read_text(encoding="utf-8"))
+        assert data["video_path"] == "Tiếng Việt.mp4"
+        assert data["script_review"]["approved"] is False
+>       assert data["voice"]["display_name"] == "HN - Ngọc Huyền"
+E       AssertionError: assert 'Chưa chọn giọng' == 'HN - Ngọc Huyền'
+E         
+E         - HN - Ngọc Huyền
+E         + Chưa chọn giọng
+
+tests\test_project.py:18: AssertionError
+____________ test_reject_invalid_or_unsupported_projects[change0] _____________
+
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_reject_invalid_or_unsuppo0')
+change = {'schema_version': 6}
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            {"schema_version": 6},
+            {"schema_version": True},
+            {"project_id": "bad"},
+            {"video_path": 42},
+            {"video_path": "bad.mov"},
+            {"target_language": []},
+            {"subtitles": [{"text": "preserve me"}]},
+            {"api_key": "do-not-store"},
+            {"script_review": {"approved": True}},
+            {"voice": {"speed": 1.2}},
+        ],
+    )
+    def test_reject_invalid_or_unsupported_projects(tmp_path, change):
+        target = tmp_path / "invalid.vkdub"
+        save_project(Project(), target)
+        data = json.loads(target.read_text(encoding="utf-8"))
+        data.update(change)
+        target.write_text(json.dumps(data), encoding="utf-8")
+        before = target.read_bytes()
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests\test_project.py:53: Failed
+______________________ test_save_transcript_and_settings ______________________
+
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_save_transcript_and_setti0')
+transcript = Transcript(segments=(SubtitleSegment(id=1, start=0.2, end=1.9, text='Hello world.'), SubtitleSegment(id=2, start=2.0, ...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', cache_key='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+
+    def test_save_transcript_and_settings(tmp_path, transcript):
+        project = Project(
+            video_path=tmp_path / "speech.mp4",
+            transcript=transcript,
+            transcription_settings=TranscriptionSettings("tiny", "cpu"),
+        )
+        target = tmp_path / "transcript.vkdub"
+        save_project(project, target)
+        assert load_project(target) == project
+        data = json.loads(target.read_text(encoding="utf-8"))
+>       assert data["schema_version"] == 5
+E       assert 6 == 5
+
+tests\test_transcript.py:91: AssertionError
+______________ test_migrate_schema_one_without_modifying_source _______________
+
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_migrate_schema_one_withou0')
+
+    def test_migrate_schema_one_without_modifying_source(tmp_path):
+        target = tmp_path / "legacy.vkdub"
+        save_project(Project(), target)
+        data = json.loads(target.read_text(encoding="utf-8"))
+        data["schema_version"] = 1
+        data["voice"] = VOICE
+        del data["voice_assets"]
+        del data["transcription"]
+        target.write_text(json.dumps(data), encoding="utf-8")
+        before = target.read_bytes()
+>       loaded = load_project(target)
+                 ^^^^^^^^^^^^^^^^^^^^
+
+tests\test_transcript.py:107: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+source = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_migrate_schema_one_withou0/legacy.vkdub')
+
+    def load_project(source: Path) -> Project:
+        if source.stat().st_size > MAX_PROJECT_BYTES:
+            raise ValueError("Project quá lớn (tối đa 16 MB).")
+        try:
+            data = json.loads(source.read_text(encoding="utf-8-sig"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Tệp .vkdub không phải JSON UTF-8 hợp lệ.") from exc
+        if not isinstance(data, dict):
+            raise ValueError("Nội dung project phải là một đối tượng JSON.")
+        if type(data.get("schema_version")) is not int or data["schema_version"] not in (1, 2, 3, 4, 5, 6):
+            raise ValueError("Chưa hỗ trợ schema này. Hãy mở bằng phiên bản ứng dụng phù hợp.")
+        allowed = {
+            "schema_version",
+            "legacy",
+            "app_version",
+            "project_id",
+            "video_path",
+            "output_directory",
+            "source_language",
+            "target_language",
+            "transcript",
+            "transcription",
+            "translation",
+            "script",
+            "video_duration_ms",
+            "subtitles",
+            "subtitle_style",
+            "masks",
+            "voice",
+            "voice_assets",
+            "script_review",
+            "export",
+        }
+        # Refuse later-phase data instead of silently discarding it on the next save.
+        if "legacy" in data and data["legacy"] != {
+            "voice_disabled": data.get("voice", {}).get("provider") in ("vbee", "elevenlabs")
+        }:
+>           raise ValueError("Metadata legacy không hợp lệ; giữ nguyên project.")
+E           ValueError: Metadata legacy không hợp lệ; giữ nguyên project.
+
+src\vkdub\services\project_service.py:144: ValueError
+_________ test_approval_persists_exact_revision_and_tampering_revokes _________
+
+project = Project(project_id='15fb843e-edba-441c-acaa-a38f04938f80', video_path=WindowsPath('C:/Users/khucv/AppData/Local/Temp/p...nd_opacity=0.5, alignment=2, margin_bottom=50, margin_horizontal=30, max_width_ratio=0.85, line_spacing=1.1), masks=[])
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_approval_persists_exact_r0')
+
+    def test_approval_persists_exact_revision_and_tampering_revokes(project, tmp_path):
+        original = project.approve(True)
+        path = tmp_path / "approved.vkdub"
+        save_project(project, path)
+        loaded = load_project(path)
+        assert loaded.is_approved and loaded.require_approval() == original
+        data = json.loads(path.read_text(encoding="utf-8"))
+>       assert data["schema_version"] == 5
+E       assert 6 == 5
+
+tests\test_script.py:109: AssertionError
+____ test_schema_three_translation_migrates_to_editable_unapproved_script _____
+
+project = Project(project_id='adf6ba0c-a909-47a0-896a-dff485a519a7', video_path=WindowsPath('C:/Users/khucv/AppData/Local/Temp/p...nd_opacity=0.5, alignment=2, margin_bottom=50, margin_horizontal=30, max_width_ratio=0.85, line_spacing=1.1), masks=[])
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_schema_three_translation_0')
+
+    def test_schema_three_translation_migrates_to_editable_unapproved_script(project, tmp_path):
+        path = tmp_path / "legacy.vkdub"
+        save_project(project, path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["schema_version"] = 3
+        data["voice"] = VOICE
+        del data["voice_assets"]
+        del data["script"]
+        del data["video_duration_ms"]
+        path.write_text(json.dumps(data), encoding="utf-8")
+        before = path.read_bytes()
+>       migrated = load_project(path)
+                   ^^^^^^^^^^^^^^^^^^
+
+tests\test_script.py:148: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+source = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-102/test_schema_three_translation_0/legacy.vkdub')
+
+    def load_project(source: Path) -> Project:
+        if source.stat().st_size > MAX_PROJECT_BYTES:
+            raise ValueError("Project quá lớn (tối đa 16 MB).")
+        try:
+            data = json.loads(source.read_text(encoding="utf-8-sig"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Tệp .vkdub không phải JSON UTF-8 hợp lệ.") from exc
+        if not isinstance(data, dict):
+            raise ValueError("Nội dung project phải là một đối tượng JSON.")
+        if type(data.get("schema_version")) is not int or data["schema_version"] not in (1, 2, 3, 4, 5, 6):
+            raise ValueError("Chưa hỗ trợ schema này. Hãy mở bằng phiên bản ứng dụng phù hợp.")
+        allowed = {
+            "schema_version",
+            "legacy",
+            "app_version",
+            "project_id",
+            "video_path",
+            "output_directory",
+            "source_language",
+            "target_language",
+            "transcript",
+            "transcription",
+            "translation",
+            "script",
+            "video_duration_ms",
+            "subtitles",
+            "subtitle_style",
+            "masks",
+            "voice",
+            "voice_assets",
+            "script_review",
+            "export",
+        }
+        # Refuse later-phase data instead of silently discarding it on the next save.
+        if "legacy" in data and data["legacy"] != {
+            "voice_disabled": data.get("voice", {}).get("provider") in ("vbee", "elevenlabs")
+        }:
+>           raise ValueError("Metadata legacy không hợp lệ; giữ nguyên project.")
+E           ValueError: Metadata legacy không hợp lệ; giữ nguyên project.
+
+src\vkdub\services\project_service.py:144: ValueError
+=========================== short test summary info ===========================
+FAILED tests/test_project.py::test_roundtrip_unicode_and_relative_paths - Ass...
+FAILED tests/test_project.py::test_reject_invalid_or_unsupported_projects[change0]
+FAILED tests/test_transcript.py::test_save_transcript_and_settings - assert 6...
+FAILED tests/test_transcript.py::test_migrate_schema_one_without_modifying_source
+FAILED tests/test_script.py::test_approval_persists_exact_revision_and_tampering_revokes
+FAILED tests/test_script.py::test_schema_three_translation_migrates_to_editable_unapproved_script
+6 failed, 84 passed in 1.26s

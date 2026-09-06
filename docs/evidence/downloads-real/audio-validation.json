@@ -1,0 +1,10 @@
+{
+  "voice_track_rms": 4933.3,
+  "voice_track_peak": 30121,
+  "voice_clipped_samples": 0,
+  "mixed_output_rms_first_10s": 2026.9,
+  "mixed_output_peak_first_10s": 12013,
+  "sentences_time_compressed": 158,
+  "max_tempo": 2.103,
+  "median_tempo_for_compressed": 1.202
+}

@@ -1,0 +1,15 @@
+{
+  "passed": false,
+  "platform": "windows",
+  "checks": [
+    "real CapCut preview before approval"
+  ],
+  "ticks": 17,
+  "capcut-preview": {
+    "seconds": 4.394666666666667,
+    "rate": 48000
+  },
+  "elapsed": 1.25,
+  "capcut_synthesis_calls": 0,
+  "error": "Traceback (most recent call last):\n  File \"D:\\ToolVideo\\scripts\\smoke_two_voice_engines.py\", line 129, in tick\n    assert len(calls) == 2\n           ^^^^^^^^^^^^^^^\nAssertionError\n"
+}

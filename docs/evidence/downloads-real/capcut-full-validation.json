@@ -1,0 +1,39 @@
+{
+  "registered_tracks": {
+    "video": 1,
+    "audio": 260,
+    "text": 260
+  },
+  "voice_files": 260,
+  "missing_voice_files": 0,
+  "audio_timeline_overlaps": 0,
+  "video_exists": true,
+  "video_probe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 768,
+        "height": 576,
+        "r_frame_rate": "25/1",
+        "duration": "474.880000"
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "44100",
+        "channels": 2,
+        "r_frame_rate": "0/0",
+        "duration": "474.893991"
+      }
+    ],
+    "format": {
+      "duration": "474.893991",
+      "size": "49379506"
+    }
+  },
+  "mask_region_mean_difference": 48.02,
+  "outside_mean_difference": 0.95
+}

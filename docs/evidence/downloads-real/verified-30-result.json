@@ -1,0 +1,38 @@
+{
+  "exit_code": 0,
+  "speech_track": {
+    "sample_rate": 48000,
+    "channels": 1,
+    "bits": 16,
+    "duration": 474.893
+  },
+  "probe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "index": 0,
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 768,
+        "height": 576,
+        "r_frame_rate": "25/1",
+        "duration": "30.000000"
+      },
+      {
+        "index": 1,
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "44100",
+        "channels": 2,
+        "r_frame_rate": "0/0",
+        "duration": "30.000000"
+      }
+    ],
+    "format": {
+      "duration": "30.000000",
+      "size": "3218647"
+    }
+  },
+  "subtitle_box": false
+}

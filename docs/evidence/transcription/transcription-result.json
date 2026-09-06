@@ -1,0 +1,36 @@
+{
+  "checks": [
+    "real offline CPU inference; responsive GUI; source transcript rows",
+    "cache reuse returns identical transcript",
+    "cancel at model loading preserves previous transcript",
+    "project save/load preserves transcript and settings",
+    "clicking a transcript row seeks video; approval/export remain disabled"
+  ],
+  "passed": true,
+  "transcript": {
+    "segments": [
+      {
+        "id": 1,
+        "start": 0.0,
+        "end": 5.04,
+        "text": "Hello world. This is a local test of video playback and speech recognition."
+      },
+      {
+        "id": 2,
+        "start": 5.92,
+        "end": 7.04,
+        "text": "Thank you for listening."
+      }
+    ],
+    "language": "en",
+    "requested_language": "en",
+    "duration": 7.94125,
+    "model": "tiny",
+    "device": "cpu",
+    "fingerprint": "a0b05a4c219d46a87f810d7db3852a6b2b5c7a820d835301f27c6f1044cc4920",
+    "cache_key": "49898ca43b030d9e444ecffb4788bfc31b6ba43382c8973c96729a215202d963"
+  },
+  "seek_target_ms": 5920,
+  "elapsed_seconds": 10.62,
+  "responsive_timer_ticks": 148
+}

@@ -1,0 +1,152 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.12, pytest-9.1.1, pluggy-1.6.0 -- D:\ToolVideo\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.10.3 -- Qt runtime 6.10.3 -- Qt compiled 6.10.3
+rootdir: D:\ToolVideo
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.0, qt-4.5.0
+collecting ... collected 299 items
+
+tests/test_api_cost.py::test_paid_equivalent_formula_never_subtracts_free_quota PASSED [  0%]
+tests/test_api_cost.py::test_settings_survive_restart_and_exclude_credentials PASSED [  0%]
+tests/test_api_cost.py::test_invalid_cost_settings[kwargs0] PASSED       [  1%]
+tests/test_api_cost.py::test_invalid_cost_settings[kwargs1] PASSED       [  1%]
+tests/test_api_cost.py::test_invalid_cost_settings[kwargs2] PASSED       [  1%]
+tests/test_api_cost.py::test_invalid_cost_settings[kwargs3] PASSED       [  2%]
+tests/test_api_cost.py::test_invalid_cost_settings[kwargs4] PASSED       [  2%]
+tests/test_api_cost.py::test_monthly_usage_unknown_and_reset PASSED      [  2%]
+tests/test_api_cost.py::test_credential_storage_redaction_and_delete PASSED [  3%]
+tests/test_api_cost.py::test_credential_backend_error_is_sanitized PASSED [  3%]
+tests/test_elevenlabs.py::test_elevenlabs_keystore_save_and_retrieve PASSED [  3%]
+tests/test_elevenlabs.py::test_elevenlabs_keystore_invalid_values PASSED [  4%]
+tests/test_elevenlabs.py::test_voice_settings_elevenlabs PASSED          [  4%]
+tests/test_elevenlabs.py::test_elevenlabs_init_validation PASSED         [  4%]
+tests/test_elevenlabs.py::test_elevenlabs_synthesize_success PASSED      [  5%]
+tests/test_elevenlabs.py::test_elevenlabs_http_errors[401-x\xe1c th\u1ef1c] PASSED [  5%]
+tests/test_elevenlabs.py::test_elevenlabs_http_errors[429-h\u1ebft h\u1ea1n m\u1ee9c] PASSED [  5%]
+tests/test_elevenlabs.py::test_elevenlabs_http_errors[400-t\u1eeb ch\u1ed1i y\xeau c\u1ea7u] PASSED [  6%]
+tests/test_elevenlabs.py::test_elevenlabs_http_errors[500-HTTP 500] PASSED [  6%]
+tests/test_elevenlabs.py::test_elevenlabs_invalid_text_rejected[] PASSED [  6%]
+tests/test_elevenlabs.py::test_elevenlabs_invalid_text_rejected[   ] PASSED [  7%]
+tests/test_elevenlabs.py::test_elevenlabs_invalid_text_rejected[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] PASSED [  7%]
+tests/test_elevenlabs.py::test_elevenlabs_list_voices_success PASSED     [  7%]
+tests/test_elevenlabs.py::test_elevenlabs_list_voices_error_fallback PASSED [  8%]
+tests/test_elevenlabs.py::test_ui_provider_switching_and_credential_flow PASSED [  8%]
+tests/test_gemini.py::test_actual_rest_contract_headers_schema_and_usage PASSED [  8%]
+tests/test_gemini.py::test_http_errors_never_echo_key_or_provider_body[400] PASSED [  9%]
+tests/test_gemini.py::test_http_errors_never_echo_key_or_provider_body[401] PASSED [  9%]
+tests/test_gemini.py::test_http_errors_never_echo_key_or_provider_body[403] PASSED [  9%]
+tests/test_gemini.py::test_http_errors_never_echo_key_or_provider_body[404] PASSED [ 10%]
+tests/test_gemini.py::test_http_errors_never_echo_key_or_provider_body[429] PASSED [ 10%]
+tests/test_gemini.py::test_http_errors_never_echo_key_or_provider_body[503] PASSED [ 10%]
+tests/test_gemini.py::test_429_retry_after_honored_and_bounded PASSED    [ 11%]
+tests/test_gemini.py::test_network_timeout_is_not_retried_and_usage_remains_unknown PASSED [ 11%]
+tests/test_gemini.py::test_blocked_truncated_invalid_responses_not_applied_but_usage_recorded[data0] PASSED [ 11%]
+tests/test_gemini.py::test_blocked_truncated_invalid_responses_not_applied_but_usage_recorded[data1] PASSED [ 12%]
+tests/test_gemini.py::test_blocked_truncated_invalid_responses_not_applied_but_usage_recorded[data2] PASSED [ 12%]
+tests/test_gemini.py::test_blocked_truncated_invalid_responses_not_applied_but_usage_recorded[data3] PASSED [ 12%]
+tests/test_gemini.py::test_blocked_truncated_invalid_responses_not_applied_but_usage_recorded[data4] PASSED [ 13%]
+tests/test_gemini.py::test_connection_reads_model_without_generation_or_transcript PASSED [ 13%]
+tests/test_logging.py::test_configure_logging_and_redact PASSED          [ 13%]
+tests/test_logging.py::test_log_viewer_dialog_ui PASSED                  [ 14%]
+tests/test_mask.py::test_mask_item_defaults_and_clamping PASSED          [ 14%]
+tests/test_mask.py::test_mask_item_is_active_at PASSED                   [ 14%]
+tests/test_mask.py::test_to_pixel_rect PASSED                            [ 15%]
+tests/test_mask.py::test_hex_to_ffmpeg_color PASSED                      [ 15%]
+tests/test_mask.py::test_build_ffmpeg_mask_filter PASSED                 [ 15%]
+tests/test_mask.py::test_validate_mask PASSED                            [ 16%]
+tests/test_mask.py::test_project_masks_roundtrip PASSED                  [ 16%]
+tests/test_mask.py::test_video_canvas_mask_rendering_and_interaction PASSED [ 16%]
+tests/test_mask.py::test_mask_editor_dialog_actions PASSED               [ 17%]
+tests/test_metadata.py::test_video_without_audio_and_fractional_fps PASSED [ 17%]
+tests/test_metadata.py::test_unknown_fps_falls_back PASSED               [ 17%]
+tests/test_metadata.py::test_malformed_or_nonvideo_metadata[invalid] PASSED [ 18%]
+tests/test_metadata.py::test_malformed_or_nonvideo_metadata[null] PASSED [ 18%]
+tests/test_metadata.py::test_malformed_or_nonvideo_metadata[{}] PASSED   [ 18%]
+tests/test_metadata.py::test_malformed_or_nonvideo_metadata[{"streams":[]}] PASSED [ 19%]
+tests/test_metadata.py::test_malformed_or_nonvideo_metadata[{"streams": [{"codec_type": "video", "codec_name": "h264", "width": 0, "height": 1080, "avg_frame_rate": "30000/1001"}], "format": {"duration": "12.5", "size": "10000"}}] PASSED [ 19%]
+tests/test_metadata.py::test_malformed_or_nonvideo_metadata[{"streams": [{"codec_type": "video", "codec_name": "h264", "width": 1920, "height": "bad", "avg_frame_rate": "30000/1001"}], "format": {"duration": "12.5", "size": "10000"}}] PASSED [ 19%]
+tests/test_metadata.py::test_audio_and_cover_art PASSED                  [ 20%]
+tests/test_process.py::test_find_tool_honors_explicit_path PASSED        [ 20%]
+tests/test_process.py::test_missing_tools_report_both_and_finish PASSED  [ 20%]
+tests/test_process.py::test_process_does_not_block_ui PASSED             [ 21%]
+tests/test_process.py::test_process_timeout_emits_once PASSED            [ 21%]
+tests/test_process.py::test_invalid_executable_is_actionable PASSED      [ 21%]
+tests/test_project.py::test_roundtrip_unicode_and_relative_paths PASSED  [ 22%]
+tests/test_project.py::test_empty_project_roundtrip PASSED               [ 22%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change0] PASSED [ 22%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change1] PASSED [ 23%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change2] PASSED [ 23%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change3] PASSED [ 23%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change4] PASSED [ 24%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change5] PASSED [ 24%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change6] PASSED [ 24%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change7] PASSED [ 25%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change8] PASSED [ 25%]
+tests/test_project.py::test_reject_invalid_or_unsupported_projects[change9] PASSED [ 25%]
+tests/test_project.py::test_bad_json[broken JSON] PASSED                 [ 26%]
+tests/test_project.py::test_bad_json[[]] PASSED                          [ 26%]
+tests/test_project.py::test_bad_json[null] PASSED                        [ 26%]
+tests/test_project.py::test_bad_json[{"schema_version":1}] PASSED        [ 27%]
+tests/test_project.py::test_atomic_save_preserves_old_file PASSED        [ 27%]
+tests/test_project.py::test_oversized_save_preserves_readable_previous_file PASSED [ 27%]
+tests/test_recovery.py::test_recovery_lifecycle PASSED                   [ 28%]
+tests/test_recovery.py::test_recovery_corrupt_file PASSED                [ 28%]
+tests/test_render.py::test_escape_ffmpeg_filter_path PASSED              [ 28%]
+tests/test_render.py::test_build_audio_mix_filter PASSED                 [ 29%]
+tests/test_render.py::test_parse_ffmpeg_progress PASSED                  [ 29%]
+tests/test_render.py::test_build_speech_track_wav PASSED                 [ 29%]
+tests/test_render.py::test_build_render_command PASSED                   [ 30%]
+tests/test_render.py::test_export_dialog_checklist PASSED                [ 30%]
+Timeout (0:00:20)!
+Thread 0x00009254 (most recent call first):
+  File "D:\ToolVideo\src\vkdub\ui\main_window.py", line 389 in _startup_checks
+  File "D:\ToolVideo\src\vkdub\ui\main_window.py", line 450 in _detection_finished
+  File "D:\ToolVideo\src\vkdub\media\process.py", line 160 in _detected
+  File "D:\ToolVideo\src\vkdub\media\process.py", line 140 in detect
+  File "D:\ToolVideo\src\vkdub\ui\main_window.py", line 439 in detect_tools
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytestqt\qt_compat.py", line 160 in exec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytestqt\wait_signal.py", line 58 in wait
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytestqt\qtbot.py", line 503 in wait
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytestqt\qtbot.py", line 600 in waitUntil
+  File "D:\ToolVideo\tests\test_review_ui.py", line 27 in window
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\fixtures.py", line 998 in call_fixture_func
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\fixtures.py", line 1328 in pytest_fixture_setup
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\fixtures.py", line 1232 in execute
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\fixtures.py", line 726 in _get_active_fixturedef
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\fixtures.py", line 630 in getfixturevalue
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\fixtures.py", line 806 in _fillfixtures
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\python.py", line 1710 in setup
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 536 in setup
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 170 in pytest_runtest_setup
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 250 in <lambda>
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 361 in from_call
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 249 in call_and_report
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 132 in runtestprotocol
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\runner.py", line 118 in pytest_runtest_protocol
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 408 in pytest_runtestloop
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 384 in _main
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 330 in wrap_session
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\main.py", line 377 in pytest_cmdline_main
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_callers.py", line 121 in _multicall
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_manager.py", line 120 in _hookexec
+  File "D:\ToolVideo\.venv\Lib\site-packages\pluggy\_hooks.py", line 512 in __call__
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\config\__init__.py", line 229 in _main
+  File "D:\ToolVideo\.venv\Lib\site-packages\_pytest\config\__init__.py", line 253 in _console_main
+  File "D:\ToolVideo\.venv\Lib\site-packages\pytest\__main__.py", line 9 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 198 in _run_module_as_main
+tests/test_review_ui.py::test_acceptance_one_character_edit_revokes_and_undo_requires_review 

@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "checks": [
+    "One-click add, body drag, corner resize, Escape deselect",
+    "Real video plays with text removal while Qt timer continues",
+    "Save/reopen preserves geometry; top-right × deletes and saves"
+  ],
+  "qt_ticks": 39,
+  "platform": "windows",
+  "playback_frames_with_erase": 25,
+  "decoded_frames": 39,
+  "elapsed_seconds": 2.61
+}

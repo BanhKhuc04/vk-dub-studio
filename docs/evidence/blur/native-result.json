@@ -1,0 +1,13 @@
+{
+  "passed": false,
+  "checks": [
+    "One-click add, body drag, corner resize, Escape deselect",
+    "Real video plays with blur while Qt timer continues"
+  ],
+  "qt_ticks": 265,
+  "platform": "windows",
+  "playback_frames_with_blur": 25,
+  "decoded_frames": 41,
+  "elapsed_seconds": 18.2,
+  "failure": "Traceback (most recent call last):\n  File \"D:\\ToolVideo\\scripts\\smoke_blur.py\", line 127, in tick\n    assert window.project.masks[0].to_dict() == saved_mask\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+}

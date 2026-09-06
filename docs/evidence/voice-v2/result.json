@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "platform": "windows",
+  "checks": [
+    "Real Gemini structured translation preserves timing and stops at review",
+    "Approve CTA synthesizes both lines with real local VieNeu",
+    "Second generation reuses validated audio cache without synthesis",
+    "Edit revokes approval; reapprove regenerates only the changed line",
+    "Voice preview creates real WAV; settings list actual SDK presets"
+  ],
+  "qt_ticks": 1190,
+  "translation": [
+    "Xin chào mọi người.",
+    "Cảm ơn các bạn đã xem video này."
+  ],
+  "preview_audio": "D:\\ToolVideo\\docs\\evidence\\voice-v2\\app-data\\cache\\voice-preview\\f53dc6afc484b0da8bbe0daca34febc3e5e8c0243001d5ef19a1d82bdc54c8ba.wav",
+  "elapsed_seconds": 76.17,
+  "synthesize_calls": 4
+}

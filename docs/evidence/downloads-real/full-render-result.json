@@ -1,0 +1,36 @@
+{
+  "exit_code": 0,
+  "elapsed_seconds": 21.06,
+  "output": "D:\\ToolVideo\\docs\\evidence\\downloads-real\\SaveTik-verified-full-dubbed.mp4",
+  "probe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 768,
+        "height": 576,
+        "r_frame_rate": "25/1",
+        "duration": "474.880000"
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "44100",
+        "channels": 2,
+        "r_frame_rate": "0/0",
+        "duration": "474.870998"
+      }
+    ],
+    "format": {
+      "duration": "474.880000",
+      "size": "40391557"
+    }
+  },
+  "stderr_tail": [
+    "[libx264 @ 0000026096c4ff00] Weighted P-Frames: Y:0.5% UV:0.2%",
+    "[libx264 @ 0000026096c4ff00] kb/s:480.51",
+    "[aac @ 00000260970db2c0] Qavg: 998.819"
+  ]
+}

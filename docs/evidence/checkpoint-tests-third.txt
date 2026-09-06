@@ -1,0 +1,139 @@
+........................................................................ [ 24%]
+........................................................................ [ 48%]
+........................................................................ [ 72%]
+.............................F.............................F.F.......... [ 96%]
+...........                                                              [100%]
+================================== FAILURES ===================================
+_______________ test_pipeline_status_reflects_voice_generation ________________
+
+window = <vkdub.ui.main_window.MainWindow(0x26392f1d920) at 0x0000026390EAEB80>
+qtbot = <pytestqt.qtbot.QtBot object at 0x00000263928CE690>
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-109/test_pipeline_status_reflects_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000263928CD7F0>
+
+    def test_pipeline_status_reflects_voice_generation(window, qtbot, tmp_path, monkeypatch):
+        configured(window, monkeypatch)
+    
+        async def generate(
+            project, provider, root, ffmpeg, ffprobe, progress, cancel, complete, line_ids, force
+        ):
+            await asyncio.sleep(0.05)
+            line = project.script.lines[0]
+            path = tmp_path / "test.wav"
+            path.write_bytes(b"unit fixture only")
+            asset = VoiceAsset(
+                audio_key(line.text, project.voice),
+                digest(line.text),
+                "vbee",
+                DEFAULT_VOICE,
+                1.0,
+                10000,
+                path,
+                file_hash(path),
+                datetime.now(UTC).isoformat(),
+            )
+            complete(line.id, asset, "")
+    
+        monkeypatch.setattr("vkdub.ui.tts_controller.generate_voice", generate)
+        window.review.review_checkbox.setChecked(True)
+        assert window.review_controller.approve()
+        assert window.workflow_state == "GENERATING_VOICE"
+>       assert "● Tạo Voice" in window.left.status_voice.text()
+E       assert '● Tạo Voice' in '● Voice (Đang chạy…)'
+E        +  where '● Voice (Đang chạy…)' = <built-in method text of PySide6.QtWidgets.QLabel object at 0x0000026392236C40>()
+E        +    where <built-in method text of PySide6.QtWidgets.QLabel object at 0x0000026392236C40> = <PySide6.QtWidgets.QLabel(0x2639318f3f0) at 0x0000026392236C40>.text
+E        +      where <PySide6.QtWidgets.QLabel(0x2639318f3f0) at 0x0000026392236C40> = <vkdub.ui.left_config_panel.LeftConfigPanel(0x26392f201a0, name="panel") at 0x00000263928FBEC0>.status_voice
+E        +        where <vkdub.ui.left_config_panel.LeftConfigPanel(0x26392f201a0, name="panel") at 0x00000263928FBEC0> = <vkdub.ui.main_window.MainWindow(0x26392f1d920) at 0x0000026390EAEB80>.left
+
+tests\test_tts_ui.py:225: AssertionError
+----------------------------- Captured log setup ------------------------------
+INFO     vkdub:main_window.py:298 Sẵn sàng — VK Dub Studio 2.0.
+------------------------------ Captured log call ------------------------------
+INFO     vkdub:main_window.py:298 Đã duyệt kịch bản 36a5699359a3.
+INFO     vkdub:main_window.py:298 Đang tạo voice từ kịch bản đã duyệt qua Vbee…
+---------------------------- Captured log teardown ----------------------------
+INFO     vkdub:main_window.py:298 Hoàn tất lượt tạo voice. Kiểm tra audio và các cảnh báo; chưa xuất video.
+__________________________ test_left_config_panel_v2 __________________________
+
+qtbot = <pytestqt.qtbot.QtBot object at 0x0000026393BE2540>
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-109/test_left_config_panel_v20')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000026393BE1F70>
+
+    def test_left_config_panel_v2(qtbot, tmp_path, monkeypatch):
+        monkeypatch.setenv("VKDUB_DATA_DIR", str(tmp_path / "data"))
+        panel = LeftConfigPanel()
+        qtbot.addWidget(panel)
+    
+        # Check CapCut destination display
+        assert panel.capcut_dest_lbl is not None
+    
+        # Check dynamic CTA texts
+        panel.update_cta_for_state("IDLE", has_video=False)
+        assert panel.process_button.text() == "📂 HÃY CHỌN VIDEO"
+        assert panel.process_button.isEnabled() is False
+    
+        panel.update_cta_for_state("IDLE", has_video=True)
+        assert panel.process_button.text() == "🚀 BẮT ĐẦU XỬ LÝ"
+        assert panel.process_button.isEnabled() is True
+    
+        panel.update_cta_for_state("TRANSCRIBED", has_video=True)
+>       assert panel.process_button.text() == "✓ DUYỆT & TẠO VOICE"
+E       AssertionError: assert '🚀 BẮT ĐẦU XỬ LÝ' == '✓ DUYỆT & TẠO VOICE'
+E         
+E         - ✓ DUYỆT & TẠO VOICE
+E         + 🚀 BẮT ĐẦU XỬ LÝ
+
+tests\test_v2_ui.py:30: AssertionError
+______________________ test_main_window_v2_shell_and_cta ______________________
+
+qtbot = <pytestqt.qtbot.QtBot object at 0x00000263923586B0>
+tmp_path = WindowsPath('C:/Users/khucv/AppData/Local/Temp/pytest-of-khucv/pytest-109/test_main_window_v2_shell_and_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000026393BE08C0>
+
+    def test_main_window_v2_shell_and_cta(qtbot, tmp_path, monkeypatch):
+        monkeypatch.setenv("VKDUB_DATA_DIR", str(tmp_path / "data"))
+        monkeypatch.setattr("vkdub.media.process.find_tool", lambda _: None)
+        monkeypatch.setattr(QMessageBox, "question", lambda *a: QMessageBox.StandardButton.Discard)
+        monkeypatch.setattr(CredentialStore, "get", lambda self: "fake-test-key")
+    
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+        qtbot.waitUntil(lambda: window.tools_ready)
+    
+        # Health banner exists
+        assert window.health_banner is not None
+    
+        # Mask button labeled "+ Làm mờ"
+        assert "Làm mờ" in window.preview.btn_mask.text()
+    
+        # Legacy TTS panel is hidden from main view
+        assert hasattr(window.tts, "panel")
+        assert window.tts.panel.isHidden()
+    
+        # Initial state without video: CTA disabled
+        assert window.left.process_button.isEnabled() is False
+    
+        # Simulate video imported
+        window.project = Project(
+            video_path=tmp_path / "video.mp4",
+            video_duration_ms=5000,
+        )
+        window._refresh()
+>       assert window.left.process_button.isEnabled() is True
+E       assert False is True
+E        +  where False = <built-in method isEnabled of PySide6.QtWidgets.QPushButton object at 0x0000026392361680>()
+E        +    where <built-in method isEnabled of PySide6.QtWidgets.QPushButton object at 0x0000026392361680> = <PySide6.QtWidgets.QPushButton(0x26391d35460, name="primary") at 0x0000026392361680>.isEnabled
+E        +      where <PySide6.QtWidgets.QPushButton(0x26391d35460, name="primary") at 0x0000026392361680> = <vkdub.ui.left_config_panel.LeftConfigPanel(0x26391e02f90, name="panel") at 0x000002639235FC80>.process_button
+E        +        where <vkdub.ui.left_config_panel.LeftConfigPanel(0x26391e02f90, name="panel") at 0x000002639235FC80> = <vkdub.ui.main_window.MainWindow(0x26391e032f0) at 0x000002639235F740>.left
+
+tests\test_v2_ui.py:113: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     vkdub:main_window.py:298 Sẵn sàng — VK Dub Studio 2.0.
+INFO     vkdub:main_window.py:298 ffmpeg: Chưa tìm thấy — cài FFmpeg hoặc đặt đường dẫn môi trường.
+INFO     vkdub:main_window.py:298 ffprobe: Chưa tìm thấy — cài FFmpeg hoặc đặt đường dẫn môi trường.
+=========================== short test summary info ===========================
+FAILED tests/test_tts_ui.py::test_pipeline_status_reflects_voice_generation
+FAILED tests/test_v2_ui.py::test_left_config_panel_v2 - AssertionError: asser...
+FAILED tests/test_v2_ui.py::test_main_window_v2_shell_and_cta - assert False ...
+3 failed, 296 passed in 17.95s

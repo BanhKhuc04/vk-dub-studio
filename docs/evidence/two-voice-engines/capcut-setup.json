@@ -1,0 +1,16 @@
+{
+  "count": 24,
+  "health": {
+    "ok": true,
+    "code": "CAPCUT_READY",
+    "title": "CapCut TTS",
+    "message": "Đã tạo audio thử. Cần mạng khi đọc; từng giọng có thể thay đổi theo dịch vụ.",
+    "action_label": null,
+    "action_id": null
+  },
+  "probe": {
+    "revision": "e06da1f4e0c0010354f4e7702f02c18cbdd419a2",
+    "duration_ms": 2403,
+    "tested_voice": "capcut-1ea995c7c72fef1280f9be7c"
+  }
+}

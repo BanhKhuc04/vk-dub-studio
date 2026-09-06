@@ -1,0 +1,13 @@
+{
+  "passed": false,
+  "checks": [
+    "One-click add, body drag, corner resize, Escape deselect",
+    "Real video plays with blur while Qt timer continues"
+  ],
+  "qt_ticks": 703,
+  "platform": "windows",
+  "playback_frames_with_blur": 25,
+  "decoded_frames": 37,
+  "elapsed_seconds": 45.05,
+  "failure": "Traceback (most recent call last):\n  File \"D:\\ToolVideo\\scripts\\smoke_blur.py\", line 70, in tick\n    raise TimeoutError(f\"Stage {stage}\")\nTimeoutError: Stage 5\n"
+}
