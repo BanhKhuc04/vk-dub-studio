@@ -422,12 +422,27 @@ class SettingsDialog(QDialog):
             "VieNeu — dùng offline, thêm được giọng riêng", "vieneu_local"
         )
         self.voice_backend_combo.addItem("CapCut — giọng có sẵn, cần Internet", "capcut_tts")
-        self.voice_backend_combo.addItem("Vbee — Dubbing Studio tự động (Edge/Chrome)", "vbee")
+        self.voice_backend_combo.addItem("Vbee — Lồng tiếng tự động (Trình duyệt / API)", "vbee")
         current_provider = self.main_window.project.voice.provider or self.app_settings.tts_backend
         backend_idx = self.voice_backend_combo.findData(current_provider)
         self.voice_backend_combo.setCurrentIndex(max(0, backend_idx))
         self.voice_backend_combo.currentIndexChanged.connect(self._on_voice_backend_changed)
         form.addRow("Dùng giọng từ:", self.voice_backend_combo)
+
+        self.vbee_mode_combo = QComboBox()
+        self.vbee_mode_combo.addItem(
+            "🌐 Trình duyệt tự động (Vbee Dubbing Studio — Edge/Chrome)", "browser"
+        )
+        self.vbee_mode_combo.addItem(
+            "⚡ API chính thức (Vbee Realtime API — Dùng App ID & Token)", "api"
+        )
+        current_vbee_mode = getattr(self.app_settings, "vbee_mode", "browser")
+        vbee_mode_idx = self.vbee_mode_combo.findData(current_vbee_mode)
+        self.vbee_mode_combo.setCurrentIndex(max(0, vbee_mode_idx))
+        self.vbee_mode_combo.currentIndexChanged.connect(self._on_vbee_mode_changed)
+
+        self.lbl_vbee_mode = QLabel("Chế độ Vbee:")
+        form.addRow(self.lbl_vbee_mode, self.vbee_mode_combo)
 
         self.lbl_voice_status = QLabel(check_tts_backend(self.app_settings.tts_backend).message)
         self.lbl_voice_status.setWordWrap(True)
@@ -435,6 +450,49 @@ class SettingsDialog(QDialog):
         form.addRow("Trạng thái Engine:", self.lbl_voice_status)
 
         layout.addLayout(form)
+
+        # Vbee API Credentials Box
+        self.vbee_api_box = QWidget()
+        vbee_api_layout = QVBoxLayout(self.vbee_api_box)
+        vbee_api_layout.setContentsMargins(0, 4, 0, 8)
+        vbee_api_layout.setSpacing(8)
+
+        vbee_api_layout.addWidget(section_label("THÔNG TIN VBEE API (REALTIME)"))
+        vbee_api_layout.addWidget(
+            info_label(
+                "Lấy App ID và Access Token từ tài khoản Vbee API (api-docs.vbee.vn). "
+                "Thông tin được mã hóa an toàn trong Windows Credential Manager."
+            )
+        )
+        api_form = QFormLayout()
+        api_form.setSpacing(8)
+        self.vbee_app_id_input = QLineEdit()
+        self.vbee_app_id_input.setPlaceholderText("Nhập App ID mới…")
+        self.vbee_token_input = QLineEdit()
+        self.vbee_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.vbee_token_input.setPlaceholderText("Nhập Access Token mới…")
+        api_form.addRow("App ID:", self.vbee_app_id_input)
+        api_form.addRow("Access Token:", self.vbee_token_input)
+        vbee_api_layout.addLayout(api_form)
+
+        vbee_actions = QHBoxLayout()
+        self.btn_save_vbee_api = QPushButton("Lưu thông tin Vbee API")
+        self.btn_save_vbee_api.clicked.connect(self._save_vbee_api_credentials)
+        self.btn_test_vbee_api = QPushButton("Kiểm tra kết nối API")
+        self.btn_test_vbee_api.clicked.connect(self._test_vbee_api)
+        self.btn_delete_vbee_api = QPushButton("Xóa thông tin API")
+        self.btn_delete_vbee_api.clicked.connect(self._delete_vbee_api_credentials)
+        for btn in (self.btn_save_vbee_api, self.btn_test_vbee_api, self.btn_delete_vbee_api):
+            vbee_actions.addWidget(btn)
+        vbee_actions.addStretch()
+        vbee_api_layout.addLayout(vbee_actions)
+
+        self.lbl_vbee_api_status = QLabel("")
+        self.lbl_vbee_api_status.setWordWrap(True)
+        self.lbl_vbee_api_status.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
+        vbee_api_layout.addWidget(self.lbl_vbee_api_status)
+
+        layout.addWidget(self.vbee_api_box)
 
         layout.addWidget(section_label("QUẢN LÝ GIỌNG ĐỌC"))
         voice_manage_box = QHBoxLayout()
@@ -527,6 +585,111 @@ class SettingsDialog(QDialog):
         self.refresh_voice_catalog()
         self._voice_selection_changed()
 
+    def _on_vbee_mode_changed(self) -> None:
+        if not hasattr(self, "vbee_mode_combo"):
+            return
+        mode = self.vbee_mode_combo.currentData() or "browser"
+        self.app_settings.vbee_mode = mode
+        save_app_settings(self.app_settings)
+        self.main_window.tts.read_credentials()
+        self.main_window._refresh()
+        self._update_voice_controls()
+
+    def _refresh_vbee_api_status(self) -> None:
+        try:
+            from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+
+            has_app = bool(VbeeAppStore().get())
+            has_token = bool(VbeeTokenStore().get())
+            if has_app and has_token:
+                self.lbl_vbee_api_status.setText(
+                    "✓ Đã lưu App ID & Token trong Windows Credential Manager."
+                )
+            elif has_app:
+                self.lbl_vbee_api_status.setText("⚠ Đã có App ID nhưng chưa có Access Token.")
+            else:
+                self.lbl_vbee_api_status.setText("Chưa lưu thông tin Vbee API.")
+        except Exception:
+            self.lbl_vbee_api_status.setText("Không đọc được Windows Credential Manager.")
+
+    def _save_vbee_api_credentials(self) -> None:
+        app_id = self.vbee_app_id_input.text().strip()
+        token = self.vbee_token_input.text().strip()
+        if not app_id or not token or any(c.isspace() for c in app_id + token):
+            QMessageBox.warning(
+                self,
+                "Lỗi",
+                "Vui lòng nhập App ID và Access Token hợp lệ (không chứa khoảng trắng).",
+            )
+            return
+        try:
+            from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+
+            VbeeAppStore().save(app_id)
+            VbeeTokenStore().save(token)
+            self.vbee_app_id_input.clear()
+            self.vbee_token_input.clear()
+            self.lbl_vbee_api_status.setText("✓ Đã lưu an toàn trong Windows Credential Manager.")
+            self.main_window.tts.read_credentials()
+            self.main_window._refresh()
+            self._update_voice_controls()
+        except Exception as exc:
+            self.lbl_vbee_api_status.setText(f"Lỗi: {exc}")
+
+    def _delete_vbee_api_credentials(self) -> None:
+        try:
+            from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+
+            VbeeAppStore().delete()
+            VbeeTokenStore().delete()
+            self.vbee_app_id_input.clear()
+            self.vbee_token_input.clear()
+            self.lbl_vbee_api_status.setText("Đã xóa thông tin Vbee API khỏi máy tính.")
+            self.main_window.tts.read_credentials()
+            self.main_window._refresh()
+            self._update_voice_controls()
+        except Exception as exc:
+            self.lbl_vbee_api_status.setText(f"Lỗi: {exc}")
+
+    def _test_vbee_api(self) -> None:
+        try:
+            import asyncio
+
+            from vkdub.providers.vbee_tts import VbeeTTSProvider
+            from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+            from vkdub.services.tts_usage import TTSUsage
+
+            app_id = self.vbee_app_id_input.text().strip() or VbeeAppStore().get()
+            token = self.vbee_token_input.text().strip() or VbeeTokenStore().get()
+            if not app_id or not token:
+                QMessageBox.warning(
+                    self,
+                    "Chưa đủ thông tin",
+                    "Vui lòng nhập hoặc lưu App ID và Token trước khi kiểm tra.",
+                )
+                return
+
+            self.lbl_vbee_api_status.setText("Đang kiểm tra kết nối tới Vbee API…")
+            tts = VbeeTTSProvider(app_id, token, TTSUsage())
+            voices = asyncio.run(tts.list_voices())
+            can_realtime, detail = asyncio.run(tts.check_realtime_support())
+
+            if can_realtime:
+                self.lbl_vbee_api_status.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
+                self.lbl_vbee_api_status.setText(
+                    f"✓ Kết nối Vbee API thành công! Đọc được {len(voices)} giọng. Tài khoản hỗ trợ Realtime API."
+                )
+            else:
+                self.lbl_vbee_api_status.setStyleSheet("color: #fca5a5; font-weight: 600; font-size: 12px;")
+                self.lbl_vbee_api_status.setText(
+                    f"✓ Token & App ID chính xác ({len(voices)} giọng khả dụng).\n"
+                    f"⚠ Tuy nhiên: {detail}.\n"
+                    f"👉 Để lồng tiếng với gói này, vui lòng chuyển chế độ phía trên sang 'Trình duyệt tự động'!"
+                )
+        except Exception as exc:
+            self.lbl_vbee_api_status.setStyleSheet("color: #fca5a5; font-weight: 600; font-size: 12px;")
+            self.lbl_vbee_api_status.setText(f"Lỗi kiểm tra API: {exc}")
+
     def _update_voice_controls(self) -> None:
         backend = self.voice_backend_combo.currentData()
         health = check_tts_backend(backend)
@@ -538,20 +701,42 @@ class SettingsDialog(QDialog):
         if hasattr(self, "btn_setup_voice"):
             local = backend == "vieneu_local"
             is_vbee = backend == "vbee"
+            vbee_mode = (
+                self.vbee_mode_combo.currentData()
+                if hasattr(self, "vbee_mode_combo")
+                else "browser"
+            )
+            is_vbee_api = is_vbee and vbee_mode == "api"
+
+            if hasattr(self, "lbl_vbee_mode") and hasattr(self, "vbee_mode_combo"):
+                self.lbl_vbee_mode.setVisible(is_vbee)
+                self.vbee_mode_combo.setVisible(is_vbee)
+
+            if hasattr(self, "vbee_api_box"):
+                self.vbee_api_box.setVisible(is_vbee_api)
+                if is_vbee_api:
+                    self._refresh_vbee_api_status()
+
             idle = not self.main_window.busy
             self.voice_backend_combo.setEnabled(idle)
             if is_vbee:
-                self.btn_setup_voice.setText("🌐 Mở / Kiểm tra Vbee Dubbing")
+                if is_vbee_api:
+                    self.btn_setup_voice.setVisible(False)
+                else:
+                    self.btn_setup_voice.setVisible(True)
+                    self.btn_setup_voice.setText("🌐 Mở / Kiểm tra Vbee Dubbing")
             elif local:
+                self.btn_setup_voice.setVisible(True)
                 self.btn_setup_voice.setText("Cài / Kiểm tra VieNeu")
             else:
+                self.btn_setup_voice.setVisible(True)
                 self.btn_setup_voice.setText("Kết nối / Kiểm tra CapCut")
             self.btn_setup_voice.setEnabled(idle)
             self.btn_use_local.setVisible(not local and not is_vbee)
             self.btn_use_local.setEnabled(idle)
             ready = health.ok and idle and bool(self.voice_list_combo.currentData())
             self.voice_list_combo.setEnabled(ready)
-            self.btn_voice_preview.setEnabled(ready and not is_vbee)
+            self.btn_voice_preview.setEnabled(ready and (not is_vbee or is_vbee_api))
             self.btn_add_voice.setVisible(local)
             self.btn_rename_voice.setVisible(local)
             self.btn_delete_voice.setVisible(local)
@@ -638,6 +823,17 @@ class SettingsDialog(QDialog):
         self.app_settings.selected_voice = self.voice_list_combo.currentData() or ""
         self.app_settings.voice_volume = self.spin_voice_vol.value()
         self.app_settings.original_volume = self.spin_orig_vol.value()
+        if hasattr(self, "vbee_mode_combo"):
+            self.app_settings.vbee_mode = self.vbee_mode_combo.currentData() or "browser"
+        if self.app_settings.tts_backend == "vbee":
+            self.app_settings.voice_speed = 1.1
+            if (
+                hasattr(self, "vbee_app_id_input")
+                and hasattr(self, "vbee_token_input")
+                and self.vbee_app_id_input.text().strip()
+                and self.vbee_token_input.text().strip()
+            ):
+                self._save_vbee_api_credentials()
         identifier = self.voice_list_combo.currentData()
         if identifier:
             self.main_window.project.voice = replace(
@@ -646,6 +842,7 @@ class SettingsDialog(QDialog):
                 voice_id=identifier,
                 display_name=self.voice_list_combo.currentText(),
                 volume=self.app_settings.voice_volume / 100,
+                speed=1.1 if self.app_settings.tts_backend == "vbee" else self.main_window.project.voice.speed,
             )
             self.main_window.dirty = True
         if not self._persist_settings():

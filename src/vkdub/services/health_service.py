@@ -127,6 +127,37 @@ def check_tts_backend(backend: str) -> HealthResult:
             None if ready else "open_settings_voice",
         )
     if backend == "vbee":
+        from vkdub.services.app_settings import load_app_settings
+
+        mode = load_app_settings().vbee_mode
+        if mode == "api":
+            try:
+                from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+
+                has_app = bool(VbeeAppStore().get())
+                has_token = bool(VbeeTokenStore().get())
+                ready = has_app and has_token
+                return HealthResult(
+                    ready,
+                    "VBEE_API_READY" if ready else "VBEE_API_KEY_MISSING",
+                    "Vbee API",
+                    (
+                        "Vbee API đã sẵn sàng (Đã lưu App ID & Token)."
+                        if ready
+                        else "Chưa cấu hình App ID hoặc Token cho Vbee API. Vui lòng vào Cài đặt -> Voice."
+                    ),
+                    None if ready else "Cài đặt Voice",
+                    None if ready else "open_settings_voice",
+                )
+            except Exception as exc:
+                return HealthResult(
+                    False,
+                    "VBEE_API_ERROR",
+                    "Vbee API",
+                    f"Lỗi kiểm tra Vbee API: {exc}",
+                    "Cài đặt Voice",
+                    "open_settings_voice",
+                )
         try:
             import playwright  # noqa: F401
 

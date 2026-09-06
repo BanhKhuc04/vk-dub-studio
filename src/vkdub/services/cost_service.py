@@ -36,7 +36,9 @@ class ProviderPricing:
 
 
 def load_pricing(model: str = GEMINI_MODEL) -> list[ProviderPricing]:
-    path = Path(__file__).resolve().parents[3] / "resources" / "provider_pricing.json"
+    from vkdub.utils.paths import resource_path
+
+    path = resource_path("provider_pricing.json")
     if not path.is_file():
         path = Path(sys.prefix) / "share" / "vk-dub-studio" / "provider_pricing.json"
     data = json.loads(path.read_text(encoding="utf-8"))

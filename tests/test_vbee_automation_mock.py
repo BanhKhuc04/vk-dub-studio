@@ -21,6 +21,16 @@ def _make_mock_page(url: str = "https://studio.vbee.vn/studio/dubbing") -> Async
     page.url = url
     page.set_default_timeout = MagicMock()
     page.set_default_navigation_timeout = MagicMock()
+    page.query_selector = AsyncMock(return_value=None)
+    page.is_closed = MagicMock(return_value=False)
+    mock_loc = MagicMock()
+    mock_loc.first = mock_loc
+    mock_loc.is_visible = AsyncMock(return_value=False)
+    mock_loc.count = AsyncMock(return_value=0)
+    mock_loc.input_value = AsyncMock(return_value="")
+    mock_loc.click = AsyncMock()
+    mock_loc.filter = MagicMock(return_value=mock_loc)
+    page.locator = MagicMock(return_value=mock_loc)
     return page
 
 
@@ -190,3 +200,125 @@ async def test_workflow_orchestrator_mocked_provider(tmp_path: Path) -> None:
         assert WorkflowState.OPENING_VBEE in observed_states
         assert WorkflowState.READY in observed_states
         assert workflow.current_state == WorkflowState.READY
+
+
+@pytest.mark.anyio
+async def test_automation_ensure_voice_ngoc_huyen() -> None:
+    """Verify ensure_voice_ngoc_huyen succeeds when trigger or option matches."""
+    mock_context = MagicMock()
+    mock_page = _make_mock_page()
+    mock_context.pages = [mock_page]
+
+    # Voice selector already has Ngọc Huyền
+    mock_trigger = AsyncMock()
+    mock_trigger.is_visible.return_value = True
+    mock_trigger.text_content.return_value = "HN - Ngọc Huyền"
+    mock_page.query_selector.return_value = mock_trigger
+
+    automation = VbeeBrowserAutomation(mock_context)
+    await automation.ensure_voice_ngoc_huyen()
+
+
+@pytest.mark.anyio
+async def test_automation_ensure_speed_and_format() -> None:
+    """Verify ensure_speed_1x and ensure_format_mp3 interact correctly with selectors."""
+    mock_context = MagicMock()
+    mock_page = _make_mock_page()
+    mock_context.pages = [mock_page]
+
+    mock_elem = AsyncMock()
+    mock_elem.is_visible.return_value = True
+    mock_elem.text_content.return_value = "1.0x"
+    mock_elem.get_attribute.return_value = "ant-radio-button-wrapper-checked"
+    mock_page.query_selector.return_value = mock_elem
+
+    automation = VbeeBrowserAutomation(mock_context)
+    await automation.ensure_speed_1x()
+    await automation.ensure_format_mp3()
+
+
+@pytest.mark.anyio
+async def test_automation_ensure_speed_1_1() -> None:
+    """Verify ensure_speed(1.1) interacts with dropdown and selects 1.1x."""
+    mock_context = MagicMock()
+    mock_page = _make_mock_page()
+    mock_context.pages = [mock_page]
+
+    # Setup locator behavior for speed input and dropdown items
+    mock_input = MagicMock()
+    mock_input.is_visible = AsyncMock(return_value=True)
+    mock_input.input_value = AsyncMock(return_value="1x")  # Initially 1x
+
+    mock_trigger = MagicMock()
+    mock_trigger.is_visible = AsyncMock(return_value=True)
+    mock_trigger.click = AsyncMock()
+
+    mock_opt_1_1 = MagicMock()
+    mock_opt_1_1.text_content = AsyncMock(return_value="1.1x\nNhanh")
+    mock_opt_1_1.click = AsyncMock()
+
+    mock_options = MagicMock()
+    mock_options.count = AsyncMock(return_value=1)
+    mock_options.nth = MagicMock(return_value=mock_opt_1_1)
+
+    def locator_side_effect(selector: str):
+        if "input" in selector:
+            loc = MagicMock()
+            loc.first = mock_input
+            return loc
+        if "ArrowDropDownIcon" in selector or "popupIndicator" in selector:
+            loc = MagicMock()
+            loc.first = mock_trigger
+            return loc
+        if "MuiMenuItem" in selector or "listbox" in selector:
+            return mock_options
+        loc = MagicMock()
+        loc.first = MagicMock(is_visible=AsyncMock(return_value=False))
+        return loc
+
+    mock_page.locator = MagicMock(side_effect=locator_side_effect)
+
+    automation = VbeeBrowserAutomation(mock_context)
+    await automation.ensure_speed(1.1)
+
+    # Verify that trigger was clicked to open dropdown and 1.1x option was clicked
+    mock_trigger.click.assert_awaited_once()
+    mock_opt_1_1.click.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_automation_find_job_row_and_completion() -> None:
+    """Verify find_job_row locates row and wait_job_completion detects download button."""
+    mock_context = MagicMock()
+    mock_page = _make_mock_page()
+    mock_context.pages = [mock_page]
+
+    unique_name = "vkdub_test_20260906_120000.srt"
+
+    mock_row = AsyncMock()
+    mock_row.inner_text.return_value = f"{unique_name} Hoàn thành"
+
+    # Mock locator query (synchronous in Playwright)
+    mock_candidates = MagicMock()
+    mock_candidates.count = AsyncMock(return_value=1)
+    mock_candidates.nth = MagicMock(return_value=mock_row)
+
+    mock_page.locator = MagicMock(return_value=mock_candidates)
+
+    # Mock download button inside row
+    mock_download_btn = AsyncMock()
+    mock_download_btn.is_visible.return_value = True
+    mock_download_btn.is_enabled.return_value = True
+    mock_row.locator = MagicMock(return_value=MagicMock(first=mock_download_btn))
+
+    automation = VbeeBrowserAutomation(mock_context)
+    row = await automation.find_job_row(unique_name, timeout_s=2.0)
+    assert row is mock_row
+
+    await automation.wait_job_completion(
+        job_row=row,
+        unique_name=unique_name,
+        timeout_s=2.0,
+        poll_interval_s=0.05,
+    )
+

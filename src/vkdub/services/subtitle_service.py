@@ -9,8 +9,9 @@ from vkdub.services.srt_service import write_srt
 
 def load_presets() -> dict[str, SubtitleStyle]:
     """Load subtitle style presets from resources or fallback to built-in presets."""
-    root_dir = Path(__file__).resolve().parent.parent.parent.parent
-    preset_file = root_dir / "resources" / "subtitle_presets.json"
+    from vkdub.utils.paths import resource_path
+
+    preset_file = resource_path("subtitle_presets.json")
     if preset_file.is_file():
         try:
             data = json.loads(preset_file.read_text(encoding="utf-8"))

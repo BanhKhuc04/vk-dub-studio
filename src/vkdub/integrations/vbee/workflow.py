@@ -56,8 +56,15 @@ def export_vbee_srt(project: Project, output_dir: Path | None = None) -> Path:
     target_dir = output_dir or (workspace_root() / "export")
     target_dir.mkdir(parents=True, exist_ok=True)
 
+    import re
+
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    srt_filename = f"vbee_subtitles_{timestamp_str}.srt"
+    if project.video_path:
+        slug = re.sub(r"[^a-zA-Z0-9_-]", "_", project.video_path.stem)
+    else:
+        slug = "project"
+    slug = slug.strip("_")[:30] or "project"
+    srt_filename = f"vkdub_{slug}_{timestamp_str}.srt"
     srt_path = target_dir / srt_filename
 
     write_srt(srt_path, project.script, project.duration_ms)
@@ -86,6 +93,7 @@ class VbeeVoiceWorkflow:
         progress_callback: Callable[[int, str], None] | None = None,
         check_cancel: Callable[[], None] | None = None,
         working_dir: Path | None = None,
+        speed: float | None = None,
     ) -> None:
         self.project = project
         self.provider = provider
@@ -95,6 +103,9 @@ class VbeeVoiceWorkflow:
         self.progress_callback = progress_callback
         self.check_cancel = check_cancel or (lambda: None)
         self.working_dir = working_dir or (data_root() / "vbee_staging")
+        self.speed = speed if speed is not None else (
+            getattr(project.voice, "speed", 1.1) if project and project.voice else 1.1
+        )
         self.current_state = WorkflowState.IDLE
         self.srt_path: Path | None = None
         self.downloaded_audio_path: Path | None = None
@@ -130,7 +141,10 @@ class VbeeVoiceWorkflow:
         """Execute the complete Vbee workflow from validation to audio import."""
         self.working_dir.mkdir(parents=True, exist_ok=True)
         try:
+            logger.info("[VBEE][START] Bắt đầu quy trình tạo Voice tự động bằng Vbee Dubbing")
+
             # 1. Validation
+            self._set_state(WorkflowState.VALIDATING, "Đang kiểm tra điều kiện kịch bản và công cụ…")
             self.check_cancel()
             validate_project_for_vbee(self.project)
 
@@ -138,55 +152,86 @@ class VbeeVoiceWorkflow:
             self._set_state(WorkflowState.EXPORTING_SRT, "Đang xuất file SRT tiếng Việt…")
             self.check_cancel()
             self.srt_path = export_vbee_srt(self.project, self.working_dir)
+            logger.info("[VBEE][SRT] Đã xuất file SRT thành công: %s", self.srt_path)
 
             # 3. Provider execution (Browser / API)
-            self._set_state(WorkflowState.OPENING_VBEE, "Đang mở Vbee Studio trên trình duyệt…")
+            is_api = getattr(self.provider, "name", "") == "vbee_api"
+            if is_api:
+                self._set_state(WorkflowState.OPENING_VBEE, "Đang kết nối Vbee API…")
+            else:
+                self._set_state(WorkflowState.OPENING_VBEE, "Đang mở Vbee Studio trên trình duyệt…")
             self.check_cancel()
 
-            # The provider manages sub-states (login check, upload, submit, processing, download)
-            # and passes progress through provider callbacks
             def on_provider_progress(pct: int, msg: str) -> None:
                 self.check_cancel()
-                # Map progress percentages to sub-states
-                if "đăng nhập" in msg.lower():
+                # Map progress percentages to semantic sub-states
+                msg_lower = msg.lower()
+                if "kết nối" in msg_lower:
+                    self._set_state(WorkflowState.OPENING_VBEE, msg)
+                elif "đăng nhập" in msg_lower:
                     self._set_state(WorkflowState.LOGIN_REQUIRED, msg)
-                elif "tải file srt" in msg.lower() or pct <= 45:
+                elif "tải file srt" in msg_lower:
                     self._set_state(WorkflowState.UPLOADING_SRT, msg)
-                elif "chuyển phụ đề" in msg.lower() and pct <= 55:
+                elif "cấu hình" in msg_lower:
+                    self._set_state(WorkflowState.CONFIGURING_VOICE, msg)
+                elif "bắt đầu chuyển" in msg_lower or "chuyển phụ đề" in msg_lower and pct <= 60:
                     self._set_state(WorkflowState.SUBMITTING, msg)
-                elif "xử lý" in msg.lower() or (55 < pct < 85):
+                elif "đang tạo voice" in msg_lower or "xử lý" in msg_lower or (60 < pct < 85):
                     self._set_state(WorkflowState.PROCESSING, msg)
-                elif "tải" in msg.lower() and pct >= 85:
+                elif "tải" in msg_lower and pct >= 85:
                     self._set_state(WorkflowState.DOWNLOADING, msg)
+                elif "tổng hợp" in msg_lower or "chuẩn hóa" in msg_lower:
+                    self._set_state(WorkflowState.PROCESSING_AUDIO, msg)
                 elif self.progress_callback:
                     self.progress_callback(pct, msg)
 
-            self.downloaded_audio_path = await self.provider.execute_dubbing(
-                project=self.project,
-                srt_path=self.srt_path,
-                progress_callback=on_provider_progress,
-                check_cancel=self.check_cancel,
-            )
+            if is_api and hasattr(self.provider, "execute_api_dubbing"):
+                import_result = await self.provider.execute_api_dubbing(
+                    project=self.project,
+                    ffmpeg=self.ffmpeg,
+                    ffprobe=self.ffprobe,
+                    progress_callback=on_provider_progress,
+                    check_cancel=self.check_cancel,
+                    speed=self.speed,
+                )
+                self.downloaded_audio_path = Path(import_result["master_wav"])
+            else:
+                self.downloaded_audio_path = await self.provider.execute_dubbing(
+                    project=self.project,
+                    srt_path=self.srt_path,
+                    progress_callback=on_provider_progress,
+                    check_cancel=self.check_cancel,
+                    speed=self.speed,
+                )
+                logger.info("[VBEE][DOWNLOAD] File âm thanh tải về hoàn tất: %s", self.downloaded_audio_path)
 
-            # 4. Import audio
-            self._set_state(
-                WorkflowState.IMPORTING_AUDIO,
-                "Đang phân tách và nhập âm thanh vào project VK Dub Studio…",
-            )
-            self.check_cancel()
+                # 4. Import audio
+                self._set_state(
+                    WorkflowState.PROCESSING_AUDIO,
+                    "Đang chuẩn hóa âm thanh qua FFmpeg…",
+                )
+                self.check_cancel()
 
-            import_result = await slice_and_import_vbee_audio(
-                project=self.project,
-                downloaded_audio=self.downloaded_audio_path,
-                ffmpeg=self.ffmpeg,
-                ffprobe=self.ffprobe,
-            )
+                self._set_state(
+                    WorkflowState.IMPORTING_AUDIO,
+                    "Đang phân tách và nhập âm thanh vào project VK Dub Studio…",
+                )
+                self.check_cancel()
+
+                import_result = await slice_and_import_vbee_audio(
+                    project=self.project,
+                    downloaded_audio=self.downloaded_audio_path,
+                    ffmpeg=self.ffmpeg,
+                    ffprobe=self.ffprobe,
+                )
+            logger.info("[VOICE][IMPORT] Đã nhập xong %d câu thoại vào project.", import_result["lines_count"])
 
             # 5. Ready!
             self._set_state(
                 WorkflowState.READY,
                 f"Đã hoàn thành! Đã tạo và đồng bộ {import_result['lines_count']} câu thoại Vbee.",
             )
+            logger.info("[VOICE][READY] Hoàn thành toàn bộ quy trình Voice Vbee.")
 
             return {
                 "status": "success",

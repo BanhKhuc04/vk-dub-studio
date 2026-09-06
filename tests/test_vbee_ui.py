@@ -147,3 +147,59 @@ def test_studio_voice_controller_vbee_delegation() -> None:
     assert started is True
     window.vbee_controller.start_workflow.assert_called_once()
 
+
+def test_vbee_controller_api_mode_missing_credentials(monkeypatch, tmp_path) -> None:
+    """VbeeController blocks start and notifies user when Vbee API credentials are missing."""
+    from vkdub.services.app_settings import AppSettings, save_app_settings
+
+    monkeypatch.setattr("vkdub.services.app_settings.data_root", lambda: tmp_path)
+    save_app_settings(AppSettings(vbee_mode="api"))
+
+    monkeypatch.setattr("vkdub.services.credential_service.VbeeAppStore.get", lambda self: None)
+    monkeypatch.setattr("vkdub.services.credential_service.VbeeTokenStore.get", lambda self: None)
+    monkeypatch.setattr("vkdub.ui.vbee_controller.validate_project_for_vbee", lambda p: None)
+
+    window = DummyMainWindow()
+    window.open_settings = MagicMock()
+    window._error = MagicMock()
+
+    controller = VbeeController(window)
+    started = controller.start_workflow()
+
+    assert started is False
+    window._error.assert_called_once()
+    assert "Chưa cấu hình App ID hoặc Access Token" in window._error.call_args[0][0]
+    window.open_settings.assert_called_once_with(2)
+
+
+def test_vbee_controller_api_mode_with_credentials(monkeypatch, tmp_path) -> None:
+    """VbeeController instantiates VbeeApiProvider when API mode has credentials."""
+    from vkdub.integrations.vbee.provider import VbeeApiProvider
+    from vkdub.services.app_settings import AppSettings, save_app_settings
+
+    monkeypatch.setattr("vkdub.services.app_settings.data_root", lambda: tmp_path)
+    save_app_settings(AppSettings(vbee_mode="api"))
+
+    monkeypatch.setattr("vkdub.services.credential_service.VbeeAppStore.get", lambda self: "app-id-123")
+    monkeypatch.setattr("vkdub.services.credential_service.VbeeTokenStore.get", lambda self: "token-456")
+    monkeypatch.setattr("vkdub.ui.vbee_controller.validate_project_for_vbee", lambda p: None)
+
+    window = DummyMainWindow()
+    window.open_settings = MagicMock()
+    window._error = MagicMock()
+    window.left.speed_combo = MagicMock()
+    window.left.speed_combo.currentData.return_value = 1.1
+
+    controller = VbeeController(window)
+
+    # Monkeypatch VbeeWorkflowJob.start to avoid running background thread
+    monkeypatch.setattr("vkdub.ui.vbee_controller.VbeeWorkflowJob.start", lambda self: None)
+
+    started = controller.start_workflow()
+    assert started is True
+    assert controller.job is not None
+    assert isinstance(controller.job.provider, VbeeApiProvider)
+    assert controller.job.provider.app_id == "app-id-123"
+    assert controller.job.provider.token == "token-456"
+    assert controller.job.speed == 1.1
+

@@ -7,14 +7,39 @@ from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 from vkdub.media.ffprobe import parse_metadata
 
 
+import sys
+
+
 def find_tool(name: str) -> str | None:
+    # 1. Explicit environment override (e.g. FFMPEG_PATH, FFPROBE_PATH)
     configured = os.environ.get(f"{name.upper()}_PATH")
     if configured:
         path = Path(configured).expanduser()
         return str(path.resolve()) if path.is_file() else None
+
+    # 2. Bundled tools inside application directory (production standalone bundle)
+    base_dirs: list[Path] = []
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        base_dirs.extend([exe_dir, exe_dir / "_internal"])
+        if hasattr(sys, "_MEIPASS"):
+            base_dirs.append(Path(getattr(sys, "_MEIPASS")))
+    else:
+        repo_root = Path(__file__).resolve().parents[3]
+        base_dirs.extend([repo_root, repo_root / "resources"])
+
+    for b in base_dirs:
+        for sub in ["", "tools", "tools/ffmpeg", "bin", "_internal/tools", "resources/tools"]:
+            candidate = (b / sub / f"{name}.exe") if os.name == "nt" else (b / sub / name)
+            if candidate.is_file():
+                return str(candidate.resolve())
+
+    # 3. System PATH
     found = shutil.which(name)
     if found:
         return found
+
+    # 4. Windows WinGet paths
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
         winget_links = Path(local_app_data) / "Microsoft" / "WinGet" / "Links" / f"{name}.exe"

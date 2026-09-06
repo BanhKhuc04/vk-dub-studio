@@ -105,3 +105,30 @@ def test_duplicate_start_protection(tmp_path: Path) -> None:
     assert result is False
     mock_window.log.assert_called_once()
     assert "đang bận" in mock_window.log.call_args[0][0]
+
+
+def test_vbee_workflow_speed_defaults_and_sync() -> None:
+    """Verify VbeeVoiceWorkflow defaults to speed 1.1 when unspecified, and respects explicit speed."""
+    from vkdub.integrations.vbee.workflow import VbeeVoiceWorkflow
+
+    mock_provider = MagicMock()
+    mock_project = MagicMock()
+    mock_project.voice = None
+
+    wf = VbeeVoiceWorkflow(
+        project=mock_project,
+        provider=mock_provider,
+        ffmpeg="ffmpeg",
+        ffprobe="ffprobe",
+    )
+    assert wf.speed == 1.1
+
+    # Explicit speed
+    wf_custom = VbeeVoiceWorkflow(
+        project=mock_project,
+        provider=mock_provider,
+        ffmpeg="ffmpeg",
+        ffprobe="ffprobe",
+        speed=1.2,
+    )
+    assert wf_custom.speed == 1.2

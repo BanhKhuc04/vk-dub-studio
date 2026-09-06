@@ -23,29 +23,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install .[dev] pyinstaller
 
-      - name: Build Standalone Application
+      - name: Build Standalone Application & Installer
+        shell: pwsh
         run: |
-          python packaging/build_exe.py
-
-      - name: Compile Inno Setup Installer
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
-        with:
-          path: installer/VK-Dub-Studio.iss
+          python packaging/build_all.py
 
       - name: Calculate SHA-256 Checksum
         id: checksum
         shell: pwsh
         run: |
-          $installerPath = "dist/VK-Dub-Studio-Setup-x64.exe"
-          $hash = (Get-FileHash $installerPath -Algorithm SHA256).Hash.ToLower()
+          $installer = Get-ChildItem dist/VKDubStudio-Setup-*.exe | Select-Object -First 1
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLower()
           Write-Output "Installer SHA256: $hash"
+          echo "INSTALLER_PATH=$($installer.FullName)" >> $env:GITHUB_OUTPUT
           echo "INSTALLER_SHA256=$hash" >> $env:GITHUB_OUTPUT
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/VK-Dub-Studio-Setup-x64.exe
+            dist/VKDubStudio-Setup-*.exe
             packaging/latest.json
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

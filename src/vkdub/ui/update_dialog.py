@@ -14,7 +14,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from vkdub.services.update_service import UpdateInfo, download_installer, launch_installer
+from vkdub.services.update_service import (
+    UpdateInfo,
+    apply_update_and_restart,
+    download_installer,
+    launch_installer,
+)
 from vkdub.utils.paths import data_root
 from vkdub.version import __version__
 
@@ -160,7 +165,7 @@ class UpdateDialog(QDialog):
             )
             if ret == QMessageBox.StandardButton.Yes:
                 try:
-                    launch_installer(self._target_path)
+                    apply_update_and_restart(self._target_path, silent=False)
                     app = QApplication.instance()
                     if app is not None:
                         app.quit()

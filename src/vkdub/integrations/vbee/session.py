@@ -61,6 +61,31 @@ def detect_browser_channel() -> str | None:
     return None
 
 
+def find_edge_executable() -> str | None:
+    for candidate in EDGE_CANDIDATES:
+        if Path(candidate).is_file():
+            return candidate
+    return None
+
+
+def cleanup_stale_profile_processes(profile_dir: Path) -> None:
+    """Terminate any lingering browser processes using this dedicated automation profile."""
+    if os.name != "nt":
+        return
+    import subprocess
+
+    profile_str = str(profile_dir).replace("/", "\\")
+    cmd = (
+        f'Get-CimInstance Win32_Process -Filter "Name = \'msedge.exe\' or Name = \'chrome.exe\'" | '
+        f'Where-Object {{ $_.CommandLine -like "*{profile_str}*" }} | '
+        f'ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}'
+    )
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, timeout=5)
+    except Exception as exc:
+        logger.debug("cleanup_stale_profile_processes: %s", exc)
+
+
 async def create_vbee_browser_context(
     playwright: Playwright,
     profile_dir: Path | None = None,
@@ -70,7 +95,8 @@ async def create_vbee_browser_context(
 ) -> BrowserContext:
     """Launch persistent browser context with stored cookies/session."""
     user_data_dir = profile_dir or get_vbee_profile_dir()
-    chosen_channel = channel or detect_browser_channel()
+    cleanup_stale_profile_processes(user_data_dir)
+    edge_exe = find_edge_executable()
 
     launch_args = [
         "--disable-blink-features=AutomationControlled",
@@ -85,19 +111,25 @@ async def create_vbee_browser_context(
         "viewport": {"width": 1280, "height": 800},
         "locale": "vi-VN",
         "accept_downloads": True,
-        "ignore_default_args": ["--enable-automation"],
     }
 
-    if downloads_path:
-        downloads_path.mkdir(parents=True, exist_ok=True)
-        context_kwargs["downloads_path"] = str(downloads_path)
-
-    if chosen_channel:
-        context_kwargs["channel"] = chosen_channel
+    if edge_exe:
+        context_kwargs["executable_path"] = edge_exe
+    elif channel:
+        context_kwargs["channel"] = channel
+    else:
+        detected = detect_browser_channel()
+        if detected:
+            context_kwargs["channel"] = detected
+        else:
+            raise RuntimeError(
+                "Không tìm thấy Microsoft Edge hoặc Google Chrome trên máy tính.\n"
+                "Vui lòng cài đặt Microsoft Edge hoặc Google Chrome để sử dụng tính năng tự động hóa Vbee."
+            )
 
     logger.info(
-        "Khởi tạo trình duyệt Vbee: channel=%s, profile=%s, headless=%s",
-        chosen_channel or "default",
+        "Khởi tạo trình duyệt Vbee: exe=%s, profile=%s, headless=%s",
+        edge_exe or context_kwargs.get("channel", "bundled"),
         user_data_dir,
         headless,
     )
@@ -105,13 +137,18 @@ async def create_vbee_browser_context(
     try:
         return await playwright.chromium.launch_persistent_context(**context_kwargs)
     except Exception as exc:
-        # If launched with a channel and it fails, retry without channel (bundled chromium)
-        if chosen_channel:
-            logger.warning(
-                "Lỗi khởi chạy với channel=%s (%s). Thử lại với Chromium mặc định.",
-                chosen_channel,
-                exc,
-            )
-            context_kwargs.pop("channel", None)
+        err_msg = str(exc)
+        if "existing browser session" in err_msg or "ProcessSingleton" in err_msg:
+            logger.warning("Phát hiện tiến trình cũ đang giữ profile. Đang dọn dẹp và thử lại…")
+            cleanup_stale_profile_processes(user_data_dir)
+            import asyncio
+
+            await asyncio.sleep(1.0)
             return await playwright.chromium.launch_persistent_context(**context_kwargs)
+
+        if "Executable doesn't exist" in err_msg or "channel" in err_msg:
+            raise RuntimeError(
+                "Không thể mở trình duyệt điều khiển Vbee. "
+                "Hãy đảm bảo Microsoft Edge hoặc Google Chrome đã được cài đặt trên máy tính của bạn."
+            ) from exc
         raise

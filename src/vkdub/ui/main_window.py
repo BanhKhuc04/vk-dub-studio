@@ -3,6 +3,7 @@ import time
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence, QTextCursor
@@ -164,16 +165,94 @@ class MainWindow(QMainWindow):
         self.autosave_timer.start()
 
         self._refresh()
-        self.log("Sẵn sàng — VK Dub Studio 2.0.")
+        self.log("Sẵn sàng — VK Dub Studio 2.1.")
         QTimer.singleShot(0, self.detect_tools)
         self.recovery_timer = QTimer(self)
         self.recovery_timer.setSingleShot(True)
         self.recovery_timer.timeout.connect(self._check_crash_recovery)
         self.recovery_timer.start(500)
+        QTimer.singleShot(2500, self._check_background_update)
 
     def _on_autosave_timer(self) -> None:
         if load_app_settings().autosave and self.dirty and not self.busy and self.project.script:
             save_recovery_state(self.project, self.project_file)
+
+    def _check_background_update(self) -> None:
+        if not load_app_settings().auto_update:
+            return
+
+        def worker() -> None:
+            try:
+                import threading
+                from pathlib import Path
+                from vkdub.services.update_service import (
+                    DEFAULT_UPDATE_FEED_STABLE,
+                    download_installer,
+                    fetch_update_info,
+                    is_newer_version,
+                    verify_sha256,
+                )
+                from vkdub.utils.paths import data_root
+                from vkdub.version import __version__
+
+                info = fetch_update_info(DEFAULT_UPDATE_FEED_STABLE, timeout_sec=6.0)
+                if not info or not is_newer_version(info.version, __version__):
+                    return
+
+                cache_dir = data_root() / "updates"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                target = cache_dir / f"VKDubStudio-Setup-v{info.version}.exe"
+
+                if target.is_file() and verify_sha256(target, info.sha256):
+                    QTimer.singleShot(0, lambda: self._prompt_update_ready(info, target))
+                    return
+
+                downloaded = download_installer(
+                    url=info.installer_url,
+                    target_path=target,
+                    expected_sha256=info.sha256,
+                    timeout_sec=120.0,
+                )
+                if downloaded and target.is_file():
+                    QTimer.singleShot(0, lambda: self._prompt_update_ready(info, target))
+            except Exception:
+                pass
+
+        import threading
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+
+    def _prompt_update_ready(self, info: Any, target: Path) -> None:
+        from vkdub.services.update_service import apply_update_and_restart
+
+        msg = (
+            f"🎉 Đã có bản cập nhật mới v{info.version}!\n\n"
+            f"Bản cài đặt đã được tải ngầm về máy và xác thực toàn vẹn (SHA-256).\n"
+            f"Bạn có muốn đóng ứng dụng để nâng cấp và khởi động lại ngay không?"
+        )
+        ret = QMessageBox.question(
+            self,
+            "Cập nhật sẵn sàng — VK Dub Studio",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if ret == QMessageBox.StandardButton.Yes:
+            if self.dirty and self.project.script:
+                ans = QMessageBox.question(
+                    self,
+                    "Lưu dự án",
+                    "Dự án có thay đổi chưa lưu. Bạn có muốn lưu trước khi cập nhật không?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if ans == QMessageBox.StandardButton.Yes:
+                    self.save()
+
+            apply_update_and_restart(target, silent=False)
+            app = QApplication.instance()
+            if app is not None:
+                app.quit()
 
     def _check_crash_recovery(self) -> None:
         if not self.isVisible():
@@ -230,23 +309,34 @@ class MainWindow(QMainWindow):
     def add_blur_mask(self) -> None:
         if self.busy or not self.project.video_path:
             return
-        # Offset additional regions so each new rectangle can be grabbed immediately.
-        offset = (len(self.project.masks) % 5) * 0.04
+        # Giữ duy nhất 1 khung chọn khu vực phụ đề có thể điều chỉnh phạm vi
+        if self.project.masks:
+            mask = self.project.masks[0]
+            self.preview.video.set_masks(self.project.masks, mask.id, self.preview.player.position())
+            self.preview.video.interactive_mask_mode = True
+            self.preview.video.update()
+            self.statusBar().showMessage(
+                "Khung che phụ đề: Kéo để di chuyển · Kéo góc để đổi kích thước bao trọn phụ đề cũ",
+                8000,
+            )
+            return
+
         mask = MaskItem(
-            name=f"Xóa chữ {len(self.project.masks) + 1}",
+            name="Khung che phụ đề",
             mask_type="erase",
-            x=0.12,
-            y=0.74 - offset,
-            width=0.76,
-            height=0.16,
+            x=0.08,
+            y=0.76,
+            width=0.84,
+            height=0.15,
             blur_strength=24,
         )
         self.project.masks.append(mask)
         self.preview.video.set_masks(self.project.masks, mask.id, self.preview.player.position())
+        self.preview.video.interactive_mask_mode = True
         self.dirty = True
         self._refresh()
         self.statusBar().showMessage(
-            "Khoanh rộng hơn chữ một chút · Kéo để di chuyển · Kéo góc để đổi cỡ · × để xóa",
+            "Đã bật Khung che phụ đề: Kéo để di chuyển · Kéo góc để đổi kích thước bao trọn phụ đề cũ",
             12000,
         )
 
@@ -546,6 +636,19 @@ class MainWindow(QMainWindow):
             return
         state = self.workflow_state
         if state in ("IDLE", "VIDEO_IMPORTED"):
+            # Đảm bảo hiển thị 1 khung che phụ đề trên video để người dùng căn chỉnh
+            if not self.project.masks:
+                self.add_blur_mask()
+            else:
+                self.preview.video.set_masks(
+                    self.project.masks, self.project.masks[0].id, self.preview.player.position()
+                )
+                self.preview.video.interactive_mask_mode = True
+                self.preview.video.update()
+            self.statusBar().showMessage(
+                "Khung khu vực phụ đề đã bật: Bạn có thể kéo di chuyển hoặc kéo góc để khớp với phụ đề trên video.",
+                10000,
+            )
             self._auto_pipeline = True
             if not self.transcription.start():
                 self._auto_pipeline = False
@@ -750,6 +853,20 @@ class MainWindow(QMainWindow):
             if metadata and metadata.duration > 0
             else None,
         )
+        # Tự động tạo sẵn 1 khung che phụ đề ở chân video
+        default_mask = MaskItem(
+            name="Khung che phụ đề",
+            mask_type="erase",
+            x=0.08,
+            y=0.76,
+            width=0.84,
+            height=0.15,
+            blur_strength=24,
+        )
+        self.project.masks = [default_mask]
+        self.preview.video.set_masks(self.project.masks, default_mask.id, 0)
+        self.preview.video.interactive_mask_mode = True
+
         self.review_controller.bind_project()
         self.project_file = None
         self.dirty = True
@@ -757,7 +874,7 @@ class MainWindow(QMainWindow):
         if metadata:
             self.preview.show_metadata(metadata)
         self._refresh()
-        self.log(f"Đã nhập video: {path.name}")
+        self.log(f"Đã nhập video: {path.name} (đã tạo Khung che phụ đề)")
 
     def _metadata_ready(self, path_text: str, metadata: VideoMetadata) -> None:
         path = Path(path_text)

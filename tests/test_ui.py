@@ -11,6 +11,7 @@ from vkdub.services.project_service import save_project
 from vkdub.ui.main_window import MainWindow
 from vkdub.ui.video_canvas import VideoCanvas
 from vkdub.ui.video_preview import clock_text
+from vkdub.version import __version__
 
 
 @pytest.fixture
@@ -28,7 +29,7 @@ def window(qtbot, monkeypatch):
 
 def test_shell_branding_and_workflow_gate(window):
     assert "VK Dub Studio — by vanhkhuc.dev" in window.windowTitle()
-    assert "v2.0.0" in window.windowTitle()
+    assert f"v{__version__}" in window.windowTitle()
     assert "Sản phẩm được tạo bởi vanhkhuc.dev" in window.left.credit_label.text()
     assert "Dành tặng em bé Trang Vũ <3" in window.left.credit_label.text()
     assert not window.review.approve_button.isEnabled()

@@ -5,8 +5,14 @@ from typing import Any
 
 from PySide6.QtCore import QThread, Signal
 
+from vkdub.integrations.vbee.errors import VbeeError
 from vkdub.providers.gemini_translation import ProviderError
 from vkdub.services.credential_service import redact
+
+
+import logging
+
+logger = logging.getLogger("vkdub.cloud_job")
 
 
 class CloudJob(QThread):
@@ -50,12 +56,27 @@ class CloudJob(QThread):
             self.succeeded.emit(result)
         except asyncio.CancelledError:
             self.cancelled.emit()
-        except (ProviderError, ValueError) as exc:
+        except (ProviderError, ValueError, VbeeError) as exc:
+            logger.warning("CloudJob expected error: %s", exc)
             self.failed.emit(redact(str(exc)))
-        except Exception:
-            self.failed.emit(
-                "Không hoàn thành công việc API. Kiểm tra kết nối và quyền ghi dữ liệu cục bộ."
-            )
+        except Exception as exc:
+            logger.error("CloudJob unexpected error: %s", exc, exc_info=True)
+            msg = str(exc)
+            if any(
+                term in msg
+                for term in (
+                    "Target closed",
+                    "Browser has been closed",
+                    "Target page, context or browser has been closed",
+                )
+            ):
+                self.failed.emit("Cửa sổ trình duyệt đã bị đóng.")
+            elif "Timeout" in type(exc).__name__ or "timeout" in msg.lower():
+                self.failed.emit("Tác vụ xử lý quá thời gian quy định.")
+            elif isinstance(exc, (FileNotFoundError, PermissionError, OSError)):
+                self.failed.emit("Lỗi truy cập tệp hoặc thư mục.")
+            else:
+                self.failed.emit("Không thể hoàn thành tác vụ. Vui lòng kiểm tra lại.")
         finally:
             # Release the closure containing the in-memory provider/key after completion.
             self.operation = _empty

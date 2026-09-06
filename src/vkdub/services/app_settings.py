@@ -47,6 +47,7 @@ class AppSettings:
     vieneu_runtime: str = ""
     default_output: str = ""
     autosave: bool = True
+    vbee_mode: str = "browser"  # "browser" | "api"
 
     def __post_init__(self) -> None:
         if self.schema_version != 2:
@@ -56,6 +57,8 @@ class AppSettings:
                 raise ValueError("Cài đặt bật/tắt không hợp lệ.")
         if self.tts_backend not in ("vieneu_local", "capcut_tts", "vbee"):
             raise ValueError("Voice Engine không hợp lệ.")
+        if self.vbee_mode not in ("browser", "api"):
+            raise ValueError("Chế độ Vbee không hợp lệ.")
         if not isinstance(self.gemini_model, str) or not re.fullmatch(
             r"[A-Za-z0-9._-]{1,120}", self.gemini_model
         ):

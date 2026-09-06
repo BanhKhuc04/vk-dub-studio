@@ -9,10 +9,10 @@ from pathlib import Path
 import httpx
 
 DEFAULT_UPDATE_FEED_STABLE = (
-    "https://raw.githubusercontent.com/vanhkhuc/vk-dub-studio/main/latest.json"
+    "https://raw.githubusercontent.com/BanhKhuc04/vk-dub-studio/main/latest.json"
 )
 DEFAULT_UPDATE_FEED_BETA = (
-    "https://raw.githubusercontent.com/vanhkhuc/vk-dub-studio/main/latest-beta.json"
+    "https://raw.githubusercontent.com/BanhKhuc04/vk-dub-studio/main/latest-beta.json"
 )
 
 
@@ -159,3 +159,30 @@ def launch_installer(installer_path: Path) -> subprocess.Popen:
         raise FileNotFoundError(f"Tệp cài đặt không tồn tại: {installer_path}")
     creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     return subprocess.Popen([str(installer_path)], creationflags=creation_flags)
+
+
+def apply_update_and_restart(installer_path: Path, silent: bool = False) -> None:
+    """Launch installer to upgrade the application, wait for completion, then relaunch VK Dub Studio."""
+    import sys
+
+    if not installer_path.is_file():
+        raise FileNotFoundError(f"Tệp cài đặt không tồn tại: {installer_path}")
+
+    exe_path = sys.executable if getattr(sys, "frozen", False) else ""
+    target_exe = (
+        Path(exe_path).resolve()
+        if exe_path
+        else Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "VK Dub Studio" / "VK Dub Studio.exe"
+    )
+
+    installer_str = f'"{installer_path.resolve()}"'
+    args = "/SILENT /CLOSEAPPLICATIONS" if silent else "/CLOSEAPPLICATIONS"
+    target_str = f'"{target_exe}"'
+
+    cmd_script = (
+        f'timeout /t 2 /nobreak >nul & '
+        f'start "" /wait {installer_str} {args} & '
+        f'start "" {target_str}'
+    )
+    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    subprocess.Popen(["cmd.exe", "/c", cmd_script], creationflags=creation_flags)

@@ -34,7 +34,9 @@ class CapCutExportResult:
 
 
 def _template_path() -> Path:
-    source = Path(__file__).parents[3] / "resources" / "capcut_v360000_template.json"
+    from vkdub.utils.paths import resource_path
+
+    source = resource_path("capcut_v360000_template.json")
     installed = Path(sys.prefix) / "share" / "vk-dub-studio" / source.name
     path = source if source.is_file() else installed
     if not path.is_file() or path.stat().st_size > 2_000_000:

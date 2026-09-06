@@ -5,13 +5,16 @@ from enum import StrEnum
 
 class WorkflowState(StrEnum):
     IDLE = "IDLE"
+    VALIDATING = "VALIDATING"
     EXPORTING_SRT = "EXPORTING_SRT"
     OPENING_VBEE = "OPENING_VBEE"
     LOGIN_REQUIRED = "LOGIN_REQUIRED"
     UPLOADING_SRT = "UPLOADING_SRT"
+    CONFIGURING_VOICE = "CONFIGURING_VOICE"
     SUBMITTING = "SUBMITTING"
     PROCESSING = "PROCESSING"
     DOWNLOADING = "DOWNLOADING"
+    PROCESSING_AUDIO = "PROCESSING_AUDIO"
     IMPORTING_AUDIO = "IMPORTING_AUDIO"
     READY = "READY"
     ERROR = "ERROR"
@@ -20,13 +23,16 @@ class WorkflowState(StrEnum):
     def label(self) -> str:
         labels = {
             self.IDLE: "Sẵn sàng",
+            self.VALIDATING: "Đang kiểm tra điều kiện kịch bản và công cụ",
             self.EXPORTING_SRT: "Đang xuất file SRT tiếng Việt",
             self.OPENING_VBEE: "Đang mở Vbee Dubbing Studio",
             self.LOGIN_REQUIRED: "Cần đăng nhập Vbee trên trình duyệt",
             self.UPLOADING_SRT: "Đang tải file SRT lên Vbee",
+            self.CONFIGURING_VOICE: "Đang cấu hình giọng đọc HN - Ngọc Huyền & thông số",
             self.SUBMITTING: "Đang yêu cầu chuyển phụ đề",
             self.PROCESSING: "Vbee đang xử lý phụ đề thành voice…",
             self.DOWNLOADING: "Đang tải file âm thanh kết quả",
+            self.PROCESSING_AUDIO: "Đang chuẩn hóa âm thanh qua FFmpeg",
             self.IMPORTING_AUDIO: "Đang nhập âm thanh vào project VK Dub Studio",
             self.READY: "Hoàn tất! Voice Vbee đã sẵn sàng",
             self.ERROR: "Có lỗi xảy ra trong quá trình tạo voice",
@@ -48,12 +54,15 @@ class WorkflowState(StrEnum):
         """Sequential 0-indexed step number for checklist progression."""
         order = [
             self.IDLE,
+            self.VALIDATING,
             self.EXPORTING_SRT,
             self.OPENING_VBEE,
             self.UPLOADING_SRT,
+            self.CONFIGURING_VOICE,
             self.SUBMITTING,
             self.PROCESSING,
             self.DOWNLOADING,
+            self.PROCESSING_AUDIO,
             self.IMPORTING_AUDIO,
             self.READY,
         ]

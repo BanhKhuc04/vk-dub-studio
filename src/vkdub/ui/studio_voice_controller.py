@@ -241,7 +241,15 @@ class StudioVoiceController(TTSController):
         self.window.log("Đang tạo voice từ kịch bản đã duyệt bằng giọng đang chọn…")
         return self._local_job("voice", operation)
 
-    def provider(self, backend: str) -> VieNeuLocalProvider:
+    def provider(self, backend: str) -> Any:
+        if backend == "vbee":
+            from vkdub.providers.vbee_tts import VbeeTTSProvider
+            from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+            from vkdub.services.tts_usage import TTSUsage
+
+            app_id = VbeeAppStore().get() or ""
+            token = VbeeTokenStore().get() or ""
+            return VbeeTTSProvider(app_id, token, TTSUsage())
         factory = CapCutTTSProvider if backend == "capcut_tts" else VieNeuLocalProvider
         return factory(str(self.window.tools.paths["ffmpeg"]))
 
@@ -270,6 +278,29 @@ class StudioVoiceController(TTSController):
         if self.window.busy:
             return False
         if backend == "vbee":
+            vbee_mode = getattr(load_app_settings(), "vbee_mode", "browser")
+            if vbee_mode == "api":
+                async def vbee_api_test_operation() -> list[dict]:
+                    assert self.job
+                    from vkdub.providers.vbee_tts import VbeeTTSProvider
+                    from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+                    from vkdub.services.tts_usage import TTSUsage
+
+                    app_id = VbeeAppStore().get()
+                    token = VbeeTokenStore().get()
+                    if not app_id or not token:
+                        raise ValueError("Chưa lưu App ID hoặc Access Token cho Vbee API.")
+                    self.job.progress.emit(20, "Đang kết nối kiểm tra Vbee API…")
+                    tts = VbeeTTSProvider(app_id, token, TTSUsage())
+                    voices = await tts.list_voices()
+                    self.job.progress.emit(
+                        100, f"✓ Kết nối Vbee API thành công ({len(voices)} giọng khả dụng)!"
+                    )
+                    return read_catalog("vbee")
+
+                self.setup_backend = backend
+                return self._local_job("setup", vbee_api_test_operation)
+
             async def vbee_test_operation() -> list[dict]:
                 assert self.job
                 from playwright.async_api import async_playwright
@@ -278,26 +309,28 @@ class StudioVoiceController(TTSController):
                 from vkdub.integrations.vbee.session import create_vbee_browser_context
                 from vkdub.services.voice_catalog import read_catalog
 
-                self.job.progress.emit("Đang mở trình duyệt Vbee Dubbing Studio...")
+                self.job.progress.emit(10, "Đang mở trình duyệt Vbee Dubbing Studio...")
                 async with async_playwright() as p:
                     context = await create_vbee_browser_context(p, headless=False)
                     try:
                         automation = VbeeBrowserAutomation(context)
                         await automation.open_dubbing_studio()
-                        self.job.progress.emit("Đang kiểm tra trạng thái đăng nhập Vbee...")
+                        self.job.progress.emit(30, "Đang kiểm tra trạng thái đăng nhập Vbee...")
                         logged_in = await automation.is_logged_in()
                         if logged_in:
-                            self.job.progress.emit("✓ Vbee đã đăng nhập sẵn. Sẵn sàng sử dụng!")
+                            self.job.progress.emit(
+                                100, "✓ Vbee đã đăng nhập sẵn. Sẵn sàng sử dụng!"
+                            )
                         else:
                             self.job.progress.emit(
-                                "Vbee chưa đăng nhập. Vui lòng đăng nhập trên cửa sổ vừa mở..."
+                                40, "Vbee chưa đăng nhập. Vui lòng đăng nhập trên cửa sổ vừa mở..."
                             )
                             await automation.wait_for_user_login(
-                                timeout_s=90,
+                                timeout_s=180,
                                 check_cancel=self.job.check_cancel,
-                                progress_callback=self.job.progress.emit,
+                                progress_callback=lambda msg: self.job.progress.emit(50, msg),
                             )
-                            self.job.progress.emit("✓ Đăng nhập Vbee thành công!")
+                            self.job.progress.emit(100, "✓ Đăng nhập Vbee thành công!")
                     finally:
                         await context.close()
                 return read_catalog("vbee")
@@ -338,10 +371,11 @@ class StudioVoiceController(TTSController):
     def preview_voice(self, identifier: str | None = None, backend: str | None = None) -> bool:
         backend = backend or self.window.project.voice.provider
         if backend == "vbee":
-            self.window.log(
-                "Vbee tạo voice qua trình duyệt; bấm Duyệt kịch bản để tạo voice tự động."
-            )
-            return False
+            if getattr(load_app_settings(), "vbee_mode", "browser") != "api":
+                self.window.log(
+                    "Vbee tạo voice qua trình duyệt; bấm Duyệt kịch bản để tạo voice tự động."
+                )
+                return False
         if (
             not check_tts_backend(backend).ok
             or self.window.busy

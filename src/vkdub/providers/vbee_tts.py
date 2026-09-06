@@ -21,17 +21,47 @@ SYNC_LABELS = {
 MAX_AUDIO_BYTES = 32 * 1024 * 1024
 
 
-def response_error(status: int) -> TTSError:
+import json
+
+
+def response_error(status: int, payload: httpx.Response | bytes | None = None) -> TTSError:
+    detail = ""
+    if payload is not None:
+        try:
+            if isinstance(payload, httpx.Response):
+                raw = payload.text
+            else:
+                raw = payload.decode("utf-8", errors="ignore")
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                if "error" in data and isinstance(data["error"], dict) and "message" in data["error"]:
+                    detail = redact(str(data["error"]["message"]))
+                elif "error_message" in data:
+                    detail = redact(str(data["error_message"]))
+                    if "details" in data and isinstance(data["details"], list) and data["details"]:
+                        detail += f": {data['details']}"
+                elif "message" in data:
+                    detail = redact(str(data["message"]))
+        except Exception:
+            pass
+
     if status in (401, 403):
         return TTSError(
-            "Vbee từ chối xác thực/quyền API. Kiểm tra App ID, token, hạn token và gói API."
+            f"Vbee từ chối xác thực/quyền API ({detail or 'Kiểm tra App ID, token, hạn token và gói API'})."
         )
     if status == 429:
-        return TTSError("Vbee giới hạn yêu cầu đồng thời/quota. Chờ rồi thử lại câu lỗi.")
+        return TTSError(f"Vbee giới hạn yêu cầu đồng thời/quota ({detail or 'Chờ rồi thử lại'}).")
     if status == 400:
-        return TTSError("Vbee từ chối yêu cầu: kiểm tra credit, mã giọng và quyền Realtime API.")
+        if "not supported in user package" in detail:
+            return TTSError(
+                "Gói tài khoản Vbee của bạn chưa hỗ trợ Realtime API (This feature is not supported in user package). "
+                "Vui lòng chọn chế độ 'Trình duyệt tự động (Vbee Dubbing Studio)' để dùng trực tiếp với gói cước hiện tại!"
+            )
+        return TTSError(
+            f"Vbee từ chối yêu cầu: {detail or 'kiểm tra credit, mã giọng và quyền Realtime API.'}"
+        )
     return TTSError(
-        f"Vbee trả lỗi HTTP {status}. Kiểm tra credit/gói API rồi thử lại; chưa tự gửi lại."
+        f"Vbee trả lỗi HTTP {status}{f': {detail}' if detail else ''}. Kiểm tra credit/gói API rồi thử lại; chưa tự gửi lại."
     )
 
 
@@ -68,9 +98,12 @@ class VbeeTTSProvider:
         try:
             async with self.client() as client:
                 for _ in range(100):
-                    response = await client.get(VOICES_URL, params={"limit": 100, "cursor": cursor})
+                    params: dict[str, str | int] = {"limit": 100, "voiceOwnership": "VBEE"}
+                    if cursor:
+                        params["cursor"] = cursor
+                    response = await client.get(VOICES_URL, params=params)
                     if response.status_code != 200:
-                        raise response_error(response.status_code)
+                        raise response_error(response.status_code, response)
                     if len(response.content) > 2 * 1024 * 1024:
                         raise TTSError("Danh sách giọng Vbee quá lớn.")
                     data = response.json()
@@ -102,6 +135,37 @@ class VbeeTTSProvider:
             raise TTSError("Danh sách giọng Vbee sai cấu trúc; chưa áp dụng.") from None
         raise TTSError("Phân trang danh sách giọng Vbee không hợp lệ hoặc vượt giới hạn.")
 
+    async def check_realtime_support(self) -> tuple[bool, str]:
+        """Check whether the user's account package supports Realtime Sync TTS API."""
+        try:
+            async with self.client() as client:
+                resp = await client.post(
+                    TTS_URL,
+                    json={
+                        "text": "a",
+                        "voiceCode": "__check__",
+                        "speed": 1.0,
+                        "mode": "sync",
+                        "outputFormat": "mp3",
+                    },
+                )
+                if resp.status_code == 200:
+                    return True, "Hỗ trợ Realtime API"
+                try:
+                    data = resp.json()
+                    err_msg = ""
+                    if isinstance(data, dict) and "error" in data and isinstance(data["error"], dict):
+                        err_msg = data["error"].get("message", "")
+                    if "not supported in user package" in err_msg:
+                        return False, "gói tài khoản hiện tại (Vbee for Educators) chưa mở quyền Realtime API"
+                    if "voiceCode" in err_msg or "voice" in err_msg.lower():
+                        return True, "Hỗ trợ Realtime API"
+                    return False, err_msg or f"HTTP {resp.status_code}"
+                except Exception:
+                    return False, f"HTTP {resp.status_code}"
+        except Exception as exc:
+            return False, str(exc)
+
     async def synthesize(self, text: str, voice_id: str, speed: float, output_path: Path) -> Path:
         if not text.strip() or len(text) > self.max_characters:
             raise TTSError("Vbee Realtime yêu cầu 1–300 ký tự mỗi lượt.")
@@ -124,7 +188,8 @@ class VbeeTTSProvider:
                     },
                 ) as response:
                     if response.status_code != 200:
-                        raise response_error(response.status_code)
+                        body = await response.aread()
+                        raise response_error(response.status_code, body)
                     content_type = response.headers.get("content-type", "").split(";")[0].lower()
                     if content_type not in ("audio/mpeg", "audio/mp3", "application/octet-stream"):
                         raise TTSError(

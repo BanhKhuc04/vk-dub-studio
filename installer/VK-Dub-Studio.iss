@@ -1,14 +1,17 @@
-; Inno Setup Script for VK Dub Studio — by vanhkhuc
-; Produces: VK-Dub-Studio-Setup-x64.exe
+; Inno Setup Script for VK Dub Studio — by vanhkhuc.dev
+; Produces: VKDubStudio-Setup-X.Y.Z.exe
+
+#ifndef MyAppVersion
+#define MyAppVersion "2.1.1"
+#endif
 
 #define MyAppName "VK Dub Studio"
-#define MyAppPublisher "vanhkhuc"
+#define MyAppPublisher "vanhkhuc.dev"
 #define MyAppURL "https://github.com/vanhkhuc/vk-dub-studio"
 #define MyAppExeName "VK Dub Studio.exe"
-#define MyAppVersion "1.0.0"
 
 [Setup]
-AppId={{C7896431-72A8-4D78-9B21-04987E840E2A}
+AppId={{C7896431-72A8-4D78-9B21-04987E840E2A}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} v{#MyAppVersion}
@@ -20,12 +23,15 @@ DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=VK-Dub-Studio-Setup-x64
+OutputBaseFilename=VKDubStudio-Setup-{#MyAppVersion}
+SetupIconFile=..\resources\icon.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 CloseApplications=yes
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -41,4 +47,4 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent\n
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

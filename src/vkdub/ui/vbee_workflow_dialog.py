@@ -144,18 +144,35 @@ class VbeeWorkflowDialog(QDialog):
 
     def update_state(self, state: WorkflowState, message: str) -> None:
         """Update progress bar, checklist icons, and status text based on workflow state."""
-        self.status_banner.setText(f"Trạng thái: {message}")
+        if state == WorkflowState.LOGIN_REQUIRED:
+            banner_text = "Vui lòng đăng nhập Vbee trên cửa sổ Edge. Chỉ cần thực hiện một lần."
+            self.status_banner.setText(f"Trạng thái: {banner_text}")
+            self.status_banner.setStyleSheet(
+                "background: #78350f; color: #fef3c7; border: 1px solid #d97706; "
+                "border-radius: 6px; padding: 8px 12px; font-weight: bold; font-size: 13px;"
+            )
+        else:
+            self.status_banner.setText(f"Trạng thái: {message}")
+            if not state.is_terminal:
+                self.status_banner.setStyleSheet(
+                    "background: #1e293b; color: #f8fafc; border: 1px solid #334155; "
+                    "border-radius: 6px; padding: 8px 12px; font-weight: 600; font-size: 13px;"
+                )
+
         self.append_log(f"[{state.value}] {message}")
 
         # Map state to current step index in checklist
         state_mapping = {
+            WorkflowState.VALIDATING: 0,
             WorkflowState.EXPORTING_SRT: 0,
             WorkflowState.OPENING_VBEE: 1,
             WorkflowState.LOGIN_REQUIRED: 1,
             WorkflowState.UPLOADING_SRT: 2,
+            WorkflowState.CONFIGURING_VOICE: 3,
             WorkflowState.SUBMITTING: 3,
             WorkflowState.PROCESSING: 3,
             WorkflowState.DOWNLOADING: 4,
+            WorkflowState.PROCESSING_AUDIO: 5,
             WorkflowState.IMPORTING_AUDIO: 5,
             WorkflowState.READY: 6,
         }

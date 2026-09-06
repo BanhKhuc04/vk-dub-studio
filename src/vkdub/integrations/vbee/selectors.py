@@ -76,6 +76,49 @@ VOICE_SELECT_TRIGGER = (
     "div[class*='select-voice']",
     ".ant-select:has(.ant-select-selection-item)",
     "div:has-text('Chọn giọng đọc')",
+    "span:has-text('Chọn giọng')",
+    "div:has-text('Giọng đọc')",
+    "button:has-text('Đổi giọng')",
+)
+
+VOICE_NGOC_HUYEN_OPTIONS = (
+    "div.ant-select-item-option:has-text('Ngọc Huyền')",
+    "div[role='option']:has-text('Ngọc Huyền')",
+    "div:has-text('HN - Ngọc Huyền')",
+    "span:has-text('HN - Ngọc Huyền')",
+    "span:has-text('Ngọc Huyền')",
+    "li:has-text('Ngọc Huyền')",
+)
+
+SPEED_TRIGGER = (
+    ".speed [data-testid='ArrowDropDownIcon']",
+    ".speed .MuiAutocomplete-popupIndicator",
+    ".speed button",
+    "div[class*='speed']",
+    "span:has-text('Tốc độ')",
+    "button:has-text('1x')",
+    "span:has-text('1x')",
+    "span:has-text('1.0x')",
+)
+
+SPEED_OPTIONS_1X = (
+    "li.MuiMenuItem-root:has-text('1x')",
+    "div.ant-select-item-option:has-text('1.0x')",
+    "div.ant-select-item-option:has-text('1x')",
+    "div[role='option']:has-text('1.0x')",
+    "div[role='option']:has-text('1x')",
+    "span:has-text('1.0x')",
+    "span:has-text('1x (Chuẩn)')",
+    "li:has-text('1.0x')",
+    "li:has-text('1x')",
+)
+
+FORMAT_OPTIONS_MP3 = (
+    "button:has-text('MP3')",
+    "span:has-text('MP3')",
+    "input[value='mp3']",
+    "label:has-text('MP3')",
+    "div.ant-radio-button-wrapper:has-text('MP3')",
 )
 
 # Conversion submission
@@ -108,6 +151,9 @@ PROCESSING_INDICATORS = (
 
 # Completion indicators
 COMPLETION_INDICATORS = (
+    "button:has(svg[data-testid*='Download'])",
+    "svg[data-testid*='Download']",
+    "svg[data-testid='DownloadRoundedIcon']",
     "span:has-text('Hoàn thành')",
     "span:has-text('Thành công')",
     "button:has-text('Tải về')",
@@ -119,6 +165,9 @@ COMPLETION_INDICATORS = (
 
 # Download button selectors
 DOWNLOAD_BUTTON_SELECTORS = (
+    "button:has(svg[data-testid*='Download'])",
+    "svg[data-testid*='Download']",
+    "svg[data-testid='DownloadRoundedIcon']",
     "button:has-text('Tải xuống')",
     "button:has-text('Tải về')",
     "button:has-text('Tải audio')",

@@ -28,6 +28,7 @@ def clock_text(milliseconds: int) -> str:
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
+
 class VideoPreview(QFrame):
     playback_error = Signal(str)
     mask_requested = Signal()
@@ -99,9 +100,9 @@ class VideoPreview(QFrame):
         controls.addStretch()
 
         # Key action buttons (as specified in Section 11)
-        self.btn_mask = QPushButton("➕ Xóa chữ")
+        self.btn_mask = QPushButton("▣ Khung dịch / Xóa chữ")
         self.btn_mask.setToolTip(
-            "Tái tạo nền để xóa chữ · Kéo để di chuyển · Kéo góc để đổi kích thước · × để xóa"
+            "Khung chọn khu vực phụ đề cần che/dịch · Kéo để di chuyển · Kéo góc để đổi kích thước"
         )
         self.btn_mask.clicked.connect(self._mask_clicked)
 

@@ -103,24 +103,30 @@ async def slice_and_import_vbee_audio(
     # Normalize the master audio file to standard PCM WAV
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     master_wav = target_dir / f"master_vbee_{timestamp_str}.wav"
+    logger.info("[VOICE][FFMPEG] Đang chuẩn hóa file tải về thành WAV PCM: %s -> %s", downloaded_audio.name, master_wav.name)
     await convert_to_pcm_wav(downloaded_audio, master_wav, ffmpeg)
 
     master_duration_ms = await audio_duration(master_wav, ffprobe)
     logger.info(
-        "Đã chuẩn hóa audio Vbee: %s (thời lượng: %.2fs)",
+        "[VOICE][FFMPEG] Đã chuẩn hóa audio Vbee: %s (thời lượng: %.2fs)",
         master_wav.name,
         master_duration_ms / 1000,
     )
 
-    # Configure voice settings on the project
-    voice_settings = VoiceSettings(
-        provider="vbee",
-        voice_id=voice_id,
-        display_name=display_name,
-        speed=1.0,
-        volume=1.0,
-    )
-    project.voice = voice_settings
+    # Configure voice settings on the project (preserve existing selection if vbee)
+    if project.voice and project.voice.provider == "vbee" and project.voice.voice_id not in ("unconfigured", ""):
+        voice_settings = project.voice
+    else:
+        voice_settings = VoiceSettings(
+            provider="vbee",
+            voice_id=voice_id,
+            display_name=display_name,
+            speed=1.0,
+            volume=1.0,
+        )
+        project.voice = voice_settings
+
+    logger.info("[VOICE][IMPORT] Bắt đầu cắt và nhập từng câu thoại theo kịch bản…")
 
     # Slice per script line
     lines = project.script.lines

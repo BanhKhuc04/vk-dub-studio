@@ -8,6 +8,11 @@ __pycache__/
 .runtime/
 build/
 dist/
+tools/
+models/
+diagnostics/
+scratch/
+*.zip
 .env
 *.vkdub
 browser_profiles/
