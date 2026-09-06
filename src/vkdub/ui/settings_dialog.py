@@ -494,6 +494,34 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(self.vbee_api_box)
 
+        # Vbee Browser Reset Box (only shown in browser mode)
+        self.vbee_browser_box = QWidget()
+        vbee_browser_layout = QVBoxLayout(self.vbee_browser_box)
+        vbee_browser_layout.setContentsMargins(0, 4, 0, 8)
+        vbee_browser_layout.setSpacing(8)
+
+        vbee_browser_layout.addWidget(section_label("TÀI KHOẢN VBEE (TRÌNH DUYỆT)"))
+        vbee_browser_layout.addWidget(
+            info_label(
+                "Đăng nhập Vbee lần đầu sẽ lưu phiên làm việc trên máy. "
+                "Nếu cần đổi tài khoản hoặc đăng xuất, bấm nút Reset bên dưới."
+            )
+        )
+        btn_row_browser = QHBoxLayout()
+        self.btn_reset_vbee_browser = QPushButton("🔄 Đăng xuất / Đổi tài khoản Vbee (Reset phiên trình duyệt)")
+        self.btn_reset_vbee_browser.setStyleSheet(
+            "background: #7c3aed; color: white; font-weight: 600; padding: 6px 12px;"
+        )
+        self.btn_reset_vbee_browser.clicked.connect(self._reset_vbee_browser)
+        btn_row_browser.addWidget(self.btn_reset_vbee_browser)
+        btn_row_browser.addStretch()
+        vbee_browser_layout.addLayout(btn_row_browser)
+        self.lbl_vbee_browser_status = QLabel("")
+        self.lbl_vbee_browser_status.setWordWrap(True)
+        self.lbl_vbee_browser_status.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
+        vbee_browser_layout.addWidget(self.lbl_vbee_browser_status)
+        layout.addWidget(self.vbee_browser_box)
+
         layout.addWidget(section_label("QUẢN LÝ GIỌNG ĐỌC"))
         voice_manage_box = QHBoxLayout()
         self.voice_list_combo = QComboBox()
@@ -651,6 +679,46 @@ class SettingsDialog(QDialog):
         except Exception as exc:
             self.lbl_vbee_api_status.setText(f"Lỗi: {exc}")
 
+    def _reset_vbee_browser(self) -> None:
+        """Xóa phiên trình duyệt Vbee để đăng xuất hoặc đổi tài khoản."""
+        ans = QMessageBox.question(
+            self,
+            "Xác nhận Reset phiên Vbee",
+            "Thao tác này sẽ xóa toàn bộ cookie và dữ liệu phiên đăng nhập Vbee trên máy này.\n\n"
+            "Lần chạy kế tiếp sẽ yêu cầu đăng nhập lại Vbee Dubbing Studio.\n\n"
+            "Bạn có chắc chắn muốn tiếp tục?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if ans != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            from vkdub.integrations.vbee.session import reset_vbee_browser_session
+
+            success = reset_vbee_browser_session()
+            if success:
+                self.lbl_vbee_browser_status.setStyleSheet(
+                    "color: #34d399; font-weight: 600; font-size: 12px;"
+                )
+                self.lbl_vbee_browser_status.setText(
+                    "✓ Đã xóa phiên Vbee thành công. Lần chạy kế tiếp sẽ yêu cầu đăng nhập lại."
+                )
+                QMessageBox.information(
+                    self,
+                    "Reset thành công",
+                    "Phiên Vbee đã được xóa.\n\nLần chạy kế tiếp sẽ mở cửa sổ đăng nhập Vbee mới.",
+                )
+            else:
+                self.lbl_vbee_browser_status.setStyleSheet(
+                    "color: #fca5a5; font-weight: 600; font-size: 12px;"
+                )
+                self.lbl_vbee_browser_status.setText("✗ Không thể xóa phiên Vbee. Xem log để biết thêm.")
+        except Exception as exc:
+            self.lbl_vbee_browser_status.setStyleSheet(
+                "color: #fca5a5; font-weight: 600; font-size: 12px;"
+            )
+            self.lbl_vbee_browser_status.setText(f"Lỗi: {exc}")
+
     def _test_vbee_api(self) -> None:
         try:
             import asyncio
@@ -716,6 +784,10 @@ class SettingsDialog(QDialog):
                 self.vbee_api_box.setVisible(is_vbee_api)
                 if is_vbee_api:
                     self._refresh_vbee_api_status()
+
+            if hasattr(self, "vbee_browser_box"):
+                is_vbee_browser = is_vbee and vbee_mode == "browser"
+                self.vbee_browser_box.setVisible(is_vbee_browser)
 
             idle = not self.main_window.busy
             self.voice_backend_combo.setEnabled(idle)

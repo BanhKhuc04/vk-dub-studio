@@ -1,11 +1,11 @@
 {
-  "version": "2.1.1",
-  "published_at": "2026-09-06T20:08:40Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.1/VKDubStudio-Setup-2.1.1.exe",
-  "sha256": "07610f0fc61572e3dbf0a5b5b8d6dfb0536410cd9c8f4701671d19af453ac98c",
-  "file_size_bytes": 300820564,
+  "version": "2.1.2",
+  "published_at": "2026-09-06T20:52:27Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.2/VKDubStudio-Setup-2.1.2.exe",
+  "sha256": "daeb148bf583679e97fcc7e15a7ee18580d48218fdccf3bf067a492149263509",
+  "file_size_bytes": 300831566,
   "changelog": [
-    "VK Dub Studio v2.1.1 — Bản vá và cải tiến sản xuất",
+    "VK Dub Studio v2.1.2 — Bản vá và cải tiến sản xuất",
     "Tự động kích hoạt 1 khung che phụ đề có thể co giãn, căn chỉnh phạm vi trên video khi bắt đầu xử lý",
     "Tích hợp sẵn mô hình AI Faster-Whisper Base offline trong bộ cài (không cần tải qua mạng trên máy mới)",
     "Sửa triệt để lỗi mở thêm cửa sổ mới khi bóc băng / dịch trên Windows (Headless CLI Dispatcher)",

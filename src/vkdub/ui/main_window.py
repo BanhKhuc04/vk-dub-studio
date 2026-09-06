@@ -144,6 +144,7 @@ class MainWindow(QMainWindow):
         self.left.export_video_requested.connect(self.render_controller.open_export_dialog)
         self.left.export_capcut_requested.connect(self.capcut_export.start)
         self.preview.mask_requested.connect(self.add_blur_mask)
+        self.preview.blur_requested.connect(self.add_blur_zone)
         self.preview.subtitle_requested.connect(self.open_subtitle_settings)
         self.preview.subtitle_box_toggled.connect(self._toggle_subtitle_box)
         self.preview.preview_voice_requested.connect(self._preview_voice_clicked)
@@ -338,6 +339,31 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             "Đã bật Khung che phụ đề: Kéo để di chuyển · Kéo góc để đổi kích thước bao trọn phụ đề cũ",
             12000,
+        )
+
+    def add_blur_zone(self) -> None:
+        """Thêm vùng làm mờ (blur) vào video — dùng để che watermark, logo hoặc chữ không cần dịch."""
+        if self.busy or not self.project.video_path:
+            return
+        # Đếm số vùng làm mờ hiện có để đặt tên
+        blur_count = sum(1 for m in self.project.masks if m.mask_type == "blur")
+        mask = MaskItem(
+            name=f"Làm mờ {blur_count + 1}",
+            mask_type="blur",
+            x=0.10,
+            y=0.05,
+            width=0.35,
+            height=0.12,
+            blur_strength=20,
+        )
+        self.project.masks.append(mask)
+        self.preview.video.set_masks(self.project.masks, mask.id, self.preview.player.position())
+        self.preview.video.interactive_mask_mode = True
+        self.dirty = True
+        self._refresh()
+        self.statusBar().showMessage(
+            f"Đã thêm vùng Làm mờ: Kéo để di chuyển · Kéo góc để thay đổi kích thước",
+            10000,
         )
 
     def _on_canvas_mask_rect_changed(

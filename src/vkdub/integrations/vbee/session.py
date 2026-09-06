@@ -86,6 +86,27 @@ def cleanup_stale_profile_processes(profile_dir: Path) -> None:
         logger.debug("cleanup_stale_profile_processes: %s", exc)
 
 
+def reset_vbee_browser_session() -> bool:
+    """Safely terminate any lingering browser processes and purge the Vbee user profile.
+
+    Clears all saved cookies, tokens, and storage, allowing logging in with a fresh Vbee account.
+    """
+    profile_dir = get_vbee_profile_dir()
+    try:
+        cleanup_stale_profile_processes(profile_dir)
+        import time
+
+        time.sleep(0.5)
+        if profile_dir.exists():
+            shutil.rmtree(profile_dir, ignore_errors=True)
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Vbee browser profile reset successfully.")
+        return True
+    except Exception as exc:
+        logger.error("Failed to reset Vbee browser profile: %s", exc)
+        return False
+
+
 async def create_vbee_browser_context(
     playwright: Playwright,
     profile_dir: Path | None = None,

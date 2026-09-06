@@ -28,10 +28,10 @@ def clock_text(milliseconds: int) -> str:
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
-
 class VideoPreview(QFrame):
     playback_error = Signal(str)
     mask_requested = Signal()
+    blur_requested = Signal()
     subtitle_requested = Signal()
     subtitle_box_toggled = Signal(bool)
     preview_voice_requested = Signal()
@@ -99,12 +99,19 @@ class VideoPreview(QFrame):
 
         controls.addStretch()
 
-        # Key action buttons (as specified in Section 11)
+        # Key action buttons
         self.btn_mask = QPushButton("▣ Khung dịch / Xóa chữ")
         self.btn_mask.setToolTip(
             "Khung chọn khu vực phụ đề cần che/dịch · Kéo để di chuyển · Kéo góc để đổi kích thước"
         )
         self.btn_mask.clicked.connect(self._mask_clicked)
+
+        self.btn_blur = QPushButton("🌫 Làm mờ chữ")
+        self.btn_blur.setToolTip(
+            "Thêm vùng làm mờ (blur) — che logo/watermark/chữ không cần dịch "
+            "· Kéo để di chuyển · Kéo góc để đổi kích thước"
+        )
+        self.btn_blur.clicked.connect(self._blur_clicked)
 
         self.btn_subtitle = QPushButton("✥ Vị trí & kiểu Sub")
         self.btn_subtitle.setToolTip("Mở chỉnh phụ đề; kéo khung trên video để đổi vị trí")
@@ -136,6 +143,7 @@ class VideoPreview(QFrame):
         actions = QHBoxLayout()
         for btn in (
             self.btn_mask,
+            self.btn_blur,
             self.btn_subtitle,
             self.btn_sub_box,
             self.btn_preview_voice,
@@ -168,6 +176,9 @@ class VideoPreview(QFrame):
 
     def _mask_clicked(self) -> None:
         self.mask_requested.emit()
+
+    def _blur_clicked(self) -> None:
+        self.blur_requested.emit()
 
     def _subtitle_clicked(self) -> None:
         self.subtitle_requested.emit()
