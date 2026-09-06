@@ -162,12 +162,18 @@ def launch_installer(installer_path: Path) -> subprocess.Popen:
 
 
 def apply_update_and_restart(installer_path: Path, silent: bool = False) -> None:
-    """Launch installer to upgrade the application, wait for completion, then relaunch VK Dub Studio."""
+    """Launch installer to upgrade the application, then relaunch VK Dub Studio.
+
+    Writes a temporary .bat file to avoid cmd.exe escaping issues with
+    backslash paths on Windows.
+    """
     import sys
+    import tempfile
 
     if not installer_path.is_file():
         raise FileNotFoundError(f"Tệp cài đặt không tồn tại: {installer_path}")
 
+    # Resolve the app executable path
     exe_path = sys.executable if getattr(sys, "frozen", False) else ""
     target_exe = (
         Path(exe_path).resolve()
@@ -175,14 +181,33 @@ def apply_update_and_restart(installer_path: Path, silent: bool = False) -> None
         else Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "VK Dub Studio" / "VK Dub Studio.exe"
     )
 
-    installer_str = f'"{installer_path.resolve()}"'
+    installer_abs = str(installer_path.resolve())
+    target_abs = str(target_exe)
     args = "/SILENT /CLOSEAPPLICATIONS" if silent else "/CLOSEAPPLICATIONS"
-    target_str = f'"{target_exe}"'
 
-    cmd_script = (
-        f'timeout /t 2 /nobreak >nul & '
-        f'start "" /wait {installer_str} {args} & '
-        f'start "" {target_str}'
+    # Write a temporary .bat file — avoids backslash escaping issues when
+    # passing long paths inline to cmd.exe /c "..."
+    bat_lines = [
+        "@echo off",
+        "timeout /t 2 /nobreak >nul",
+        f'start "" /wait "{installer_abs}" {args}',
+        f'if exist "{target_abs}" start "" "{target_abs}"',
+    ]
+    bat_content = "\r\n".join(bat_lines) + "\r\n"
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".bat",
+        prefix="vkdub_update_",
+        delete=False,
+        encoding="utf-8",
     )
+    tmp.write(bat_content)
+    tmp.close()
+
     creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-    subprocess.Popen(["cmd.exe", "/c", cmd_script], creationflags=creation_flags)
+    subprocess.Popen(
+        ["cmd.exe", "/c", tmp.name],
+        creationflags=creation_flags,
+        close_fds=True,
+    )
