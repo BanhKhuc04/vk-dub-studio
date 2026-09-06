@@ -48,6 +48,7 @@ from vkdub.ui.subtitle_style_dialog import SubtitleStyleDialog
 from vkdub.ui.transcription_controller import TranscriptionController
 from vkdub.ui.translation_controller import TranslationController
 from vkdub.ui.tts_controller import TTSController
+from vkdub.ui.vbee_controller import VbeeController
 from vkdub.ui.video_preview import VideoPreview
 from vkdub.version import APP_BRANDING, __version__
 
@@ -127,6 +128,8 @@ class MainWindow(QMainWindow):
             self.tts.panel.hide()
         self.render_controller = RenderController(self)
         self.capcut_export = CapCutExportController(self)
+        self.vbee_controller = VbeeController(self)
+        self.left.vbee_voice_requested.connect(self.vbee_controller.start_workflow)
         self.review.export_button.hide()
         self.review.approve_button.hide()
         self._auto_pipeline: bool = False
@@ -400,6 +403,18 @@ class MainWindow(QMainWindow):
         self.left.save_button.setEnabled(not self.busy)
         self.left.output_button.setEnabled(not self.busy)
         self.left.detect_button.setEnabled(enabled)
+        can_vbee = enabled and bool(self.project.script) and self.project.is_approved
+        self.left.btn_vbee_voice.setEnabled(can_vbee)
+        if not self.project.script:
+            self.left.btn_vbee_voice.setToolTip("Cần có kịch bản trước khi tạo voice bằng Vbee.")
+        elif not self.project.is_approved:
+            self.left.btn_vbee_voice.setToolTip("Duyệt kịch bản trước khi tạo voice bằng Vbee.")
+        else:
+            self.left.btn_vbee_voice.setToolTip(
+                "Tự động xuất SRT tiếng Việt, mở Vbee Dubbing Studio, "
+                "tạo voice và đồng bộ vào project."
+            )
+
         self.transcription.refresh()
         self.translation.refresh()
         self.review_controller.refresh()

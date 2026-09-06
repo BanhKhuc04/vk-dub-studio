@@ -35,6 +35,7 @@ class LeftConfigPanel(QFrame):
     open_capcut_folder_requested = Signal()
     export_video_requested = Signal()
     export_capcut_requested = Signal()
+    vbee_voice_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -204,6 +205,18 @@ class LeftConfigPanel(QFrame):
         self.manage_voices_button.clicked.connect(self.manage_voices_requested.emit)
         voice_actions.addWidget(self.manage_voices_button)
         voice_col.addLayout(voice_actions)
+
+        self.btn_vbee_voice = QPushButton("⚡ Tạo voice bằng Vbee")
+        self.btn_vbee_voice.setToolTip(
+            "Tự động xuất SRT tiếng Việt, mở Vbee Dubbing Studio, tạo voice và đồng bộ vào project."
+        )
+        self.btn_vbee_voice.setStyleSheet(
+            "background: #0284c7; color: #ffffff; font-weight: bold; padding: 6px 8px; "
+            "font-size: 11px; border-radius: 4px; margin-top: 4px;"
+        )
+        self.btn_vbee_voice.clicked.connect(self.vbee_voice_requested.emit)
+        voice_col.addWidget(self.btn_vbee_voice)
+
         layout.addLayout(voice_col)
 
         sep3 = QFrame()
