@@ -74,3 +74,48 @@ def test_pipeline_runner_initial_state(qapp, tmp_path):
     assert runner.substeps[1].id == "4.2"
     assert runner.substeps[2].id == "4.3"
     assert runner.substeps[3].id == "4.4"
+
+
+def test_pipeline_runner_step_4_3_execution(qapp, tmp_path, monkeypatch):
+    from unittest.mock import MagicMock
+
+    # Prepare existing original.srt and translated.srt
+    orig_file = tmp_path / "original.srt"
+    orig_file.write_text("1\n00:00:00,000 --> 00:00:02,000\nHello world\n", encoding="utf-8")
+    trans_file = tmp_path / "translated.srt"
+    trans_file.write_text("1\n00:00:00,000 --> 00:00:02,000\nXin chào thế giới\n", encoding="utf-8")
+
+    project = Project()
+    agent = LocalAgent()
+
+    # Mock agent.generate_vbee_sync to simulate 4.4 without real browser
+    mock_audio = tmp_path / "mock_vbee.mp3"
+    mock_audio.write_bytes(b"FAKE_MP3_DATA")
+    agent.generate_vbee_sync = MagicMock(return_value=mock_audio)
+
+    # Mock build_master_timeline_audio to avoid ffmpeg call
+    import vkdub.orchestrator.pipeline_runner as pr_mod
+    monkeypatch.setattr(pr_mod, "build_master_timeline_audio", lambda **kwargs: tmp_path / "master_narration_timeline.mp3")
+
+    runner = PipelineRunner(project=project, local_agent=agent, output_dir=tmp_path)
+    # Run synchronously in test
+    runner.run()
+
+    # Verify Step 4.3 succeeded
+    s43 = next(s for s in runner.substeps if s.id == "4.3")
+    assert s43.status == SubstepStatus.SUCCESS
+    assert project.script is not None
+    assert len(project.script.lines) == 1
+    assert project.script.lines[0].text == "Xin chào thế giới"
+    assert project.target_language == "vi"
+
+    # Verify voice_script.txt was written
+    voice_txt = tmp_path / "voice_script.txt"
+    assert voice_txt.is_file()
+    assert voice_txt.read_text(encoding="utf-8").strip() == "Xin chào thế giới"
+
+    # Verify Step 4.4 and overall pipeline completion
+    s44 = next(s for s in runner.substeps if s.id == "4.4")
+    assert s44.status == SubstepStatus.SUCCESS
+    assert runner.state == PipelineState.REVIEW_READY
+

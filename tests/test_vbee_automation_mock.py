@@ -11,6 +11,7 @@ from vkdub.integrations.vbee.automation import VbeeBrowserAutomation
 from vkdub.integrations.vbee.errors import (
     VbeeDownloadError,
     VbeeQuotaExceededError,
+    VbeeUploadError,
 )
 from vkdub.integrations.vbee.state import WorkflowState
 from vkdub.integrations.vbee.workflow import VbeeVoiceWorkflow
@@ -87,6 +88,31 @@ async def test_automation_upload_srt(tmp_path: Path) -> None:
 
     await automation.upload_srt(srt_file)
     mock_input.set_input_files.assert_called_once_with(str(srt_file.resolve()))
+
+
+@pytest.mark.anyio
+async def test_submit_reports_provider_upload_rejection_immediately() -> None:
+    mock_context = MagicMock()
+    mock_page = _make_mock_page()
+    mock_context.pages = [mock_page]
+    submit = AsyncMock()
+    submit.is_visible.return_value = True
+    submit.is_enabled.return_value = True
+    rejection = AsyncMock()
+    rejection.is_visible.return_value = True
+
+    async def query_selector(selector: str):
+        if "Chuyển phụ đề" in selector:
+            return submit
+        if "Phải upload file phụ đề" in selector:
+            return rejection
+        return None
+
+    mock_page.query_selector.side_effect = query_selector
+    automation = VbeeBrowserAutomation(mock_context)
+
+    with pytest.raises(VbeeUploadError, match="không nhận tệp SRT"):
+        await automation.submit_conversion()
 
 
 @pytest.mark.anyio

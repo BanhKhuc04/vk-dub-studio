@@ -215,9 +215,24 @@ async function handleChatGPTTranslate(payload) {
 async function handleVbeeGenerate(payload) {
   try {
     const tab = await getOrOpenTab(
-      ["*://studio.vbee.vn/*", "*://vbee.vn/*"],
+      ["*://studio.vbee.vn/*dubbing*", "*://studio.vbee.vn/*", "*://vbee.vn/*"],
       "https://studio.vbee.vn/studio/dubbing"
     );
+    if (!tab.url || !tab.url.includes("/dubbing")) {
+      console.log(`[SW] Navigating tab ${tab.id} to /studio/dubbing...`);
+      await chrome.tabs.update(tab.id, { url: "https://studio.vbee.vn/studio/dubbing" });
+      await new Promise((resolve) => {
+        const listener = (tabId, info) => {
+          if (tabId === tab.id && info.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(listener);
+            resolve();
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+        setTimeout(resolve, 8000);
+      });
+      await new Promise((r) => setTimeout(r, 2000));
+    }
     await ensureAdapterInjected(tab.id, "content/vbeeAdapter.js", "CHECK_VBEE_STATUS");
     const resp = await chrome.tabs.sendMessage(tab.id, {
       action: "VBEE_GENERATE_VOICE",

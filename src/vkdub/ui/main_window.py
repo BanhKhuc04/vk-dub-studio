@@ -521,6 +521,11 @@ class MainWindow(QMainWindow):
         out_name = self.project.video_path.stem or "dubbing"
         output_dir = workspace_root() / "export" / out_name
 
+        import importlib
+        import vkdub.orchestrator.pipeline_runner as pr_mod
+        importlib.reload(pr_mod)
+        PipelineRunner = pr_mod.PipelineRunner
+
         self.pipeline_runner = PipelineRunner(
             project=self.project,
             local_agent=self.local_agent,

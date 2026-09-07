@@ -72,7 +72,24 @@
       return { status: "NAVIGATING", message: "Đang mở trang Chuyển phụ đề Vbee...", request_id };
     }
 
-    // 2. Locate SRT file input
+    // 2. Handle initial policy / terms agreement modal if present
+    const termsCheckbox = document.querySelector("input[type='checkbox'], .ant-checkbox-input, span.ant-checkbox");
+    if (termsCheckbox) {
+      if (!termsCheckbox.checked && !termsCheckbox.classList.contains("ant-checkbox-checked")) {
+        termsCheckbox.click();
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      const agreeBtn =
+        findElementByText("button", "Đồng ý & Tiếp tục") ||
+        findElementByText("button", "Đồng ý") ||
+        findElementByText("button", "Tiếp tục");
+      if (agreeBtn) {
+        agreeBtn.click();
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+
+    // 3. Locate SRT file input
     let fileInput = null;
     for (let i = 0; i < 20; i++) {
       fileInput = document.querySelector("input[type='file'][accept*='.srt'], input[type='file']");

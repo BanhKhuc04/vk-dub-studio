@@ -121,7 +121,7 @@ class PipelineRunner(QThread):
             # =======================================================
             # 4.1 TRANSCRIPTION (Whisper / Existing Script)
             # =======================================================
-            orig_srt_path = self.artifacts.original_srt
+            orig_srt_path = self.artifacts.original_srt or (self.output_dir / "original.srt")
             if not (orig_srt_path and orig_srt_path.is_file()):
                 self.state = PipelineState.TRANSCRIBING
                 self.state_changed.emit(self.state, "Đang bóc băng phụ đề gốc...")
@@ -192,7 +192,8 @@ class PipelineRunner(QThread):
                 self.state = PipelineState.TRANSCRIBED
                 self.state_changed.emit(self.state, "Bóc băng hoàn tất.")
             else:
-                logger.info("Reusing existing original.srt from checkpoint: %s", orig_srt_path)
+                self.artifacts.original_srt = orig_srt_path
+                logger.info("Reusing existing original.srt: %s", orig_srt_path)
                 self._update_substep(
                     "4.1",
                     SubstepStatus.SUCCESS,
@@ -208,7 +209,7 @@ class PipelineRunner(QThread):
             # =======================================================
             # 4.2 CHATGPT TRANSLATION (via Edge Extension)
             # =======================================================
-            trans_srt_path = self.artifacts.translated_srt
+            trans_srt_path = self.artifacts.translated_srt or (self.output_dir / "translated.srt")
             if not (trans_srt_path and trans_srt_path.is_file()):
                 self.state = PipelineState.TRANSLATING
                 self.state_changed.emit(self.state, "Đang gửi phụ đề sang ChatGPT qua Edge...")
@@ -261,7 +262,8 @@ class PipelineRunner(QThread):
                 self.state = PipelineState.TRANSLATED
                 self.state_changed.emit(self.state, "Dịch ChatGPT hoàn tất.")
             else:
-                logger.info("Reusing existing translated.srt from checkpoint: %s", trans_srt_path)
+                self.artifacts.translated_srt = trans_srt_path
+                logger.info("Reusing existing translated.srt: %s", trans_srt_path)
                 self._update_substep(
                     "4.2",
                     SubstepStatus.SUCCESS,
@@ -286,13 +288,17 @@ class PipelineRunner(QThread):
             script_content = trans_srt_path.read_text(encoding="utf-8", errors="replace")
             script_doc = parse_srt(script_content)
             self.project.script = script_doc
-            self.project.approved_revision_hash = script_doc.content_hash()
             self.project.target_language = "vi"
+            try:
+                self.project.approved_revision_hash = self.project.revision_hash
+            except Exception as e:
+                logger.warning("Could not calculate approved_revision_hash: %s", e)
+                self.project.approved_revision_hash = None
 
             # Save plain text voice script
             voice_txt_path = self.output_dir / "voice_script.txt"
             voice_txt_path.write_text(
-                "\n".join(line.vietnamese for line in script_doc.lines),
+                "\n".join(line.text for line in script_doc.lines),
                 encoding="utf-8",
             )
             self.artifacts.voice_script = voice_txt_path
@@ -314,8 +320,8 @@ class PipelineRunner(QThread):
             # =======================================================
             # 4.4 VBEE VOICE GENERATION (via Edge Extension)
             # =======================================================
-            master_audio_path = self.artifacts.vbee_master_audio
-            timeline_audio_path = self.artifacts.timeline_master_audio
+            master_audio_path = self.artifacts.vbee_master_audio or (self.output_dir / "vbee_master_raw.mp3")
+            timeline_audio_path = self.artifacts.timeline_master_audio or (self.output_dir / "master_narration_timeline.mp3")
 
             if not (timeline_audio_path and timeline_audio_path.is_file()):
                 self.state = PipelineState.VOICE_GENERATING

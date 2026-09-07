@@ -344,7 +344,15 @@ class VbeeBrowserAutomation:
             try:
                 input_elem = await page.query_selector(selector)
                 if input_elem:
-                    await input_elem.set_input_files(str(srt_path.resolve()))
+                    try:
+                        async with page.expect_file_chooser(timeout=5000) as chooser_info:
+                            await input_elem.evaluate("input => input.click()")
+                        chooser = await chooser_info.value
+                        await chooser.set_files(str(srt_path.resolve()))
+                    except Exception:
+                        # Fallback for pages and test doubles that expose the input
+                        # directly without dispatching a native chooser event.
+                        await input_elem.set_input_files(str(srt_path.resolve()))
                     selected_files = await input_elem.evaluate(
                         "input => input.files ? input.files.length : 0"
                     )
@@ -639,6 +647,13 @@ class VbeeBrowserAutomation:
         if not button_found:
             raise VbeeSubmitError(
                 "Không tìm thấy nút 'Chuyển phụ đề' khả dụng trên giao diện Vbee."
+            )
+
+        upload_rejection = await page.query_selector("text=/Phải upload file phụ đề/i")
+        if upload_rejection and await upload_rejection.is_visible():
+            raise VbeeUploadError(
+                "Vbee không nhận tệp SRT vừa chọn. Hãy xuất lại SRT rồi thử lại hoặc "
+                "dùng nút 'Tải SRT Vbee' để tải lên thủ công."
             )
 
         # Check for any confirmation modal (e.g. "Xác nhận trừ credit")
