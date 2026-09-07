@@ -58,6 +58,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("vkdub.vbee")
 
+JOB_ROW_SELECTORS = (
+    "tr",
+    ".MuiTableRow-root",
+    ".ant-table-row",
+    "div.ant-list-item",
+    "div[class*='history-item']",
+)
+
 
 def format_speed_label(speed: float | str) -> str:
     """Format speed value into Vbee display label format (e.g. 1.1 -> '1.1x', 1.0 -> '1x')."""
@@ -337,6 +345,11 @@ class VbeeBrowserAutomation:
                 input_elem = await page.query_selector(selector)
                 if input_elem:
                     await input_elem.set_input_files(str(srt_path.resolve()))
+                    selected_files = await input_elem.evaluate(
+                        "input => input.files ? input.files.length : 0"
+                    )
+                    if selected_files != 1:
+                        continue
                     logger.info("Đã upload file SRT qua file input: %s", selector)
                     uploaded = True
                     break
@@ -605,9 +618,6 @@ class VbeeBrowserAutomation:
 
         page = await self.get_or_create_page()
 
-        # Check for immediate quota error before submitting
-        await self._check_errors_on_page()
-
         # Locate convert button
         button_found = False
         for selector in SUBMIT_CONVERT_BUTTONS:
@@ -650,14 +660,14 @@ class VbeeBrowserAutomation:
         await self._check_errors_on_page()
 
     async def _check_errors_on_page(self) -> None:
-        """Scan DOM for quota warnings or failure alerts."""
+        """Scan DOM for actionable failures while ignoring low-balance banners."""
         page = await self.get_or_create_page()
 
         for selector in QUOTA_ERROR_SELECTORS:
             try:
                 elem = await page.query_selector(selector)
                 if elem and await elem.is_visible():
-                    text = (await elem.text_content() or "").strip()
+                    text = self._safe_error_text(await elem.text_content())
                     raise VbeeQuotaExceededError(
                         f"Vbee thông báo vượt hạn mức/thiếu số dư: {text or 'Hết credit'}"
                     )
@@ -670,7 +680,7 @@ class VbeeBrowserAutomation:
             try:
                 elem = await page.query_selector(selector)
                 if elem and await elem.is_visible():
-                    text = (await elem.text_content() or "").strip()
+                    text = self._safe_error_text(await elem.text_content())
                     if text and ("lỗi" in text.lower() or "thất bại" in text.lower()):
                         raise VbeeConversionFailedError(f"Vbee báo lỗi: {text}")
             except (VbeeQuotaExceededError, VbeeConversionFailedError):
@@ -678,21 +688,52 @@ class VbeeBrowserAutomation:
             except Exception:
                 continue
 
-    async def find_job_row(self, unique_name: str, timeout_s: float = 30.0) -> Locator:
-        """Find the table row or container corresponding to the unique SRT filename."""
+    @staticmethod
+    def _safe_error_text(raw_text: str | None) -> str:
+        """Return a short provider diagnostic without account identifiers."""
+        text = re.sub(r"\s+", " ", raw_text or "").strip()
+        text = re.sub(
+            r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",
+            "[email đã ẩn]",
+            text,
+            flags=re.IGNORECASE,
+        )
+        return text[:240]
+
+    async def snapshot_job_rows(self) -> frozenset[str]:
+        """Capture normalized job rows so a provider-renamed new job can be identified."""
+        page = await self.get_or_create_page()
+        rows: set[str] = set()
+        for row_selector in JOB_ROW_SELECTORS:
+            try:
+                candidates = page.locator(row_selector)
+                for index in range(await candidates.count()):
+                    text = self._normalized_row_text(await candidates.nth(index).inner_text())
+                    if text:
+                        rows.add(text)
+            except Exception:
+                continue
+        return frozenset(rows)
+
+    @staticmethod
+    def _normalized_row_text(text: str) -> str:
+        return re.sub(r"\s+", " ", text).strip()
+
+    async def find_job_row(
+        self,
+        unique_name: str,
+        timeout_s: float = 30.0,
+        previous_rows: frozenset[str] | None = None,
+    ) -> Locator:
+        """Find the submitted job by filename or as a newly inserted provider-renamed row."""
         page = await self.get_or_create_page()
         stem = Path(unique_name).stem
         logger.info("Tìm dòng công việc trên Vbee khớp với tên: %s (hoặc %s)", unique_name, stem)
 
         start_time = asyncio.get_event_loop().time()
         while (asyncio.get_event_loop().time() - start_time) < timeout_s:
-            for row_selector in (
-                "tr",
-                ".MuiTableRow-root",
-                ".ant-table-row",
-                "div.ant-list-item",
-                "div[class*='history-item']",
-            ):
+            new_row = None
+            for row_selector in JOB_ROW_SELECTORS:
                 try:
                     candidates = page.locator(row_selector)
                     count = await candidates.count()
@@ -706,8 +747,22 @@ class VbeeBrowserAutomation:
                                 i,
                             )
                             return row
+                        normalized = self._normalized_row_text(txt)
+                        if (
+                            previous_rows is not None
+                            and normalized
+                            and normalized not in previous_rows
+                        ):
+                            new_row = row
                 except Exception:
                     continue
+
+            if new_row is not None:
+                logger.info(
+                    "Vbee đã đổi tên job; dùng dòng mới xuất hiện sau khi gửi '%s'.",
+                    stem,
+                )
+                return new_row
 
             try:
                 row_selector = (

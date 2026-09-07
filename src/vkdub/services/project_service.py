@@ -66,6 +66,9 @@ def save_project(project: Project, destination: Path) -> None:
         "video_duration_ms": project.video_duration_ms,
         "masks": [mask.to_dict() for mask in project.masks],
         "voice": asdict(project.voice),
+        "master_voice_path": _portable(project.master_voice_path, destination.parent)
+        if project.master_voice_path
+        else None,
         "voice_assets": {
             identifier: {
                 **asset.to_dict(),
@@ -140,6 +143,7 @@ def load_project(source: Path) -> Project:
         "subtitle_style",
         "masks",
         "voice",
+        "master_voice_path",
         "voice_assets",
         "script_review",
         "export",
@@ -267,6 +271,8 @@ def load_project(source: Path) -> Project:
         masks=parsed_masks,
     )
     assets = data.get("voice_assets", {})
+    if data.get("master_voice_path"):
+        project.master_voice_path = resolve("master_voice_path")
     if (
         not isinstance(assets, dict)
         or len(assets) > 50_000

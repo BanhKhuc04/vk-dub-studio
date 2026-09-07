@@ -195,14 +195,11 @@ DOWNLOAD_FORMAT_WAV = (
 
 # Error and quota selectors
 QUOTA_ERROR_SELECTORS = (
-    "div:has-text('hết ký tự')",
-    "div:has-text('Không đủ điểm')",
-    "div:has-text('không đủ điểm')",
-    "div:has-text('Sắp hết điểm')",
-    "div:has-text('không đủ số dư')",
-    "div:has-text('không đủ credit')",
-    "div:has-text('vượt quá số ký tự')",
-    "div:has-text('nâng cấp gói')",
+    "text=/hết ký tự/i",
+    "text=/không đủ điểm/i",
+    "text=/không đủ số dư/i",
+    "text=/không đủ credit/i",
+    "text=/vượt quá số ký tự/i",
     ".ant-message-error:has-text('ký tự')",
     ".ant-notification-notice-error",
 )

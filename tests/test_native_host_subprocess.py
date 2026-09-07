@@ -1,7 +1,6 @@
 """End-to-End subprocess test of vkdub_host.py simulating Chromium Edge Native Messaging."""
 
 import json
-import os
 import struct
 import subprocess
 import sys
@@ -9,7 +8,7 @@ import time
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtWidgets import QApplication
 
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.bridge.protocol import Actions, BridgeStatus
@@ -20,9 +19,9 @@ PYTHON_EXE = sys.executable
 
 @pytest.fixture(scope="session")
 def qapp():
-    app = QCoreApplication.instance()
+    app = QApplication.instance()
     if not app:
-        app = QCoreApplication([])
+        app = QApplication([])
     return app
 
 
@@ -45,9 +44,12 @@ def test_vkdub_host_stdio_relay(qapp):
     )
 
     try:
-        # Wait for vkdub_host.py to connect to LocalAgent
-        time.sleep(1.0)
-        qapp.processEvents()
+        # Wait for vkdub_host.py to connect to LocalAgent (up to 4s)
+        for _ in range(40):
+            qapp.processEvents()
+            if agent.status.browser_connected:
+                break
+            time.sleep(0.1)
 
         assert agent.status.browser_connected is True
         assert True in connection_events

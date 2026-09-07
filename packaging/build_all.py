@@ -19,12 +19,19 @@ import sys
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 # Add src to sys.path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from vkdub.version import APP_BRANDING, __version__  # noqa: E402
+
+
+class SigningConfiguration(NamedTuple):
+    signtool: Path
+    certificate: Path
+    password: str
 
 
 def verify_version_sync() -> None:
@@ -59,6 +66,70 @@ def find_iscc() -> Path | None:
         if c.is_file():
             return c
     return None
+
+
+def find_signtool() -> Path | None:
+    """Locate Microsoft's Authenticode signing tool."""
+    if found := shutil.which("signtool"):
+        return Path(found)
+    kits_root = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / (
+        "Windows Kits/10/bin"
+    )
+    candidates = sorted(kits_root.glob("*/x64/signtool.exe"), reverse=True)
+    return candidates[0] if candidates else None
+
+
+def signing_configuration() -> SigningConfiguration | None:
+    """Load opt-in signing configuration and fail closed when signing is required."""
+    certificate_value = os.environ.get("VANHKHUC_CODESIGN_PFX", "").strip()
+    password = os.environ.get("VANHKHUC_CODESIGN_PASSWORD", "")
+    required = os.environ.get("VANHKHUC_REQUIRE_SIGNING", "").strip() == "1"
+    if not certificate_value and not password:
+        if required:
+            raise RuntimeError("Release signing is required but no certificate was configured.")
+        return None
+    if not certificate_value or not password:
+        raise RuntimeError(
+            "Both VANHKHUC_CODESIGN_PFX and VANHKHUC_CODESIGN_PASSWORD are required."
+        )
+    certificate = Path(certificate_value).resolve()
+    if not certificate.is_file():
+        raise FileNotFoundError(f"Code-signing certificate not found: {certificate}")
+    signtool = find_signtool()
+    if signtool is None:
+        raise RuntimeError("Windows SignTool was not found.")
+    return SigningConfiguration(signtool, certificate, password)
+
+
+def sign_binary(binary: Path, config: SigningConfiguration) -> None:
+    """Authenticode-sign a binary, timestamp it, and verify the resulting signature."""
+    if not binary.is_file():
+        raise FileNotFoundError(f"Binary to sign not found: {binary}")
+    sign_command = [
+        str(config.signtool),
+        "sign",
+        "/fd",
+        "SHA256",
+        "/td",
+        "SHA256",
+        "/tr",
+        "https://timestamp.digicert.com",
+        "/f",
+        str(config.certificate),
+        "/p",
+        config.password,
+        str(binary),
+    ]
+    # Never echo this command: it contains the certificate password.
+    subprocess.run(sign_command, cwd=str(ROOT), check=True, capture_output=True, text=True)
+    subprocess.run(
+        [str(config.signtool), "verify", "/pa", "/all", str(binary)],
+        cwd=str(ROOT),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    print(f"✓ Authenticode signature verified: {binary.name}")
 
 
 def calculate_sha256(file_path: Path) -> str:
@@ -178,6 +249,7 @@ def main() -> None:
     print("*******************************************************")
 
     verify_version_sync()
+    signing = signing_configuration()
     iscc = find_iscc()
     if not iscc:
         print("ERROR: Inno Setup Compiler (ISCC.exe) not found on system.", file=sys.stderr)
@@ -186,7 +258,11 @@ def main() -> None:
 
     stage_tools()
     dist_dir = build_pyinstaller()
+    if signing is not None:
+        sign_binary(dist_dir / "VK Dub Studio.exe", signing)
     installer = build_installer(iscc)
+    if signing is not None:
+        sign_binary(installer, signing)
     manifest = update_manifest(installer)
 
     print("\n=======================================================")

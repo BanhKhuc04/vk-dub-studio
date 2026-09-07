@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vk-dub-studio"
-version = "2.1.4"
+version = "2.1.5"
 description = "VK Dub Studio — by vanhkhuc.dev: Windows video dubbing workspace"
 requires-python = ">=3.12,<3.14"
 dependencies = ["PySide6>=6.8,<6.11", "faster-whisper>=1.2,<2", "httpx>=0.28,<1", "keyring>=25,<26", "numpy>=2,<3", "playwright>=1.40,<2"]
@@ -19,7 +19,13 @@ vk-dub-studio = "vkdub.app:main"
 where = ["src"]
 
 [tool.setuptools.data-files]
-"share/vk-dub-studio" = ["resources/provider_pricing.json", "resources/capcut_v360000_template.json"]
+"share/vk-dub-studio" = [
+    "resources/capcut_v360000_template.json",
+    "resources/icon.ico",
+    "resources/icon.png",
+    "resources/provider_pricing.json",
+    "resources/subtitle_presets.json",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

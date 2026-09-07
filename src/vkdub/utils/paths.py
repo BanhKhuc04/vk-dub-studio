@@ -42,7 +42,13 @@ def resource_path(relative: str | Path) -> Path:
             if candidate.exists():
                 return candidate
 
-    # 3. Development workspace root
+    # 3. Standard wheel installation (setuptools data-files destination)
+    installed_resources = Path(sys.prefix) / "share" / "vk-dub-studio"
+    installed_candidate = installed_resources / rel
+    if installed_candidate.exists():
+        return installed_candidate
+
+    # 4. Development workspace root
     repo_root = Path(__file__).resolve().parents[3]
     for candidate in (
         repo_root / "resources" / rel,

@@ -19,7 +19,12 @@ REGISTRY_TARGETS = [
 def default_manifest_path() -> Path:
     """Locate the native messaging host manifest in the project or application install tree."""
     # Check project tools dir
-    cand = Path(__file__).resolve().parent.parent.parent.parent / "tools" / "native_host" / f"{HOST_NAME}.json"
+    cand = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "tools"
+        / "native_host"
+        / f"{HOST_NAME}.json"
+    )
     if cand.is_file():
         return cand
     # Fallback to current working directory tools
@@ -64,10 +69,14 @@ def ensure_host_registered(manifest_path: Path | None = None) -> bool:
                 success = True
                 continue
 
-            with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
+            with winreg.CreateKeyEx(
+                winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE
+            ) as key:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, manifest_str)
             success = True
-            logger.info("Registered Native Messaging Host for %s at HKCU\\%s", browser_name, key_path)
+            logger.info(
+                "Registered Native Messaging Host for %s at HKCU\\%s", browser_name, key_path
+            )
         except Exception as exc:
             logger.warning("Failed to register native host for %s: %s", browser_name, exc)
 

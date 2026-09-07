@@ -134,76 +134,19 @@ async def slice_and_import_vbee_audio(
         )
         project.voice = voice_settings
 
-    logger.info("[VOICE][IMPORT] Bắt đầu cắt và nhập từng câu thoại theo kịch bản…")
+    master_sha = file_hash(master_wav)
+    project.master_voice_path = master_wav.resolve()
 
-    # Slice per script line
+    logger.info(
+        "[VOICE][IMPORT] Gắn master audio nguyên vẹn từ Vbee vào dự án (không cắt vụn âm thanh)…"
+    )
+
     lines = project.script.lines
     imported_assets: dict[str, VoiceAsset] = {}
 
-    for index, line in enumerate(lines):
-        line_start_s = max(0.0, line.start_ms / 1000.0)
-        line_duration_s = max(0.1, (line.end_ms - line.start_ms) / 1000.0)
-
-        # File name based on audio_key hash
+    for line in lines:
+        line_duration_ms = max(1, line.end_ms - line.start_ms)
         key = audio_key(line.text, voice_settings)
-        line_wav = target_dir / f"{key}-{index:04d}.wav"
-
-        # Extract line segment using ffmpeg
-        slice_cmd = [
-            ffmpeg,
-            "-y",
-            "-nostdin",
-            "-v",
-            "error",
-            "-ss",
-            f"{line_start_s:.3f}",
-            "-t",
-            f"{line_duration_s:.3f}",
-            "-i",
-            str(master_wav),
-            "-ar",
-            "24000",
-            "-ac",
-            "1",
-            "-sample_fmt",
-            "s16",
-            str(line_wav),
-        ]
-        slice_proc = subprocess.run(
-            slice_cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-            creationflags=0x08000000 if os.name == "nt" else 0,
-        )
-
-        if slice_proc.returncode != 0 or not line_wav.is_file():
-            # Fallback: create silent audio matching duration if slice failed
-            fallback_cmd = [
-                ffmpeg,
-                "-y",
-                "-nostdin",
-                "-v",
-                "error",
-                "-f",
-                "lavfi",
-                "-i",
-                f"anullsrc=r=24000:cl=mono:d={line_duration_s:.3f}",
-                "-sample_fmt",
-                "s16",
-                str(line_wav),
-            ]
-            subprocess.run(
-                fallback_cmd,
-                capture_output=True,
-                timeout=30,
-                creationflags=0x08000000 if os.name == "nt" else 0,
-            )
-
-        duration_ms = await audio_duration(line_wav, ffprobe)
-        sha = file_hash(line_wav)
 
         asset = VoiceAsset(
             cache_key=key,
@@ -211,20 +154,20 @@ async def slice_and_import_vbee_audio(
             provider="vbee",
             voice_id=voice_settings.voice_id,
             speed=voice_settings.speed,
-            duration_ms=max(1, duration_ms),
-            output_path=line_wav.resolve(),
-            audio_sha256=sha,
+            duration_ms=line_duration_ms,
+            output_path=master_wav.resolve(),
+            audio_sha256=master_sha,
             generated_at=datetime.now(UTC).isoformat(),
         )
-
         imported_assets[line.id] = asset
 
     # Assign voice assets to project
     project.voice_assets.update(imported_assets)
 
     logger.info(
-        "Đã import %d câu thoại từ Vbee vào project. voice_ready=%s",
+        "Đã gắn voice Vbee nguyên khối (%d câu, master: %s) vào project. voice_ready=%s",
         len(imported_assets),
+        master_wav.name,
         project.voice_ready,
     )
 

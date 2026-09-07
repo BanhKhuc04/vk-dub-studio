@@ -1,6 +1,6 @@
 """Unit tests for Browser Bridge protocol and BridgeStatus model."""
 
-from vkdub.bridge.protocol import Actions, BridgeStatus, PROTOCOL_VERSION
+from vkdub.bridge.protocol import PROTOCOL_VERSION, Actions, BridgeStatus
 
 
 def test_bridge_status_defaults():

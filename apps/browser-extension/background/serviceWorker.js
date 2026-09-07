@@ -1,6 +1,7 @@
 /**
- * VK Dub Studio — Background Service Worker
- * Manages Native Messaging bridge, monitors ChatGPT & Vbee tabs and cookies.
+ * VK Dub Studio — Background Service Worker (H6.1 & H6.2 Router)
+ *
+ * Coordinates Native Messaging with ChatGPT & Vbee content script adapters.
  */
 
 import { NativeMessagingBridge } from "../bridge/nativeMessaging.js";
@@ -9,7 +10,6 @@ import { Actions, createStatusReport } from "../bridge/protocol.js";
 const isEdge = navigator.userAgent.includes("Edg/");
 const browserName = isEdge ? "Microsoft Edge" : "Google Chrome";
 
-// State cache
 const state = {
   chatgptAvailable: false,
   chatgptLoggedIn: false,
@@ -33,9 +33,7 @@ async function checkCookiesAuth() {
         c.name.includes("auth") ||
         c.name === "__Secure-next-auth.session-token"
     );
-  } catch (err) {
-    console.debug("[SW] Error checking ChatGPT cookies:", err);
-  }
+  } catch (err) {}
 
   try {
     const vbeeCookies = await chrome.cookies.getAll({ domain: "vbee.vn" });
@@ -47,45 +45,35 @@ async function checkCookiesAuth() {
         c.name === "accessToken" ||
         c.name === "jwt"
     );
-  } catch (err) {
-    console.debug("[SW] Error checking Vbee cookies:", err);
-  }
+  } catch (err) {}
 
   return { chatgptAuthFromCookie, vbeeAuthFromCookie };
 }
 
 async function refreshAllStatus() {
-  // 1. Query ChatGPT tabs
   let chatgptTabs = [];
   try {
     chatgptTabs = await chrome.tabs.query({
       url: ["*://chatgpt.com/*", "*://*.chatgpt.com/*"],
     });
-  } catch (e) {
-    // ignore
-  }
+  } catch (e) {}
 
-  // 2. Query Vbee tabs
   let vbeeTabs = [];
   try {
     vbeeTabs = await chrome.tabs.query({
       url: ["*://vbee.vn/*", "*://*.vbee.vn/*"],
     });
-  } catch (e) {
-    // ignore
-  }
+  } catch (e) {}
 
   state.chatgptTabs = chatgptTabs.length;
   state.vbeeTabs = vbeeTabs.length;
   state.chatgptAvailable = chatgptTabs.length > 0;
   state.vbeeAvailable = vbeeTabs.length > 0;
 
-  // 3. Check Cookie authentication
   const { chatgptAuthFromCookie, vbeeAuthFromCookie } = await checkCookiesAuth();
   let chatgptLoggedIn = chatgptAuthFromCookie;
   let vbeeLoggedIn = vbeeAuthFromCookie;
 
-  // 4. Query active content script if tabs are open for deeper DOM confirmation
   if (chatgptTabs.length > 0 && chatgptTabs[0].id) {
     try {
       const resp = await chrome.tabs.sendMessage(chatgptTabs[0].id, {
@@ -94,9 +82,7 @@ async function refreshAllStatus() {
       if (resp && typeof resp.logged_in === "boolean") {
         chatgptLoggedIn = resp.logged_in;
       }
-    } catch (e) {
-      // Content script may not be loaded yet or tab loading
-    }
+    } catch (e) {}
   }
 
   if (vbeeTabs.length > 0 && vbeeTabs[0].id) {
@@ -107,14 +93,11 @@ async function refreshAllStatus() {
       if (resp && typeof resp.logged_in === "boolean") {
         vbeeLoggedIn = resp.logged_in;
       }
-    } catch (e) {
-      // Content script may not be loaded yet
-    }
+    } catch (e) {}
   }
 
   state.chatgptLoggedIn = chatgptLoggedIn;
   state.vbeeLoggedIn = vbeeLoggedIn;
-
   return state;
 }
 
@@ -136,6 +119,81 @@ async function sendStatusReport() {
   bridge.send(report);
 }
 
+async function getOrOpenTab(urlPatterns, targetUrl) {
+  const tabs = await chrome.tabs.query({ url: urlPatterns });
+  if (tabs.length > 0 && tabs[0].id) {
+    await chrome.tabs.update(tabs[0].id, { active: true });
+    return tabs[0];
+  }
+  const newTab = await chrome.tabs.create({ url: targetUrl });
+  // Wait for tab to load
+  await new Promise((resolve) => {
+    const listener = (tabId, info) => {
+      if (tabId === newTab.id && info.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+    setTimeout(resolve, 8000); // 8s safety timeout
+  });
+  // Extra wait for content script injection
+  await new Promise((r) => setTimeout(r, 1500));
+  return newTab;
+}
+
+async function handleChatGPTTranslate(payload) {
+  try {
+    const tab = await getOrOpenTab(
+      ["*://chatgpt.com/*", "*://*.chatgpt.com/*"],
+      "https://chatgpt.com"
+    );
+    const resp = await chrome.tabs.sendMessage(tab.id, {
+      action: "CHATGPT_TRANSLATE",
+      payload,
+    });
+    bridge.send({
+      action: Actions.CHATGPT_TRANSLATE_RESULT,
+      payload: resp,
+    });
+  } catch (err) {
+    bridge.send({
+      action: Actions.CHATGPT_TRANSLATE_RESULT,
+      payload: {
+        success: false,
+        error: err.message,
+        request_id: payload?.request_id,
+      },
+    });
+  }
+}
+
+async function handleVbeeGenerate(payload) {
+  try {
+    const tab = await getOrOpenTab(
+      ["*://studio.vbee.vn/*", "*://vbee.vn/*"],
+      "https://studio.vbee.vn/studio/dubbing"
+    );
+    const resp = await chrome.tabs.sendMessage(tab.id, {
+      action: "VBEE_GENERATE_VOICE",
+      payload,
+    });
+    bridge.send({
+      action: Actions.VBEE_VOICE_RESULT,
+      payload: resp,
+    });
+  } catch (err) {
+    bridge.send({
+      action: Actions.VBEE_VOICE_RESULT,
+      payload: {
+        success: false,
+        error: err.message,
+        request_id: payload?.request_id,
+      },
+    });
+  }
+}
+
 function initBridge() {
   bridge = new NativeMessagingBridge({
     onConnect: () => {
@@ -146,18 +204,21 @@ function initBridge() {
       console.warn("[SW] Native bridge disconnected:", err);
     },
     onMessage: async (msg) => {
-      console.log("[SW] Received from Native Host:", msg);
+      console.log("[SW] Received action from Native Host:", msg?.action);
       if (!msg || !msg.action) return;
 
       switch (msg.action) {
         case Actions.GET_STATUS:
           await sendStatusReport();
           break;
+        case Actions.CHATGPT_TRANSLATE:
+          await handleChatGPTTranslate(msg.payload || {});
+          break;
+        case Actions.VBEE_GENERATE_VOICE:
+          await handleVbeeGenerate(msg.payload || {});
+          break;
         case Actions.PING:
           bridge.send({ action: Actions.PONG, timestamp: Date.now() });
-          break;
-        default:
-          console.warn("[SW] Unhandled action:", msg.action);
           break;
       }
     },
@@ -166,21 +227,17 @@ function initBridge() {
   bridge.connect();
 }
 
-// Listen to content script notifications
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || !message.action) return;
-
+chrome.runtime.onMessage.addListener((message) => {
   if (
-    message.action === "CHATGPT_TAB_READY" ||
-    message.action === "CHATGPT_STATUS_CHANGED" ||
-    message.action === "VBEE_TAB_READY" ||
-    message.action === "VBEE_STATUS_CHANGED"
+    message?.action === "CHATGPT_TAB_READY" ||
+    message?.action === "CHATGPT_STATUS_CHANGED" ||
+    message?.action === "VBEE_TAB_READY" ||
+    message?.action === "VBEE_STATUS_CHANGED"
   ) {
     sendStatusReport();
   }
 });
 
-// Listen to tab events to update availability
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
     if (tab.url.includes("chatgpt.com") || tab.url.includes("vbee.vn")) {
@@ -193,12 +250,10 @@ chrome.tabs.onRemoved.addListener(() => {
   sendStatusReport();
 });
 
-// Periodic status refresh (every 10 seconds)
 setInterval(() => {
   if (bridge && bridge.isConnected) {
     sendStatusReport();
   }
 }, 10000);
 
-// Start bridge connection
 initBridge();

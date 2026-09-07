@@ -14,7 +14,7 @@ def test_version_is_semantic():
     parts = __version__.split(".")
     assert len(parts) >= 3
     assert all(p.isdigit() for p in parts[:3])
-    assert __version__ == "2.1.4"
+    assert __version__ == "2.1.5"
 
 
 def test_resource_path_resolution(tmp_path):
@@ -31,6 +31,15 @@ def test_resource_path_resolution(tmp_path):
     assert presets.is_file()
 
 
+def test_resource_path_supports_standard_wheel_installation(tmp_path, monkeypatch):
+    installed = tmp_path / "share" / "vk-dub-studio" / "wheel-only.txt"
+    installed.parent.mkdir(parents=True)
+    installed.write_text("installed", encoding="utf-8")
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+
+    assert resource_path("wheel-only.txt") == installed
+
+
 def test_find_tool_with_bundled_tools(tmp_path, monkeypatch):
     # Ensure explicit env override takes precedence
     fake_exe = tmp_path / "custom_tool.exe"
@@ -45,13 +54,13 @@ def test_find_tool_with_bundled_tools(tmp_path, monkeypatch):
 
 def test_update_manifest_structure():
     info = UpdateInfo(
-        version="2.1.5",
+        version="2.1.6",
         published_at="2026-09-07T00:00:00Z",
-        installer_url="https://github.com/vanhkhuc/vk-dub-studio/releases/download/v2.1.5/VKDubStudio-Setup-2.1.5.exe",
+        installer_url="https://github.com/vanhkhuc/vk-dub-studio/releases/download/v2.1.6/VKDubStudio-Setup-2.1.6.exe",
         sha256="a" * 64,
         changelog=("Sửa lỗi cập nhật",),
         file_size_bytes=100000000,
-        patch_url="https://github.com/vanhkhuc/vk-dub-studio/releases/download/v2.1.5/VKDubStudio-Patch-2.1.5.zip",
+        patch_url="https://github.com/vanhkhuc/vk-dub-studio/releases/download/v2.1.6/VKDubStudio-Patch-2.1.6.zip",
         patch_sha256="b" * 64,
         patch_size_bytes=3000000,
     )
@@ -109,10 +118,16 @@ def test_release_versions_are_synchronized():
     assert f'#define MyAppVersion "{__version__}"' in installer_text
 
 
-def test_bundled_model_detected_by_model_service():
+def test_downloaded_model_detected_by_model_service(tmp_path, monkeypatch):
     from vkdub.services.model_service import model_directory, model_ready
+
+    data_directory = tmp_path / "app-data"
+    model = data_directory / "models" / "base"
+    model.mkdir(parents=True)
+    for filename in ("model.bin", "config.json", "tokenizer.json"):
+        (model / filename).write_bytes(b"test")
+    monkeypatch.setenv("VKDUB_DATA_DIR", str(data_directory))
 
     assert model_ready("base") is True
     path = model_directory("base")
-    assert path.is_dir()
-    assert (path / "model.bin").is_file()
+    assert path == model

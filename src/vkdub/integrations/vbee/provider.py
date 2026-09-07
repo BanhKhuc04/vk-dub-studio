@@ -101,12 +101,7 @@ class VbeeBrowserProvider:
                     )
 
                 logger.info("[VBEE][LOGIN] Phiên đăng nhập hợp lệ.")
-                progress_callback(40, "Đang tải file SRT lên hệ thống Vbee…")
-                check_cancel()
-                logger.info("[VBEE][UPLOAD] Đang tải file phụ đề lên Vbee: %s", srt_path.name)
-                await automation.upload_srt(srt_path)
-
-                progress_callback(48, "Cấu hình giọng đọc HN - Ngọc Huyền…")
+                progress_callback(42, "Cấu hình giọng đọc HN - Ngọc Huyền…")
                 check_cancel()
                 logger.info("[VBEE][VOICE] Thiết lập giọng đọc 'HN - Ngọc Huyền'…")
                 await automation.ensure_voice_ngoc_huyen()
@@ -119,22 +114,34 @@ class VbeeBrowserProvider:
                     )
                 )
                 speed_label = f"{target_speed:.2f}".rstrip("0").rstrip(".") + "x"
-                progress_callback(52, f"Cấu hình tốc độ {speed_label} & định dạng MP3…")
+                progress_callback(48, f"Cấu hình tốc độ {speed_label} & định dạng MP3…")
                 check_cancel()
                 logger.info("[VBEE][SPEED] Thiết lập tốc độ đọc %s…", speed_label)
                 await automation.ensure_speed(target_speed)
                 logger.info("[VBEE][FORMAT] Thiết lập định dạng MP3…")
                 await automation.ensure_format_mp3()
 
+                # Upload last because Vbee rebuilds and clears its file input when
+                # voice/speed/format settings change.
+                progress_callback(54, "Đang tải file SRT lên hệ thống Vbee…")
+                check_cancel()
+                logger.info("[VBEE][UPLOAD] Đang tải file phụ đề lên Vbee: %s", srt_path.name)
+                await automation.upload_srt(srt_path)
+
                 progress_callback(58, "Đang bắt đầu chuyển phụ đề…")
                 check_cancel()
+                previous_rows = await automation.snapshot_job_rows()
                 logger.info("[VBEE][SUBMIT] Bắt đầu chuyển phụ đề…")
                 await automation.submit_conversion()
 
                 progress_callback(65, "Đang định vị dòng công việc…")
                 check_cancel()
                 logger.info("[VBEE][JOB] Định vị dòng công việc khớp với: %s", srt_path.name)
-                job_row = await automation.find_job_row(srt_path.name, timeout_s=45.0)
+                job_row = await automation.find_job_row(
+                    srt_path.name,
+                    timeout_s=45.0,
+                    previous_rows=previous_rows,
+                )
                 progress_callback(70, "Vbee đang chuyển đổi phụ đề thành voice…")
                 await automation.wait_job_completion(
                     job_row=job_row,

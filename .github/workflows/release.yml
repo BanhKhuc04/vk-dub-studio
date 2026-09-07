@@ -18,15 +18,60 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
+      - name: Install Windows packaging tools
+        shell: pwsh
+        run: |
+          choco install innosetup ffmpeg --no-progress -y
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install .[dev] pyinstaller
 
-      - name: Build Standalone Application & Installer
+      - name: Require release signing certificate
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:CERTIFICATE_PASSWORD)) {
+            throw "WINDOWS_CERTIFICATE_BASE64 and WINDOWS_CERTIFICATE_PASSWORD are required."
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "vanhkhuc-codesign.pfx"
+          [IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:CERTIFICATE_BASE64)
+          )
+          "VANHKHUC_CODESIGN_PFX=$certificatePath" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify tag version
         shell: pwsh
         run: |
+          $version = python -c "import sys; sys.path.insert(0, 'src'); from vkdub.version import __version__; print(__version__)"
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag $env:GITHUB_REF_NAME does not match application version v$version."
+          }
+
+      - name: Build Standalone Application & Installer
+        shell: pwsh
+        env:
+          VANHKHUC_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          VANHKHUC_REQUIRE_SIGNING: '1'
+        run: |
           python packaging/build_all.py
+
+      - name: Verify Authenticode signatures
+        shell: pwsh
+        run: |
+          $application = "dist/VK Dub Studio/VK Dub Studio.exe"
+          $installer = Get-ChildItem dist/VKDubStudio-Setup-*.exe | Select-Object -First 1
+          foreach ($file in @($application, $installer.FullName)) {
+            $signature = Get-AuthenticodeSignature -FilePath $file
+            if ($signature.Status -ne 'Valid') {
+              throw "Invalid Authenticode signature for $file: $($signature.Status)"
+            }
+          }
 
       - name: Calculate SHA-256 Checksum
         id: checksum

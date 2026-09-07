@@ -3,8 +3,9 @@
 import json
 import socket
 import time
+
 import pytest
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtWidgets import QApplication
 
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.bridge.protocol import Actions, BridgeStatus
@@ -14,9 +15,9 @@ TEST_PORT = 59814
 
 @pytest.fixture(scope="session")
 def qapp():
-    app = QCoreApplication.instance()
+    app = QApplication.instance()
     if not app:
-        app = QCoreApplication([])
+        app = QApplication([])
     return app
 
 
@@ -82,4 +83,76 @@ def test_local_agent_client_connection_and_status(qapp):
     assert False in connection_events
     assert agent.status.browser_connected is False
 
+    agent.stop()
+
+
+def test_local_agent_translate_and_vbee_sync(qapp, tmp_path):
+    import base64
+    import threading
+
+    agent = LocalAgent(port=TEST_PORT + 2)
+    assert agent.start() is True
+
+    # Connect mock client socket
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect(("127.0.0.1", TEST_PORT + 2))
+    time.sleep(0.2)
+    agent.status.browser_connected = True
+
+    # Mock server responder thread simulating extension replies
+    def mock_extension_responder():
+        buf = ""
+        while True:
+            try:
+                data = client.recv(4096)
+                if not data:
+                    break
+                buf += data.decode("utf-8")
+                while "\n" in buf:
+                    line, buf = buf.split("\n", 1)
+                    if not line.strip():
+                        continue
+                    msg = json.loads(line)
+                    action = msg.get("action")
+                    payload = msg.get("payload", {})
+                    req_id = payload.get("request_id")
+
+                    if action == Actions.CHATGPT_TRANSLATE:
+                        reply = {
+                            "action": Actions.CHATGPT_TRANSLATE_RESULT,
+                            "payload": {
+                                "success": True,
+                                "translated_srt": "1\n00:00:01,000 --> 00:00:02,000\nXin chào\n",
+                                "request_id": req_id,
+                            },
+                        }
+                        client.sendall((json.dumps(reply) + "\n").encode("utf-8"))
+                    elif action == Actions.VBEE_GENERATE_VOICE:
+                        fake_audio = b"ID3\x03\x00\x00\x00FAKE_AUDIO_DATA"
+                        reply = {
+                            "action": Actions.VBEE_VOICE_RESULT,
+                            "payload": {
+                                "success": True,
+                                "audio_base64": base64.b64encode(fake_audio).decode("ascii"),
+                                "request_id": req_id,
+                            },
+                        }
+                        client.sendall((json.dumps(reply) + "\n").encode("utf-8"))
+            except Exception:
+                break
+
+    t = threading.Thread(target=mock_extension_responder, daemon=True)
+    t.start()
+
+    # 1. Test translation sync
+    res_srt = agent.translate_srt_sync("1\n00:00:01,000 --> 00:00:02,000\nHello\n", timeout_s=5.0)
+    assert "Xin chào" in res_srt
+
+    # 2. Test Vbee audio generation sync
+    target_audio = tmp_path / "vbee_master.mp3"
+    saved_path = agent.generate_vbee_sync(res_srt, target_audio, timeout_s=5.0)
+    assert saved_path.is_file()
+    assert saved_path.read_bytes().startswith(b"ID3")
+
+    client.close()
     agent.stop()

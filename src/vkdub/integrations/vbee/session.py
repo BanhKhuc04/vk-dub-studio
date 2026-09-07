@@ -150,6 +150,51 @@ def reset_vbee_browser_session() -> bool:
         return False
 
 
+def sync_user_browser_session(target_dir: Path) -> bool:
+    """Sync logged-in cookies and storage from the user's primary Edge/Chrome profile into target_dir."""
+    local_app_data = Path(os.environ.get("LOCALAPPDATA", ""))
+    edge_data = local_app_data / "Microsoft" / "Edge" / "User Data"
+    chrome_data = local_app_data / "Google" / "Chrome" / "User Data"
+
+    source_root = None
+    if edge_data.is_dir():
+        source_root = edge_data
+    elif chrome_data.is_dir():
+        source_root = chrome_data
+
+    if not source_root:
+        return False
+
+    try:
+        source_profile = None
+        for cand in ("Profile 1", "Profile 2", "Default"):
+            if (source_root / cand).is_dir():
+                source_profile = source_root / cand
+                break
+        if not source_profile:
+            source_profile = source_root / "Default"
+
+        target_profile = target_dir / "Default"
+        target_profile.mkdir(parents=True, exist_ok=True)
+
+        local_state = source_root / "Local State"
+        if local_state.is_file():
+            shutil.copy2(local_state, target_dir / "Local State")
+
+        for subfolder in ("Network", "Storage", "Local Storage"):
+            src_sub = source_profile / subfolder
+            dst_sub = target_profile / subfolder
+            if src_sub.is_dir():
+                try:
+                    shutil.copytree(src_sub, dst_sub, dirs_exist_ok=True)
+                except Exception:
+                    pass
+        return True
+    except Exception as exc:
+        logger.warning("Không thể đồng bộ session từ trình duyệt người dùng: %s", exc)
+        return False
+
+
 async def create_vbee_browser_context(
     playwright: Playwright,
     profile_dir: Path | None = None,
@@ -159,9 +204,12 @@ async def create_vbee_browser_context(
 ) -> BrowserContext:
     """Launch persistent browser context with stored cookies/session."""
     user_data_dir = (profile_dir if profile_dir is not None else get_vbee_profile_dir()).resolve()
-    reused_profile = is_vbee_profile_initialized(user_data_dir)
     user_data_dir.mkdir(parents=True, exist_ok=True)
     cleanup_stale_profile_processes(user_data_dir)
+
+    # Sync company credentials and session cookies from user's primary browser
+    sync_user_browser_session(user_data_dir)
+    reused_profile = is_vbee_profile_initialized(user_data_dir)
     browser_exe = find_browser_executable(user_data_dir)
 
     launch_args = [

@@ -24,6 +24,8 @@ from vkdub.domain.subtitle import SubtitleStyle
 from vkdub.domain.voice import VoiceSettings
 from vkdub.media.ffprobe import VideoMetadata
 from vkdub.media.process import MediaTools
+from vkdub.orchestrator.pipeline_runner import PipelineRunner
+from vkdub.orchestrator.pipeline_state import PipelineState, SubstepStatus
 from vkdub.providers.tts_provider import HealthResult
 from vkdub.services.app_settings import load_app_settings
 from vkdub.services.credential_service import redact
@@ -53,6 +55,7 @@ from vkdub.ui.translation_controller import TranslationController
 from vkdub.ui.tts_controller import TTSController
 from vkdub.ui.vbee_controller import VbeeController
 from vkdub.ui.video_preview import VideoPreview
+from vkdub.utils.paths import workspace_root
 from vkdub.version import APP_BRANDING, __version__
 
 
@@ -177,9 +180,18 @@ class MainWindow(QMainWindow):
         self.local_agent = LocalAgent(parent=self)
         self.local_agent.status_updated.connect(self.left.browser_bridge.update_status)
         self.local_agent.log_emitted.connect(self.log)
-        self.left.open_browser_requested.connect(lambda: self.local_agent.open_browser("https://chatgpt.com"))
+        self.left.open_browser_requested.connect(
+            lambda: self.local_agent.open_browser("https://chatgpt.com")
+        )
         self.left.refresh_bridge_requested.connect(self.local_agent.request_status)
         self.local_agent.start()
+
+        # Step 4: Automated Pipeline Runner (Whisper -> ChatGPT -> Script -> Vbee)
+        self.pipeline_runner: PipelineRunner | None = None
+        self.left.pipeline_start_requested.connect(self._start_pipeline_runner)
+        self.left.pipeline_cancel_requested.connect(self._cancel_pipeline_runner)
+        self.left.pipeline_retry_step_requested.connect(self._retry_pipeline_step)
+        self.left.step4_pipeline.view_log_requested.connect(self.open_log_viewer)
 
         self._refresh()
         self.log("Sẵn sàng — VK Dub Studio 2.1.")
@@ -189,14 +201,6 @@ class MainWindow(QMainWindow):
         self.recovery_timer.timeout.connect(self._check_crash_recovery)
         self.recovery_timer.start(500)
         QTimer.singleShot(2500, self._check_background_update)
-
-    def closeEvent(self, event: QCloseEvent) -> None:
-        if hasattr(self, "local_agent") and self.local_agent:
-            try:
-                self.local_agent.stop()
-            except Exception:
-                pass
-        super().closeEvent(event)
 
     def _on_autosave_timer(self) -> None:
         if load_app_settings().autosave and self.dirty and not self.busy and self.project.script:
@@ -426,7 +430,9 @@ class MainWindow(QMainWindow):
             from vkdub.services.chatgpt_bridge import prepare_chatgpt_translation
 
             srt_path, prompt = prepare_chatgpt_translation(self.project)
-            self.log(f"Đã mở ChatGPT và sao chép prompt dịch vào Clipboard. File SRT: {srt_path.name}")
+            self.log(
+                f"Đã mở ChatGPT và sao chép prompt dịch vào Clipboard. File SRT: {srt_path.name}"
+            )
             QMessageBox.information(
                 self,
                 "Đã mở ChatGPT & Copy Prompt",
@@ -440,7 +446,9 @@ class MainWindow(QMainWindow):
 
     def _on_import_chatgpt_srt_clicked(self) -> None:
         if not self.project:
-            QMessageBox.warning(self, "Chưa có dự án", "Vui lòng chọn video trước khi nạp file SRT.")
+            QMessageBox.warning(
+                self, "Chưa có dự án", "Vui lòng chọn video trước khi nạp file SRT."
+            )
             return
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -456,8 +464,12 @@ class MainWindow(QMainWindow):
             doc = import_translated_srt(self.project, Path(path))
             self.review.set_script(doc, self.project.is_approved)
             if hasattr(self.left, "lbl_review_status"):
-                self.left.lbl_review_status.setText(f"Đã nạp {len(doc.lines)} câu từ {Path(path).name}")
-                self.left.lbl_review_status.setStyleSheet("color: #34d399; font-weight: bold; font-size: 11px;")
+                self.left.lbl_review_status.setText(
+                    f"Đã nạp {len(doc.lines)} câu từ {Path(path).name}"
+                )
+                self.left.lbl_review_status.setStyleSheet(
+                    "color: #34d399; font-weight: bold; font-size: 11px;"
+                )
             self.dirty = True
             self._refresh()
             self.log(f"Đã nạp thành công {len(doc.lines)} câu phụ đề dịch từ {Path(path).name}.")
@@ -470,6 +482,175 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Lỗi nạp phụ đề", f"Không thể nạp file SRT: {exc}")
 
+    # -------------------------------------------------------------------------
+    # H6 Step 4: Automated Pipeline Runner Integration
+    # -------------------------------------------------------------------------
+    def _start_pipeline_runner(self) -> None:
+        if self.busy:
+            return
+        if not self.project.video_path or not self.project.video_path.is_file():
+            QMessageBox.warning(
+                self,
+                "Chưa chọn video",
+                "Vui lòng chọn video nguồn (Bước 01) trước khi bắt đầu xử lý tự động.",
+            )
+            return
+
+        # Đảm bảo có khung che phụ đề
+        if not self.project.masks:
+            self.add_blur_mask()
+
+        # Lấy thông số giọng đọc và tốc độ từ Step 2
+        voice_data = self.left.voice_combo.currentText()
+        voice_name = "Ngọc Huyền"
+        if "Ngọc Huyền" in voice_data:
+            voice_name = "Ngọc Huyền"
+        elif "Quỳnh Anh" in voice_data:
+            voice_name = "Quỳnh Anh"
+
+        speed_str = self.left.speed_combo.currentText().split(" ")[0]
+        if not speed_str.endswith("x"):
+            speed_str = f"{self.left.speed_combo.currentData()}x"
+
+        self.busy = True
+        self.left.step4_pipeline.set_running_state(True)
+        self.log(
+            "🚀 Bắt đầu quy trình xử lý tự động 4 bước (Whisper → ChatGPT → Kịch bản → Vbee)..."
+        )
+
+        out_name = self.project.video_path.stem or "dubbing"
+        output_dir = workspace_root() / "export" / out_name
+
+        self.pipeline_runner = PipelineRunner(
+            project=self.project,
+            local_agent=self.local_agent,
+            output_dir=output_dir,
+            voice_name=voice_name,
+            speed=speed_str,
+            parent=self,
+        )
+
+        self.pipeline_runner.state_changed.connect(self._on_pipeline_state_changed)
+        self.pipeline_runner.substep_updated.connect(self._on_pipeline_substep_updated)
+        self.pipeline_runner.artifact_ready.connect(self._on_pipeline_artifact_ready)
+        self.pipeline_runner.log_emitted.connect(self.log)
+        self.pipeline_runner.pipeline_completed.connect(self._on_pipeline_completed)
+        self.pipeline_runner.pipeline_failed.connect(self._on_pipeline_failed)
+        self.pipeline_runner.pipeline_cancelled.connect(self._on_pipeline_cancelled)
+
+        self.pipeline_runner.start()
+        self._refresh()
+
+    def _cancel_pipeline_runner(self) -> None:
+        if self.pipeline_runner and self.pipeline_runner.isRunning():
+            self.log("⏹ Đang yêu cầu dừng quy trình xử lý tự động...")
+            self.pipeline_runner.cancel()
+
+    def _retry_pipeline_step(self, step_id: str) -> None:
+        if self.busy:
+            return
+        self.log(f"🔄 Đang thực hiện lại bước {step_id}...")
+        if self.pipeline_runner:
+            out_dir = self.pipeline_runner.output_dir
+            if step_id == "4.1":
+                orig = out_dir / "original.srt"
+                if orig.exists():
+                    orig.unlink()
+            elif step_id == "4.2":
+                trans = out_dir / "translated.srt"
+                if trans.exists():
+                    trans.unlink()
+            elif step_id in ("4.3", "4.4"):
+                m_raw = out_dir / "vbee_master_raw.mp3"
+                m_tl = out_dir / "master_narration_timeline.mp3"
+                if m_raw.exists():
+                    m_raw.unlink()
+                if m_tl.exists():
+                    m_tl.unlink()
+        self._start_pipeline_runner()
+
+    def _on_pipeline_state_changed(self, state: PipelineState, message: str) -> None:
+        self.log(f"[{state.value}] {message}")
+        self.statusBar().showMessage(message, 5000)
+
+    def _on_pipeline_substep_updated(
+        self,
+        step_id: str,
+        status: SubstepStatus,
+        progress: int,
+        message: str,
+        artifact: Path | None = None,
+        duration_s: float | None = None,
+    ) -> None:
+        error = None
+        if self.pipeline_runner:
+            for s in self.pipeline_runner.substeps:
+                if s.id == step_id:
+                    if duration_s is None:
+                        duration_s = s.duration_s
+                    if artifact is None:
+                        artifact = s.artifact_path
+                    error = s.error
+                    break
+        self.left.step4_pipeline.update_substep(
+            step_id=step_id,
+            status=status,
+            progress=progress,
+            message=message,
+            artifact=artifact,
+            error=error,
+            duration_s=duration_s,
+        )
+
+    def _on_pipeline_artifact_ready(self, key: str, path: Path) -> None:
+        self.log(f"✓ Đã tạo artifact [{key}]: {path.name}")
+        if key == "translated_srt":
+            self.review_controller.bind_project()
+        elif key == "master_audio":
+            self.project.master_voice_path = path
+
+    def _on_pipeline_completed(self, artifacts: Any) -> None:
+        self.busy = False
+        self.left.step4_pipeline.set_running_state(False)
+        self.left.step4_pipeline.overall_badge.setText("✔ Hoàn thành")
+        self.left.step4_pipeline.overall_badge.setStyleSheet("color: #3fb950; font-weight: bold;")
+        self.left.lbl_review_status.setText(
+            "✓ Đã hoàn tất! Kịch bản và audio timeline đã sẵn sàng."
+        )
+        self.left.lbl_review_status.setStyleSheet("color: #3fb950; font-weight: bold;")
+        if artifacts.timeline_master_audio and artifacts.timeline_master_audio.is_file():
+            self.project.master_voice_path = artifacts.timeline_master_audio
+        self.review_controller.bind_project()
+        self._refresh()
+        self.log("🎉 Quy trình xử lý tự động 4 bước đã hoàn tất thành công!")
+        QMessageBox.information(
+            self,
+            "Xử lý tự động hoàn tất",
+            "Toàn bộ quy trình (Bóc băng → ChatGPT → Kịch bản → Vbee Timeline Audio) đã hoàn tất!\n\n"
+            "Bạn có thể duyệt lại kịch bản ở khung bên phải và nhấn '✔ BƯỚC 5: CHỐT KỊCH BẢN (DUYỆT)' rồi xuất CapCut.",
+        )
+
+    def _on_pipeline_failed(self, short_err: str, trace: str) -> None:
+        self.busy = False
+        self.left.step4_pipeline.set_running_state(False)
+        self.left.step4_pipeline.overall_badge.setText("✖ Thất bại")
+        self.left.step4_pipeline.overall_badge.setStyleSheet("color: #f85149; font-weight: bold;")
+        self._refresh()
+        self.log(f"✖ Lỗi quy trình xử lý tự động: {short_err}")
+        QMessageBox.critical(
+            self,
+            "Lỗi xử lý tự động",
+            f"Quy trình tự động gặp lỗi:\n\n{short_err}\n\nBạn có thể kiểm tra log chi tiết (F12) hoặc bấm nút 'Thử lại' ở bước gặp sự cố.",
+        )
+
+    def _on_pipeline_cancelled(self) -> None:
+        self.busy = False
+        self.left.step4_pipeline.set_running_state(False)
+        self.left.step4_pipeline.overall_badge.setText("⏹ Đã hủy")
+        self.left.step4_pipeline.overall_badge.setStyleSheet("color: #d29922; font-weight: bold;")
+        self._refresh()
+        self.log("⏹ Đã dừng quy trình xử lý tự động theo yêu cầu.")
+
     def _on_approve_script_clicked(self) -> None:
         if not self.project.script or not self.project.script.lines:
             QMessageBox.warning(self, "Chưa có kịch bản", "Chưa có kịch bản phụ đề dịch để chốt.")
@@ -478,12 +659,12 @@ class MainWindow(QMainWindow):
         ok = self.review_controller.approve()
         if ok:
             self._refresh()
-            self.log("Đã chốt duyệt kịch bản thành công! Sẵn sàng cho Bước 4: Tạo Voice Vbee.")
+            self.log("Đã chốt duyệt kịch bản thành công! Sẵn sàng xuất CapCut.")
             QMessageBox.information(
                 self,
                 "Đã chốt kịch bản",
-                "Kịch bản dịch đã được xác nhận thành công!\n\n"
-                "Tiếp theo: Nhấn '⚡ BƯỚC 4: TẠO VOICE VBEE TỰ ĐỘNG' để tạo âm thanh.",
+                "Kịch bản dịch đã được duyệt thành công!\n\n"
+                "Tiếp theo: Nhấn '🎬 XUẤT PROJECT CAPCUT' để mở dự án CapCut với video, phụ đề và voice.",
             )
         else:
             QMessageBox.warning(
@@ -623,17 +804,22 @@ class MainWindow(QMainWindow):
         self.left.save_button.setEnabled(not self.busy)
         self.left.output_button.setEnabled(not self.busy)
         self.left.detect_button.setEnabled(enabled)
-        can_vbee = enabled and bool(self.project.script) and self.project.is_approved
-        self.left.btn_vbee_voice.setEnabled(can_vbee)
-        if not self.project.script:
-            self.left.btn_vbee_voice.setToolTip("Cần có kịch bản trước khi tạo voice bằng Vbee.")
-        elif not self.project.is_approved:
-            self.left.btn_vbee_voice.setToolTip("Duyệt kịch bản trước khi tạo voice bằng Vbee.")
-        else:
-            self.left.btn_vbee_voice.setToolTip(
-                "Tự động xuất SRT tiếng Việt, mở Vbee Dubbing Studio, "
-                "tạo voice và đồng bộ vào project."
-            )
+        has_video = bool(self.project.video_path)
+        can_run_pipeline = has_video and not busy
+        if hasattr(self.left, "step4_pipeline"):
+            if not self.busy:
+                self.left.step4_pipeline.btn_primary.setEnabled(can_run_pipeline)
+                if not has_video:
+                    self.left.step4_pipeline.btn_primary.setToolTip(
+                        "Vui lòng chọn video nguồn (Bước 01) trước khi bắt đầu."
+                    )
+                else:
+                    self.left.step4_pipeline.btn_primary.setToolTip(
+                        "Bắt đầu quy trình tự động 4 bước: Whisper → ChatGPT → Kịch bản → Vbee"
+                    )
+
+        can_approve = bool(self.project.script and self.project.script.lines) and not busy
+        self.left.btn_approve_script.setEnabled(can_approve)
 
         self.transcription.refresh()
         self.translation.refresh()
@@ -1160,9 +1346,32 @@ class MainWindow(QMainWindow):
                 active.stop()
             event.ignore()
             return
+        if (
+            hasattr(self, "pipeline_runner")
+            and self.pipeline_runner
+            and self.pipeline_runner.isRunning()
+        ):
+            answer = QMessageBox.question(
+                self,
+                "Dừng quy trình tự động?",
+                "Quy trình xử lý tự động đang chạy. Dừng rồi đóng ứng dụng?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                self.pipeline_runner.cancel()
+                self.pipeline_runner.wait(2000)
+            else:
+                event.ignore()
+                return
         if not self._confirm_discard():
             event.ignore()
             return
+        if hasattr(self, "local_agent") and self.local_agent:
+            try:
+                self.local_agent.stop()
+            except Exception:
+                pass
         self.preview.player.stop()
         self.autosave_timer.stop()
         self.recovery_timer.stop()

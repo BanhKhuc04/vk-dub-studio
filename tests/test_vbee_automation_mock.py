@@ -77,6 +77,7 @@ async def test_automation_upload_srt(tmp_path: Path) -> None:
     mock_context.pages = [mock_page]
 
     mock_input = AsyncMock()
+    mock_input.evaluate.return_value = 1
     mock_page.query_selector.return_value = mock_input
 
     automation = VbeeBrowserAutomation(mock_context)
@@ -132,6 +133,36 @@ async def test_automation_wait_for_completion_quota_error() -> None:
     automation = VbeeBrowserAutomation(mock_context)
     with pytest.raises(VbeeQuotaExceededError, match="hết ký tự"):
         await automation.wait_for_completion(timeout_s=2.0, poll_interval_s=0.1)
+
+
+@pytest.mark.anyio
+async def test_low_balance_banner_is_not_treated_as_quota_rejection() -> None:
+    mock_context = MagicMock()
+    mock_page = _make_mock_page()
+    mock_context.pages = [mock_page]
+    low_balance = AsyncMock()
+    low_balance.is_visible.return_value = True
+    low_balance.text_content.return_value = "Sắp hết điểm 81 điểm"
+
+    async def query_selector(selector: str) -> AsyncMock | None:
+        if "Sắp hết điểm" in selector:
+            return low_balance
+        return None
+
+    mock_page.query_selector.side_effect = query_selector
+    automation = VbeeBrowserAutomation(mock_context)
+
+    await automation._check_errors_on_page()
+
+
+def test_provider_error_text_is_bounded_and_redacts_email() -> None:
+    raw = "Không đủ điểm user@example.com " + ("chi tiết " * 100)
+
+    safe = VbeeBrowserAutomation._safe_error_text(raw)
+
+    assert "user@example.com" not in safe
+    assert "[email đã ẩn]" in safe
+    assert len(safe) <= 240
 
 
 @pytest.mark.anyio
@@ -367,3 +398,36 @@ async def test_automation_find_job_row_and_completion() -> None:
         timeout_s=2.0,
         poll_interval_s=0.05,
     )
+
+
+@pytest.mark.anyio
+async def test_automation_finds_provider_renamed_new_job_row() -> None:
+    mock_context = MagicMock()
+    mock_page = _make_mock_page()
+    mock_context.pages = [mock_page]
+    old_row = AsyncMock()
+    old_row.inner_text.return_value = "old-job Hoàn thành"
+    new_row = AsyncMock()
+    new_row.inner_text.return_value = "Dự án SRT Hôm nay - 12:05 Đang xử lý"
+    rows = [old_row]
+
+    def locator(selector: str):
+        candidates = MagicMock()
+        selected_rows = rows if selector == "tr" else []
+        candidates.count = AsyncMock(return_value=len(selected_rows))
+        candidates.nth = MagicMock(side_effect=lambda index: selected_rows[index])
+        candidates.first = MagicMock(is_visible=AsyncMock(return_value=False))
+        return candidates
+
+    mock_page.locator = MagicMock(side_effect=locator)
+    automation = VbeeBrowserAutomation(mock_context)
+    previous = await automation.snapshot_job_rows()
+    rows.append(new_row)
+
+    found = await automation.find_job_row(
+        "release_probe.srt",
+        timeout_s=2.0,
+        previous_rows=previous,
+    )
+
+    assert found is new_row

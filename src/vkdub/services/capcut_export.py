@@ -376,29 +376,58 @@ def export_capcut_project(
         text_track.update(name="PHỤ ĐỀ TIẾNG VIỆT", is_default_name=False)
         text_track["segments"] = []
         assert project.script
-        current = project.current_voices()
-        for index, line in enumerate(project.script.lines, 1):
-            asset = current[line.id]
-            copied = assets / f"voice-{index:04}.wav"
-            slot_ms = voice_slot_duration_ms(project, index - 1, duration_ms)
-            fitted_duration_ms = fit_voice_wav(asset.output_path, copied, ffmpeg, slot_ms)
-            final_audio = final / "Assets" / copied.name
+        if project.master_voice_path and project.master_voice_path.is_file():
+            # 1. Add single intact master voice track spanning from 00:00:00 (zero slicing)
+            copied_master = assets / "master-voice.wav"
+            shutil.copy2(project.master_voice_path, copied_master)
+            final_audio = final / "Assets" / copied_master.name
+            _, _, master_dur, _ = _probe_video(copied_master, ffprobe)
+            voice_duration = min(duration_ms, master_dur if master_dur > 0 else duration_ms)
             audio = _clone_bundle(template["bundles"]["audio"])
             aseg = _append_bundle(content, audio)
-            _set_range(aseg, line.start_ms, fitted_duration_ms)
+            _set_range(aseg, 0, voice_duration)
             aseg["volume"] = project.voice.volume
             amat = next(
                 row for row in audio["materials"]["audios"] if row["id"] == aseg["material_id"]
             )
-            _set_local_voice_material(amat, final_audio, line.text, fitted_duration_ms)
+            _set_local_voice_material(
+                amat, final_audio, "Voice Tiếng Việt (Toàn bộ)", voice_duration
+            )
             audio_track["segments"].append(aseg)
-            caption = _clone_bundle(template["bundles"]["text"])
-            tseg = _append_bundle(content, caption)
-            _set_range(tseg, line.start_ms, line.end_ms - line.start_ms)
-            text_material = _text_material(caption)
-            _set_text(text_material, line.text)
-            _set_text_style(text_material, tseg, project.subtitle_style)
-            text_track["segments"].append(tseg)
+
+            # 2. Add subtitle captions line by line
+            for line in project.script.lines:
+                caption = _clone_bundle(template["bundles"]["text"])
+                tseg = _append_bundle(content, caption)
+                _set_range(tseg, line.start_ms, max(1, line.end_ms - line.start_ms))
+                text_material = _text_material(caption)
+                _set_text(text_material, line.text)
+                _set_text_style(text_material, tseg, project.subtitle_style)
+                text_track["segments"].append(tseg)
+        else:
+            current = project.current_voices()
+            for index, line in enumerate(project.script.lines, 1):
+                asset = current[line.id]
+                copied = assets / f"voice-{index:04}.wav"
+                slot_ms = voice_slot_duration_ms(project, index - 1, duration_ms)
+                fitted_duration_ms = fit_voice_wav(asset.output_path, copied, ffmpeg, slot_ms)
+                final_audio = final / "Assets" / copied.name
+                audio = _clone_bundle(template["bundles"]["audio"])
+                aseg = _append_bundle(content, audio)
+                _set_range(aseg, line.start_ms, fitted_duration_ms)
+                aseg["volume"] = project.voice.volume
+                amat = next(
+                    row for row in audio["materials"]["audios"] if row["id"] == aseg["material_id"]
+                )
+                _set_local_voice_material(amat, final_audio, line.text, fitted_duration_ms)
+                audio_track["segments"].append(aseg)
+                caption = _clone_bundle(template["bundles"]["text"])
+                tseg = _append_bundle(content, caption)
+                _set_range(tseg, line.start_ms, line.end_ms - line.start_ms)
+                text_material = _text_material(caption)
+                _set_text(text_material, line.text)
+                _set_text_style(text_material, tseg, project.subtitle_style)
+                text_track["segments"].append(tseg)
         content["tracks"].extend([audio_track, text_track])
 
         meta = copy.deepcopy(template["meta"])

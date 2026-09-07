@@ -3,7 +3,6 @@
 import io
 import json
 import struct
-import pytest
 
 
 def pack_native_message(message: dict) -> bytes:
