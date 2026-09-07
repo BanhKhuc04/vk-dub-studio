@@ -346,9 +346,7 @@ def export_capcut_project(
                 raise ValueError("Cần FFmpeg để áp dụng vùng xóa chữ trước khi xuất CapCut.")
             video_source = assets / "video-da-xoa-chu.mp4"
             final_video_source = final / "Assets" / video_source.name
-            _render_masked_video(
-                project.video_path, video_source, project, width, height, ffmpeg
-            )
+            _render_masked_video(project.video_path, video_source, project, width, height, ffmpeg)
 
         video = _clone_bundle(template["bundles"]["video"])
         vseg = _append_bundle(content, video)
@@ -383,9 +381,7 @@ def export_capcut_project(
             asset = current[line.id]
             copied = assets / f"voice-{index:04}.wav"
             slot_ms = voice_slot_duration_ms(project, index - 1, duration_ms)
-            fitted_duration_ms = fit_voice_wav(
-                asset.output_path, copied, ffmpeg, slot_ms
-            )
+            fitted_duration_ms = fit_voice_wav(asset.output_path, copied, ffmpeg, slot_ms)
             final_audio = final / "Assets" / copied.name
             audio = _clone_bundle(template["bundles"]["audio"])
             aseg = _append_bundle(content, audio)

@@ -165,7 +165,7 @@ class RenderController(QObject):
             errors = [
                 line for line in self._stderr_lines if any(key in line.lower() for key in keywords)
             ]
-            detail = (errors[-1:] or self._stderr_lines[-1:])
+            detail = errors[-1:] or self._stderr_lines[-1:]
             suffix = f" Chi tiết: {detail[0][-600:]}" if detail else ""
             self._fail(f"FFmpeg kết thúc với mã lỗi {exit_code}.{suffix}")
 

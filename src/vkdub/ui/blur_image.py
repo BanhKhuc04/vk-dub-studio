@@ -81,21 +81,13 @@ def reconstructed_background(frame: QImage, rect: QRect, strength: int) -> QImag
     x1, y1 = x0 + width, y0 + height
     band = max(2, round(strength * frame.height() / 1080))
 
-    top = (
-        frame_pixels[max(0, y0 - band) : y0, x0:x1].mean(axis=0)
-        if y0 > 0
-        else None
-    )
+    top = frame_pixels[max(0, y0 - band) : y0, x0:x1].mean(axis=0) if y0 > 0 else None
     bottom = (
         frame_pixels[y1 : min(frame.height(), y1 + band), x0:x1].mean(axis=0)
         if y1 < frame.height()
         else None
     )
-    left = (
-        frame_pixels[y0:y1, max(0, x0 - band) : x0].mean(axis=1)
-        if x0 > 0
-        else None
-    )
+    left = frame_pixels[y0:y1, max(0, x0 - band) : x0].mean(axis=1) if x0 > 0 else None
     right = (
         frame_pixels[y0:y1, x1 : min(frame.width(), x1 + band)].mean(axis=1)
         if x1 < frame.width()

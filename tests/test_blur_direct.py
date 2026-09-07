@@ -42,9 +42,7 @@ def text_over_gradient(width=160, height=100):
     pixels[42:58, 45:115] = 245
     pixels[46:54, 55:105] = 20
     rgba = np.dstack([pixels, np.full((height, width), 255, np.uint8)])
-    image = QImage(
-        rgba.data, width, height, width * 4, QImage.Format.Format_RGBA8888
-    ).copy()
+    image = QImage(rgba.data, width, height, width * 4, QImage.Format.Format_RGBA8888).copy()
     return image, background, pixels
 
 
@@ -181,9 +179,7 @@ def test_real_ffmpeg_blur_timing_edges_and_multiple_regions():
         pytest.skip("FFmpeg is not installed")
     source = image_pixels(striped_image(128, 96))
     masks = [
-        MaskItem(
-            mask_type="blur", x=0, y=0, width=1, height=1, start_ms=1000, end_ms=2000
-        ),
+        MaskItem(mask_type="blur", x=0, y=0, width=1, height=1, start_ms=1000, end_ms=2000),
         MaskItem(
             mask_type="blur",
             x=0.3,
@@ -233,9 +229,7 @@ def test_overlapping_regions_do_not_restore_sharp_pixels(canvas):
     canvas.set_masks(
         [
             MaskItem(mask_type="blur", x=0, y=0, width=1, height=1, blur_strength=24),
-            MaskItem(
-                mask_type="blur", x=0.3, y=0.4, width=0.4, height=0.2, blur_strength=24
-            ),
+            MaskItem(mask_type="blur", x=0.3, y=0.4, width=0.4, height=0.2, blur_strength=24),
         ]
     )
     pixels = image_pixels(canvas.grab().toImage())

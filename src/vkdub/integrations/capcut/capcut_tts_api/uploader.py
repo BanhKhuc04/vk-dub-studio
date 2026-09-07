@@ -142,9 +142,7 @@ class VODUploader:
 
         # 1. Upload Sign
         url, headers, body_text = self._upload_sign_request()
-        sign_resp = session.post(
-            url, headers=headers, data=body_text.encode("utf-8"), timeout=60
-        )
+        sign_resp = session.post(url, headers=headers, data=body_text.encode("utf-8"), timeout=60)
         sign_data = _checked_json_response(sign_resp, "upload_sign")
         creds = sign_data.get("data") or {}
         for key in ("domain", "access_key_id", "secret_access_key", "session_token", "space_name"):

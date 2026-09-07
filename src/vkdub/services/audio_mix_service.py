@@ -21,13 +21,13 @@ def _normalize_wav(
 ) -> None:
     """Convert any audio file to the target WAV format using FFmpeg."""
     command = [
-            ffmpeg,
-            "-y",
-            "-nostdin",
-            "-v",
-            "error",
-            "-i",
-            str(source),
+        ffmpeg,
+        "-y",
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        str(source),
     ]
     if tempo > 1.001:
         factors: list[float] = []
@@ -163,19 +163,18 @@ def build_speech_track_wav(
             try:
                 rate, source_channels, source_width, source_frames = _wav_info(asset.output_path)
                 source_duration_ms = round(source_frames * 1000 / rate)
-                if (
-                    (rate, source_channels, source_width) == (sample_rate, channels, sample_width)
-                    and source_duration_ms <= slot_ms
-                ):
+                if (rate, source_channels, source_width) == (
+                    sample_rate,
+                    channels,
+                    sample_width,
+                ) and source_duration_ms <= slot_ms:
                     with wave.open(str(asset.output_path), "rb") as source_wav:
                         frames = source_wav.readframes(source_frames)
                 else:
                     if tmp_dir is None:
                         tmp_dir = tempfile.TemporaryDirectory(prefix="vkdub_wav_norm_")
                     normalized = Path(tmp_dir.name) / f"norm_{index:04}.wav"
-                    fit_voice_wav(
-                        asset.output_path, normalized, ffmpeg, slot_ms, sample_rate
-                    )
+                    fit_voice_wav(asset.output_path, normalized, ffmpeg, slot_ms, sample_rate)
                     with wave.open(str(normalized), "rb") as normalized_wav:
                         frames = normalized_wav.readframes(normalized_wav.getnframes())
                 max_bytes = int(slot_ms * sample_rate / 1000) * sample_width * channels

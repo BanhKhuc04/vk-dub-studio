@@ -321,9 +321,7 @@ class StudioVoiceController(TTSController):
                         job.progress.emit(30, "Đang kiểm tra trạng thái đăng nhập Vbee...")
                         logged_in = await automation.is_logged_in()
                         if logged_in:
-                            job.progress.emit(
-                                100, "✓ Vbee đã đăng nhập sẵn. Sẵn sàng sử dụng!"
-                            )
+                            job.progress.emit(100, "✓ Vbee đã đăng nhập sẵn. Sẵn sàng sử dụng!")
                         else:
                             job.progress.emit(
                                 40, "Vbee chưa đăng nhập. Vui lòng đăng nhập trên cửa sổ vừa mở..."

@@ -1,1 +1,1 @@
-﻿"""CapCut TTS API and integration package."""
+"""CapCut TTS API and integration package."""
