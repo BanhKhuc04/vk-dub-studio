@@ -45,6 +45,9 @@ class UpdateInfo:
     sha256: str
     changelog: tuple[str, ...]
     file_size_bytes: int = 0
+    patch_url: str = ""
+    patch_sha256: str = ""
+    patch_size_bytes: int = 0
 
     def __post_init__(self) -> None:
         if not self.version or not isinstance(self.version, str):
@@ -54,8 +57,16 @@ class UpdateInfo:
         cleaned_sha = self.sha256.strip().lower()
         if not re.fullmatch(r"[0-9a-f]{64}", cleaned_sha):
             raise ValueError("Mã băm SHA-256 của bản cập nhật không hợp lệ.")
+        if self.patch_sha256:
+            cleaned_patch_sha = self.patch_sha256.strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{64}", cleaned_patch_sha):
+                raise ValueError("Mã băm SHA-256 của bản vá không hợp lệ.")
         if not isinstance(self.changelog, tuple):
             raise ValueError("Nhật ký thay đổi không đúng cấu trúc.")
+
+    @property
+    def has_patch(self) -> bool:
+        return bool(self.patch_url and self.patch_sha256)
 
     @classmethod
     def from_dict(cls, data: dict) -> "UpdateInfo":
@@ -71,6 +82,9 @@ class UpdateInfo:
         else:
             changelog = ()
         file_size_bytes = int(data.get("file_size_bytes", 0))
+        patch_url = str(data.get("patch_url", "")).strip()
+        patch_sha256 = str(data.get("patch_sha256", "")).strip()
+        patch_size_bytes = int(data.get("patch_size_bytes", 0))
 
         return cls(
             version=version,
@@ -79,6 +93,9 @@ class UpdateInfo:
             sha256=sha256,
             changelog=changelog,
             file_size_bytes=file_size_bytes,
+            patch_url=patch_url,
+            patch_sha256=patch_sha256,
+            patch_size_bytes=patch_size_bytes,
         )
 
 
@@ -211,3 +228,50 @@ def apply_update_and_restart(installer_path: Path, silent: bool = False) -> None
         creationflags=creation_flags,
         close_fds=True,
     )
+
+
+def apply_patch_and_restart(patch_zip: Path) -> None:
+    """Extract lightweight update patch and restart VK Dub Studio.
+
+    Avoids downloading the full 300MB installer when only Python code or resources change.
+    """
+    import sys
+    import tempfile
+
+    if not patch_zip.is_file():
+        raise FileNotFoundError(f"Tệp bản vá không tồn tại: {patch_zip}")
+
+    exe_path = sys.executable if getattr(sys, "frozen", False) else ""
+    target_dir = Path(exe_path).parent if exe_path else Path(__file__).resolve().parents[2]
+    target_exe = Path(exe_path).resolve() if exe_path else target_dir / "VK Dub Studio.exe"
+
+    patch_abs = str(patch_zip.resolve())
+    dest_abs = str(target_dir.resolve())
+    target_abs = str(target_exe)
+
+    bat_lines = [
+        "@echo off",
+        "timeout /t 2 /nobreak >nul",
+        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path \'{patch_abs}\' -DestinationPath \'{dest_abs}\' -Force"',
+        f'if exist "{target_abs}" start "" "{target_abs}"',
+        'del "%~f0"',
+    ]
+    bat_content = "\r\n".join(bat_lines) + "\r\n"
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".bat",
+        prefix="vkdub_patch_",
+        delete=False,
+        encoding="utf-8",
+    )
+    tmp.write(bat_content)
+    tmp.close()
+
+    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    subprocess.Popen(
+        ["cmd.exe", "/c", tmp.name],
+        creationflags=creation_flags,
+        close_fds=True,
+    )
+

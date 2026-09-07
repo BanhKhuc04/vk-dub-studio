@@ -14,6 +14,7 @@ from vkdub.services.voice_catalog import (
     VIENEU_VERSION,
     engine_python,
     engine_root,
+    find_system_python,
     install_presets,
     read_catalog,
     save_catalog,
@@ -51,8 +52,16 @@ async def _setup_command(arguments: list[str], progress: Progress, message: str)
 async def setup_vieneu(ffmpeg: str, ffprobe: str, progress: Progress) -> list[dict]:
     root = engine_root()
     if not engine_python().is_file():
+        py_exe = find_system_python()
+        if not py_exe:
+            raise ValueError(
+                "Để sử dụng VieNeu offline, máy tính cần cài đặt sẵn Python 3.10 hoặc 3.11 "
+                "(từ python.org và tích vào ô 'Add python.exe to PATH').\n"
+                "Nếu không cài Python, bạn có thể chuyển sang dùng giọng đọc CapCut TTS hoặc Vbee "
+                "ngay trong danh sách động cơ giọng đọc."
+            )
         await _setup_command(
-            [sys.executable, "-m", "venv", str(root)],
+            [str(py_exe), "-m", "venv", str(root)],
             progress,
             "Đang chuẩn bị môi trường riêng cho VieNeu…",
         )

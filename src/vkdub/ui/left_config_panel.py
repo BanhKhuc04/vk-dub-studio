@@ -36,6 +36,8 @@ class LeftConfigPanel(QFrame):
     export_video_requested = Signal()
     export_capcut_requested = Signal()
     vbee_voice_requested = Signal()
+    vbee_export_srt_requested = Signal()
+    vbee_manual_audio_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -206,7 +208,11 @@ class LeftConfigPanel(QFrame):
         voice_actions.addWidget(self.manage_voices_button)
         voice_col.addLayout(voice_actions)
 
-        self.btn_vbee_voice = QPushButton("⚡ Tạo voice bằng Vbee")
+        # Vbee Workflow Options (Automatic + Manual)
+        vbee_container = QVBoxLayout()
+        vbee_container.setSpacing(4)
+
+        self.btn_vbee_voice = QPushButton("⚡ Tạo voice Vbee (Tự động)")
         self.btn_vbee_voice.setToolTip(
             "Tự động xuất SRT tiếng Việt, mở Vbee Dubbing Studio, tạo voice và đồng bộ vào project."
         )
@@ -215,7 +221,31 @@ class LeftConfigPanel(QFrame):
             "font-size: 11px; border-radius: 4px; margin-top: 4px;"
         )
         self.btn_vbee_voice.clicked.connect(self.vbee_voice_requested.emit)
-        voice_col.addWidget(self.btn_vbee_voice)
+        vbee_container.addWidget(self.btn_vbee_voice)
+
+        vbee_manual_row = QHBoxLayout()
+        vbee_manual_row.setSpacing(4)
+
+        self.btn_vbee_export_srt = QPushButton("⬇ Tải SRT Vbee")
+        self.btn_vbee_export_srt.setToolTip(
+            "Tải file phụ đề SRT tiếng Việt đã dịch về máy để tự tạo giọng trên Vbee Studio."
+        )
+        self.btn_vbee_export_srt.setStyleSheet("padding: 4px 6px; font-size: 10px; font-weight: 600;")
+        self.btn_vbee_export_srt.clicked.connect(self.vbee_export_srt_requested.emit)
+        vbee_manual_row.addWidget(self.btn_vbee_export_srt)
+
+        self.btn_vbee_manual_audio = QPushButton("📁 Nhập Audio Vbee")
+        self.btn_vbee_manual_audio.setToolTip(
+            "Chọn file audio (MP3/WAV) đã tạo từ Vbee để tự động cắt ghép và đồng bộ vào dự án."
+        )
+        self.btn_vbee_manual_audio.setStyleSheet(
+            "padding: 4px 6px; font-size: 10px; font-weight: 600; color: #38bdf8;"
+        )
+        self.btn_vbee_manual_audio.clicked.connect(self.vbee_manual_audio_requested.emit)
+        vbee_manual_row.addWidget(self.btn_vbee_manual_audio)
+
+        vbee_container.addLayout(vbee_manual_row)
+        voice_col.addLayout(vbee_container)
 
         layout.addLayout(voice_col)
 

@@ -35,6 +35,11 @@ datas += collect_data_files('faster_whisper')
 datas += collect_data_files('ctranslate2')
 datas += collect_data_files('playwright')
 
+datas += [
+    (str(ROOT_DIR / 'src' / 'vkdub' / 'integrations' / 'capcut' / 'Voice.json'), 'vkdub/integrations/capcut'),
+    (str(ROOT_DIR / 'src' / 'vkdub' / 'integrations' / 'capcut' / 'Voice.json'), 'resources'),
+]
+
 hiddenimports = [
     'PySide6.QtCore',
     'PySide6.QtGui',
@@ -61,6 +66,9 @@ hiddenimports = [
     'vkdub.integrations.vbee.automation',
     'vkdub.integrations.vbee.session',
     'vkdub.integrations.vbee.workflow',
+    'vkdub.integrations.capcut',
+    'vkdub.integrations.capcut.capcut_tts_api',
+    'vkdub.providers.capcut_tts',
     'vkdub.providers.vbee_tts',
     'vkdub.providers.vieneu_tts',
     'vkdub.services.update_service',

@@ -25,6 +25,80 @@ def engine_python(root: Path | None = None) -> Path:
     return root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+def find_system_python() -> Path | None:
+    """Locate a valid Python 3 interpreter on Windows that can create venvs."""
+    import glob
+    import os
+    import shutil
+    import subprocess
+    import sys
+
+    candidates: list[Path] = []
+
+    # 1. If running under normal Python runtime (not frozen)
+    if not getattr(sys, "frozen", False):
+        candidates.append(Path(sys.executable))
+
+    # 2. Check PATH
+    for cmd in ("python", "python3"):
+        if found := shutil.which(cmd):
+            candidates.append(Path(found))
+
+    # 3. Check Windows py launcher
+    if py_cmd := shutil.which("py"):
+        try:
+            res = subprocess.run(
+                [py_cmd, "-3", "-c", "import sys; print(sys.executable)"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                creationflags=0x08000000 if os.name == "nt" else 0,
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                candidates.append(Path(res.stdout.strip()))
+        except Exception:
+            pass
+
+    # 4. Check common installation directories on Windows
+    local_appdata = os.environ.get("LOCALAPPDATA", "")
+    if local_appdata:
+        py_dir = Path(local_appdata) / "Programs" / "Python"
+        if py_dir.is_dir():
+            for sub in sorted(py_dir.glob("Python3*"), reverse=True):
+                exe = sub / "python.exe"
+                if exe.is_file():
+                    candidates.append(exe)
+
+    for pattern in ("C:\\Program Files\\Python3*", "C:\\Program Files (x86)\\Python3*", "C:\\Python3*"):
+        for matched in glob.glob(pattern):
+            exe = Path(matched) / "python.exe"
+            if exe.is_file():
+                candidates.append(exe)
+
+    # Validate candidates
+    seen = set()
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+            if resolved in seen or not resolved.is_file():
+                continue
+            seen.add(resolved)
+            # Verify candidate can import venv
+            test = subprocess.run(
+                [str(resolved), "-c", "import venv; print(1)"],
+                capture_output=True,
+                timeout=4,
+                creationflags=0x08000000 if os.name == "nt" else 0,
+            )
+            if test.returncode == 0:
+                return resolved
+        except Exception:
+            continue
+
+    return None
+
+
+
 VBEE_DEFAULT_CATALOG: list[dict[str, Any]] = [
     {"id": "vbee-studio-default", "name": "Vbee Studio — Tự động / Mặc định", "custom": False},
     {"id": "vbee-ngoc-huyen", "name": "Ngọc Huyền (Nữ miền Bắc)", "custom": False},

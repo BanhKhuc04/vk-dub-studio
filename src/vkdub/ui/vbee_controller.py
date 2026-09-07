@@ -9,7 +9,9 @@ import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, QThread, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 from vkdub.domain.project import Project
 from vkdub.integrations.vbee.errors import VbeeError, VbeeValidationError
@@ -17,7 +19,7 @@ from vkdub.integrations.vbee.provider import VbeeBrowserProvider, VoiceProvider
 from vkdub.integrations.vbee.state import WorkflowState
 from vkdub.integrations.vbee.workflow import VbeeVoiceWorkflow, validate_project_for_vbee
 from vkdub.ui.vbee_workflow_dialog import VbeeWorkflowDialog
-from vkdub.utils.paths import data_root
+from vkdub.utils.paths import data_root, workspace_root
 
 if TYPE_CHECKING:
     from vkdub.ui.main_window import MainWindow
@@ -325,3 +327,145 @@ class VbeeController(QObject):
         self.window.left.job_progress.setValue(100)
         self.window.left.stop_button.setEnabled(False)
         self.window._refresh()
+
+    def export_srt_dialog(self) -> Path | None:
+        """Export approved or translated Vietnamese SRT file for manual Vbee dubbing."""
+        project = self.window.project
+        if not project.script or not project.script.lines:
+            self.window._error("Dự án chưa có kịch bản tiếng Việt. Vui lòng bóc băng và dịch kịch bản trước khi xuất SRT.")
+            return None
+
+        import re
+        from datetime import datetime
+        from vkdub.services.srt_service import write_srt
+
+        slug = (
+            re.sub(r"[^a-zA-Z0-9_-]", "_", project.video_path.stem if project.video_path else "project")
+            .strip("_")[:30]
+            or "project"
+        )
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_dir = workspace_root() / "export"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        default_path = default_dir / f"vkdub_{slug}_{timestamp}.srt"
+
+        chosen, _ = QFileDialog.getSaveFileName(
+            self.window if isinstance(self.window, QWidget) else None,
+            "Lưu file phụ đề SRT tiếng Việt (Dùng tạo Voice trên Vbee)",
+            str(default_path),
+            "SubRip Subtitles (*.srt);;Tất cả tệp (*.*)",
+        )
+        if not chosen:
+            return None
+
+        target = Path(chosen)
+        write_srt(target, project.script, project.duration_ms)
+        self.window.log(f"✓ Đã xuất file phụ đề SRT cho Vbee: {target.name}")
+
+        box = QMessageBox(
+            QMessageBox.Icon.Information,
+            "Xuất file SRT thành công",
+            f"Đã lưu file SRT tiếng Việt thành công tại:\n{target}\n\n"
+            "Các bước thực hiện thủ công:\n"
+            "1. Tải file SRT này lên Vbee Studio (vbee.vn) để tạo giọng đọc.\n"
+            "2. Sau khi Vbee chuyển đổi xong, tải file âm thanh (MP3/WAV) về máy tính.\n"
+            "3. Bấm nút '📁 Nhập Audio Vbee (Thủ công)' trên VK Dub Studio để tự động cắt ghép vào video!",
+            parent=self.window if isinstance(self.window, QWidget) else None,
+        )
+        btn_open = box.addButton("Mở thư mục chứa file", QMessageBox.ButtonRole.ActionRole)
+        box.addButton("Đã hiểu", QMessageBox.ButtonRole.AcceptRole)
+        box.exec()
+        if box.clickedButton() == btn_open:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(target.parent)))
+
+        return target
+
+    def import_manual_audio_dialog(self, audio_path: Path | None = None) -> bool:
+        """Import a downloaded Vbee audio file manually and slice per subtitle line."""
+        if self.window.busy or self.job is not None:
+            self.window.log("Hệ thống đang bận thực hiện tác vụ khác. Vui lòng chờ.")
+            return False
+
+        project = self.window.project
+        if not project.script or not project.script.lines:
+            self.window._error("Dự án chưa có kịch bản để đồng bộ âm thanh. Vui lòng dịch kịch bản trước.")
+            return False
+
+        from vkdub.integrations.vbee.importer import slice_and_import_vbee_audio
+
+        if audio_path is None:
+            chosen, _ = QFileDialog.getOpenFileName(
+                self.window if isinstance(self.window, QWidget) else None,
+                "Chọn file Audio đã tạo và tải về từ Vbee",
+                "",
+                "Audio Files (*.mp3 *.wav *.m4a *.aac *.ogg);;Tất cả tệp (*.*)",
+            )
+            if not chosen:
+                return False
+            audio_path = Path(chosen)
+
+        if not audio_path.is_file() or audio_path.stat().st_size < 2048:
+            self.window._error("File âm thanh đã chọn không tồn tại hoặc dung lượng quá nhỏ.")
+            return False
+
+        ffmpeg = self.window.tools.paths.get("ffmpeg")
+        ffprobe = self.window.tools.paths.get("ffprobe")
+        if not ffmpeg or not ffprobe:
+            self.window._error("Cần FFmpeg và FFprobe để xử lý cắt ghép âm thanh.")
+            return False
+
+        # Auto approve script if valid and not yet approved
+        if not project.is_approved and project.script_valid:
+            project.approve(True)
+
+        async def manual_import_op(state_cb: Any, prog_cb: Any) -> dict[str, Any]:
+            prog_cb(10, "Đang chuẩn hóa âm thanh Vbee thủ công...")
+            res = await slice_and_import_vbee_audio(
+                project=project,
+                downloaded_audio=audio_path,
+                ffmpeg=str(ffmpeg),
+                ffprobe=str(ffprobe),
+                voice_id="vbee_manual",
+                display_name="Vbee (Thủ công)",
+            )
+            prog_cb(100, "Đã hoàn thành cắt ghép âm thanh Vbee theo kịch bản!")
+            return res
+
+        job = VbeeWorkflowJob(
+            project=project,
+            operation=manual_import_op,
+            parent=self,
+        )
+        self.job = job
+        job.progress_changed.connect(self._on_progress_changed)
+        job.succeeded.connect(self._on_manual_succeeded)
+        job.failed.connect(self._on_failed)
+        job.finished.connect(self._on_finished)
+
+        self.window.busy = True
+        self.window.left.stop_button.setEnabled(True)
+        self.window.left.stop_button.clicked.connect(self.stop_workflow)
+        self.window.left.job_progress.setValue(10)
+        self.window.log(
+            f"Đang phân tích và cắt ghép file âm thanh Vbee ({audio_path.name}) theo {len(project.script.lines)} câu kịch bản…"
+        )
+        self.window._refresh()
+        job.start()
+        return True
+
+    @Slot(object)
+    def _on_manual_succeeded(self, result: Any) -> None:
+        count = result.get("lines_count", 0) if isinstance(result, dict) else 0
+        msg = f"✓ Đã nhập và đồng bộ thành công {count} câu thoại từ file Vbee thủ công!"
+        self.window.dirty = True
+        self.window.log(msg)
+        self.window._refresh()
+        QMessageBox.information(
+            self.window if isinstance(self.window, QWidget) else None,
+            "Nhập Audio Vbee thành công",
+            f"{msg}\n\n"
+            "Tất cả các câu thoại đã sẵn sàng. Bạn có thể nghe thử từng câu trên danh sách kịch bản "
+            "và bấm 'BẮT ĐẦU XỬ LÝ' (hoặc Xuất CapCut) để hoàn tất video!",
+        )
+        self.workflow_finished.emit(True, msg)
+

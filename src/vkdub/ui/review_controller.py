@@ -301,6 +301,9 @@ class ReviewController(QObject):
                 )
             elif name == "load":
                 self.choose_srt()
+            elif name == "import_vbee":
+                if hasattr(self.window, "vbee_controller") and self.window.vbee_controller:
+                    self.window.vbee_controller.import_manual_audio_dialog()
             elif script is None:
                 return
             elif name == "save":

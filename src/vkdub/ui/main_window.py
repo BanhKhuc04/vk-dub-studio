@@ -131,6 +131,8 @@ class MainWindow(QMainWindow):
         self.capcut_export = CapCutExportController(self)
         self.vbee_controller = VbeeController(self)
         self.left.vbee_voice_requested.connect(self.vbee_controller.start_workflow)
+        self.left.vbee_export_srt_requested.connect(self.vbee_controller.export_srt_dialog)
+        self.left.vbee_manual_audio_requested.connect(self.vbee_controller.import_manual_audio_dialog)
         self.review.export_button.hide()
         self.review.approve_button.hide()
         self._auto_pipeline: bool = False

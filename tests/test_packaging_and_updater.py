@@ -16,7 +16,7 @@ def test_version_is_semantic():
     parts = __version__.split(".")
     assert len(parts) >= 3
     assert all(p.isdigit() for p in parts[:3])
-    assert __version__ == "2.1.3"
+    assert __version__ == "2.1.4"
 
 
 def test_resource_path_resolution(tmp_path):
@@ -47,13 +47,17 @@ def test_find_tool_with_bundled_tools(tmp_path, monkeypatch):
 
 def test_update_manifest_structure():
     info = UpdateInfo(
-        version="2.1.4",
+        version="2.1.5",
         published_at="2026-09-07T00:00:00Z",
-        installer_url="https://github.com/vanhkhuc/vk-dub-studio/releases/download/v2.1.4/VKDubStudio-Setup-2.1.4.exe",
+        installer_url="https://github.com/vanhkhuc/vk-dub-studio/releases/download/v2.1.5/VKDubStudio-Setup-2.1.5.exe",
         sha256="a" * 64,
         changelog=("Sửa lỗi cập nhật",),
         file_size_bytes=100000000,
+        patch_url="https://github.com/vanhkhuc/vk-dub-studio/releases/download/v2.1.5/VKDubStudio-Patch-2.1.5.zip",
+        patch_sha256="b" * 64,
+        patch_size_bytes=3000000,
     )
+    assert info.has_patch is True
     assert is_newer_version(info.version, __version__) is True
     assert is_newer_version("2.1.1", info.version) is False
     assert is_newer_version(__version__, __version__) is False

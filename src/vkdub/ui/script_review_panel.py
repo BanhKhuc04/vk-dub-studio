@@ -90,6 +90,7 @@ class ScriptReviewPanel(QFrame):
                 ("search", "🔍 Tìm/Thay"),
                 ("load", "📂 Nhập SRT bản dịch"),
                 ("save", "⬇ SRT đã dịch"),
+                ("import_vbee", "🎵 Nhập Audio Vbee"),
                 ("save_source", "⬇ SRT chưa dịch"),
                 ("validate", "Kiểm tra"),
                 ("prepare", "Tạo bản nháp"),
@@ -108,9 +109,9 @@ class ScriptReviewPanel(QFrame):
         more_menu = QMenu(self)
         self.more_button.setMenu(more_menu)
         overflow = []
+        primary = ("load", "save", "save_source", "import_vbee", "validate")
         for name, button in self.buttons.items():
             toolbar.removeWidget(button)
-            primary = ("load", "save", "save_source", "validate")
             if name in primary:
                 toolbar.addWidget(button, 0, primary.index(name))
             else:
@@ -125,7 +126,7 @@ class ScriptReviewPanel(QFrame):
                 menu_action.setEnabled(hidden_button.isEnabled())
 
         more_menu.aboutToShow.connect(refresh_overflow)
-        toolbar.addWidget(self.more_button, 0, 4)
+        toolbar.addWidget(self.more_button, 0, len(primary))
         layout.addLayout(toolbar)
 
         # Search / Replace box
