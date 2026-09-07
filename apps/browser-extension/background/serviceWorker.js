@@ -142,12 +142,56 @@ async function getOrOpenTab(urlPatterns, targetUrl) {
   return newTab;
 }
 
+async function ensureAdapterInjected(tabId, scriptPath, pingAction) {
+  try {
+    const res = await chrome.tabs.sendMessage(tabId, { action: pingAction });
+    if (res) return true;
+  } catch (err) {
+    // Content script is not listening in this tab yet
+  }
+
+  console.log(`[SW] Injecting ${scriptPath} into tab ${tabId}...`);
+  if (chrome.scripting) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: [scriptPath],
+      });
+      await new Promise((r) => setTimeout(r, 800));
+      return true;
+    } catch (e) {
+      console.warn(`[SW] Failed executeScript on tab ${tabId}:`, e);
+    }
+  }
+
+  // Fallback: reload tab so content script loads automatically via manifest match
+  try {
+    console.log(`[SW] Reloading tab ${tabId} to activate content script...`);
+    await chrome.tabs.reload(tabId);
+    await new Promise((resolve) => {
+      const listener = (tid, info) => {
+        if (tid === tabId && info.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+      setTimeout(resolve, 8000);
+    });
+    await new Promise((r) => setTimeout(r, 1500));
+  } catch (e) {
+    console.warn(`[SW] Tab reload failed:`, e);
+  }
+  return false;
+}
+
 async function handleChatGPTTranslate(payload) {
   try {
     const tab = await getOrOpenTab(
       ["*://chatgpt.com/*", "*://*.chatgpt.com/*"],
       "https://chatgpt.com"
     );
+    await ensureAdapterInjected(tab.id, "content/chatgptAdapter.js", "CHECK_CHATGPT_STATUS");
     const resp = await chrome.tabs.sendMessage(tab.id, {
       action: "CHATGPT_TRANSLATE",
       payload,
@@ -174,6 +218,7 @@ async function handleVbeeGenerate(payload) {
       ["*://studio.vbee.vn/*", "*://vbee.vn/*"],
       "https://studio.vbee.vn/studio/dubbing"
     );
+    await ensureAdapterInjected(tab.id, "content/vbeeAdapter.js", "CHECK_VBEE_STATUS");
     const resp = await chrome.tabs.sendMessage(tab.id, {
       action: "VBEE_GENERATE_VOICE",
       payload,
