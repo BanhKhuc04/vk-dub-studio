@@ -143,14 +143,18 @@ async function getOrOpenTab(urlPatterns, targetUrl) {
 }
 
 async function ensureAdapterInjected(tabId, scriptPath, pingAction) {
+  const REQUIRED_VERSION = "2.1.6";
   try {
     const res = await chrome.tabs.sendMessage(tabId, { action: pingAction });
-    if (res) return true;
+    if (res && res.version === REQUIRED_VERSION) {
+      return true;
+    }
+    console.log(`[SW] Adapter version mismatch on tab ${tabId} (${res?.version} vs ${REQUIRED_VERSION}). Upgrading...`);
   } catch (err) {
     // Content script is not listening in this tab yet
   }
 
-  console.log(`[SW] Injecting ${scriptPath} into tab ${tabId}...`);
+  console.log(`[SW] Injecting updated ${scriptPath} into tab ${tabId}...`);
   if (chrome.scripting) {
     try {
       await chrome.scripting.executeScript({

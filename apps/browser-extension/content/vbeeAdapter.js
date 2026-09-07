@@ -46,6 +46,7 @@
     return {
       available: true,
       logged_in: isLoggedIn,
+      version: "2.1.6",
       is_studio: isStudio,
       is_dubbing_page: isDubbingPage,
       has_avatar: hasAvatar,
@@ -297,7 +298,13 @@
     throw new Error("Quá thời gian xử lý giọng đọc trên Vbee (hơn 10 phút).");
   }
 
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (window.__vbeeListener) {
+    try {
+      chrome.runtime.onMessage.removeListener(window.__vbeeListener);
+    } catch (e) {}
+  }
+
+  window.__vbeeListener = (request, sender, sendResponse) => {
     if (request && request.action === VBEE_CHECK_ACTION) {
       sendResponse(checkLoginState());
       return true;
@@ -309,7 +316,8 @@
         .catch((err) => sendResponse({ success: false, error: err.message, request_id: request.payload?.request_id }));
       return true;
     }
-  });
+  };
+  chrome.runtime.onMessage.addListener(window.__vbeeListener);
 
   try {
     chrome.runtime.sendMessage({
