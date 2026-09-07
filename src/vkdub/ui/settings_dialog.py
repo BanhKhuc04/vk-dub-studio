@@ -508,7 +508,9 @@ class SettingsDialog(QDialog):
             )
         )
         btn_row_browser = QHBoxLayout()
-        self.btn_reset_vbee_browser = QPushButton("🔄 Đăng xuất / Đổi tài khoản Vbee (Reset phiên trình duyệt)")
+        self.btn_reset_vbee_browser = QPushButton(
+            "🔄 Đăng xuất / Đổi tài khoản Vbee (Reset phiên trình duyệt)"
+        )
         self.btn_reset_vbee_browser.setStyleSheet(
             "background: #7c3aed; color: white; font-weight: 600; padding: 6px 12px;"
         )
@@ -518,7 +520,9 @@ class SettingsDialog(QDialog):
         vbee_browser_layout.addLayout(btn_row_browser)
         self.lbl_vbee_browser_status = QLabel("")
         self.lbl_vbee_browser_status.setWordWrap(True)
-        self.lbl_vbee_browser_status.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
+        self.lbl_vbee_browser_status.setStyleSheet(
+            "color: #72d7c1; font-weight: 600; font-size: 12px;"
+        )
         vbee_browser_layout.addWidget(self.lbl_vbee_browser_status)
         layout.addWidget(self.vbee_browser_box)
 
@@ -712,7 +716,9 @@ class SettingsDialog(QDialog):
                 self.lbl_vbee_browser_status.setStyleSheet(
                     "color: #fca5a5; font-weight: 600; font-size: 12px;"
                 )
-                self.lbl_vbee_browser_status.setText("✗ Không thể xóa phiên Vbee. Xem log để biết thêm.")
+                self.lbl_vbee_browser_status.setText(
+                    "✗ Không thể xóa phiên Vbee. Xem log để biết thêm."
+                )
         except Exception as exc:
             self.lbl_vbee_browser_status.setStyleSheet(
                 "color: #fca5a5; font-weight: 600; font-size: 12px;"
@@ -743,19 +749,27 @@ class SettingsDialog(QDialog):
             can_realtime, detail = asyncio.run(tts.check_realtime_support())
 
             if can_realtime:
-                self.lbl_vbee_api_status.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
+                self.lbl_vbee_api_status.setStyleSheet(
+                    "color: #72d7c1; font-weight: 600; font-size: 12px;"
+                )
                 self.lbl_vbee_api_status.setText(
-                    f"✓ Kết nối Vbee API thành công! Đọc được {len(voices)} giọng. Tài khoản hỗ trợ Realtime API."
+                    f"✓ Kết nối Vbee API thành công! Đọc được {len(voices)} giọng. "
+                    "Tài khoản hỗ trợ Realtime API."
                 )
             else:
-                self.lbl_vbee_api_status.setStyleSheet("color: #fca5a5; font-weight: 600; font-size: 12px;")
+                self.lbl_vbee_api_status.setStyleSheet(
+                    "color: #fca5a5; font-weight: 600; font-size: 12px;"
+                )
                 self.lbl_vbee_api_status.setText(
                     f"✓ Token & App ID chính xác ({len(voices)} giọng khả dụng).\n"
                     f"⚠ Tuy nhiên: {detail}.\n"
-                    f"👉 Để lồng tiếng với gói này, vui lòng chuyển chế độ phía trên sang 'Trình duyệt tự động'!"
+                    "👉 Để lồng tiếng với gói này, vui lòng chuyển chế độ phía trên "
+                    "sang 'Trình duyệt tự động'!"
                 )
         except Exception as exc:
-            self.lbl_vbee_api_status.setStyleSheet("color: #fca5a5; font-weight: 600; font-size: 12px;")
+            self.lbl_vbee_api_status.setStyleSheet(
+                "color: #fca5a5; font-weight: 600; font-size: 12px;"
+            )
             self.lbl_vbee_api_status.setText(f"Lỗi kiểm tra API: {exc}")
 
     def _update_voice_controls(self) -> None:
@@ -914,7 +928,9 @@ class SettingsDialog(QDialog):
                 voice_id=identifier,
                 display_name=self.voice_list_combo.currentText(),
                 volume=self.app_settings.voice_volume / 100,
-                speed=1.1 if self.app_settings.tts_backend == "vbee" else self.main_window.project.voice.speed,
+                speed=1.1
+                if self.app_settings.tts_backend == "vbee"
+                else self.main_window.project.voice.speed,
             )
             self.main_window.dirty = True
         if not self._persist_settings():

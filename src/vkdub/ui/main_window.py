@@ -8,6 +8,7 @@ from typing import Any
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence, QTextCursor
 from PySide6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QMainWindow,
     QMessageBox,
@@ -132,7 +133,9 @@ class MainWindow(QMainWindow):
         self.vbee_controller = VbeeController(self)
         self.left.vbee_voice_requested.connect(self.vbee_controller.start_workflow)
         self.left.vbee_export_srt_requested.connect(self.vbee_controller.export_srt_dialog)
-        self.left.vbee_manual_audio_requested.connect(self.vbee_controller.import_manual_audio_dialog)
+        self.left.vbee_manual_audio_requested.connect(
+            self.vbee_controller.import_manual_audio_dialog
+        )
         self.review.export_button.hide()
         self.review.approve_button.hide()
         self._auto_pipeline: bool = False
@@ -152,9 +155,7 @@ class MainWindow(QMainWindow):
         self.preview.preview_voice_requested.connect(self._preview_voice_clicked)
         self.preview.video.mask_rect_changed.connect(self._on_canvas_mask_rect_changed)
         self.preview.video.mask_delete_requested.connect(self._delete_blur_mask)
-        self.preview.video.subtitle_margin_changed.connect(
-            self._on_canvas_subtitle_margin_changed
-        )
+        self.preview.video.subtitle_margin_changed.connect(self._on_canvas_subtitle_margin_changed)
         self.review.play_requested.connect(self.play_script_line)
         self.review.regenerate_requested.connect(self.translation.regenerate_line)
         self._shortcut("Lưu project", QKeySequence.StandardKey.Save, self.save)
@@ -186,8 +187,6 @@ class MainWindow(QMainWindow):
 
         def worker() -> None:
             try:
-                import threading
-                from pathlib import Path
                 from vkdub.services.update_service import (
                     DEFAULT_UPDATE_FEED_STABLE,
                     download_installer,
@@ -315,7 +314,9 @@ class MainWindow(QMainWindow):
         # Giữ duy nhất 1 khung chọn khu vực phụ đề có thể điều chỉnh phạm vi
         if self.project.masks:
             mask = self.project.masks[0]
-            self.preview.video.set_masks(self.project.masks, mask.id, self.preview.player.position())
+            self.preview.video.set_masks(
+                self.project.masks, mask.id, self.preview.player.position()
+            )
             self.preview.video.interactive_mask_mode = True
             self.preview.video.update()
             self.statusBar().showMessage(
@@ -339,12 +340,13 @@ class MainWindow(QMainWindow):
         self.dirty = True
         self._refresh()
         self.statusBar().showMessage(
-            "Đã bật Khung che phụ đề: Kéo để di chuyển · Kéo góc để đổi kích thước bao trọn phụ đề cũ",
+            "Đã bật Khung che phụ đề: Kéo để di chuyển · Kéo góc để đổi kích thước "
+            "bao trọn phụ đề cũ",
             12000,
         )
 
     def add_blur_zone(self) -> None:
-        """Thêm vùng làm mờ (blur) vào video — dùng để che watermark, logo hoặc chữ không cần dịch."""
+        """Thêm vùng blur để che watermark, logo hoặc chữ không cần dịch."""
         if self.busy or not self.project.video_path:
             return
         # Đếm số vùng làm mờ hiện có để đặt tên
@@ -364,7 +366,7 @@ class MainWindow(QMainWindow):
         self.dirty = True
         self._refresh()
         self.statusBar().showMessage(
-            f"Đã thêm vùng Làm mờ: Kéo để di chuyển · Kéo góc để thay đổi kích thước",
+            "Đã thêm vùng Làm mờ: Kéo để di chuyển · Kéo góc để thay đổi kích thước",
             10000,
         )
 
@@ -674,7 +676,8 @@ class MainWindow(QMainWindow):
                 self.preview.video.interactive_mask_mode = True
                 self.preview.video.update()
             self.statusBar().showMessage(
-                "Khung khu vực phụ đề đã bật: Bạn có thể kéo di chuyển hoặc kéo góc để khớp với phụ đề trên video.",
+                "Khung khu vực phụ đề đã bật: Bạn có thể kéo di chuyển hoặc kéo góc "
+                "để khớp với phụ đề trên video.",
                 10000,
             )
             self._auto_pipeline = True

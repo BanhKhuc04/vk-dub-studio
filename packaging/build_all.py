@@ -15,14 +15,14 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add src to sys.path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from vkdub.version import APP_BRANDING, APP_NAME, __version__
+from vkdub.version import APP_BRANDING, __version__  # noqa: E402
 
 
 def find_iscc() -> Path | None:
@@ -31,7 +31,9 @@ def find_iscc() -> Path | None:
         return Path(found)
     candidates = [
         Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
-        Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Inno Setup 6" / "ISCC.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"))
+        / "Inno Setup 6"
+        / "ISCC.exe",
         Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Inno Setup 6" / "ISCC.exe",
     ]
     for c in candidates:
@@ -146,7 +148,7 @@ def build_patch_zip(dist_dir: Path) -> Path:
     }
 
     with zipfile.ZipFile(patch_file, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-        for root, dirs, files in os.walk(dist_dir):
+        for root, _dirs, files in os.walk(dist_dir):
             rel_root = Path(root).relative_to(dist_dir)
             if any(part in exclude_dirs for part in rel_root.parts):
                 continue
@@ -166,7 +168,7 @@ def update_manifest(installer_path: Path, patch_path: Path | None = None) -> Pat
     print("=======================================================")
     sha256 = calculate_sha256(installer_path)
     file_size = installer_path.stat().st_size
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     manifest = {
         "version": __version__,
@@ -176,16 +178,23 @@ def update_manifest(installer_path: Path, patch_path: Path | None = None) -> Pat
         "file_size_bytes": file_size,
         "changelog": [
             f"VK Dub Studio v{__version__} — Bản cập nhật vá lỗi và cải tiến trải nghiệm",
-            "Bổ sung quy trình Vbee thủ công: Tải file SRT tiếng Việt về máy và Nhập file audio Vbee để tự động cắt ghép, đồng bộ",
-            "Vá triệt để lỗi kết nối CapCut Voice: Tích hợp sẵn bộ SDK và chuyển sang thực thi trực tiếp in-process (không cần subprocess)",
-            "Vá triệt để lỗi kết nối VieNeu: Tự động dò tìm Python hệ thống, không còn lỗi khi gọi từ bản đóng gói .exe",
-            "Hỗ trợ Bản cập nhật siêu nhẹ (Hot-patch ~3MB): Tải nhanh trong 2 giây thay vì tải lại toàn bộ bộ cài 300MB",
+            "Bổ sung quy trình Vbee thủ công: Tải file SRT tiếng Việt về máy và "
+            "Nhập file audio Vbee để tự động cắt ghép, đồng bộ",
+            "Vá triệt để lỗi kết nối CapCut Voice: Tích hợp sẵn bộ SDK và chuyển sang "
+            "thực thi trực tiếp in-process (không cần subprocess)",
+            "Vá triệt để lỗi kết nối VieNeu: Tự động dò tìm Python hệ thống, không còn "
+            "lỗi khi gọi từ bản đóng gói .exe",
+            "Hỗ trợ Bản cập nhật siêu nhẹ (Hot-patch ~3MB): Tải nhanh trong 2 giây "
+            "thay vì tải lại toàn bộ bộ cài 300MB",
             "Bảo toàn toàn bộ dự án, cấu hình và phiên đăng nhập qua các lần cập nhật",
         ],
     }
 
     if patch_path and patch_path.is_file():
-        manifest["patch_url"] = f"https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v{__version__}/{patch_path.name}"
+        manifest["patch_url"] = (
+            "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/"
+            f"v{__version__}/{patch_path.name}"
+        )
         manifest["patch_sha256"] = calculate_sha256(patch_path)
         manifest["patch_size_bytes"] = patch_path.stat().st_size
 
@@ -197,7 +206,11 @@ def update_manifest(installer_path: Path, patch_path: Path | None = None) -> Pat
     print(f"  • Version:     v{__version__}")
     print(f"  • Installer:   {file_size / (1024 * 1024):.2f} MB")
     if patch_path and patch_path.is_file():
-        print(f"  • Patch Size:  {patch_path.stat().st_size / (1024 * 1024):.2f} MB (Tiết kiệm 99% dung lượng!)")
+        print(
+            "  • Patch Size:  "
+            f"{patch_path.stat().st_size / (1024 * 1024):.2f} MB "
+            "(Tiết kiệm 99% dung lượng!)"
+        )
     return manifest_file
 
 

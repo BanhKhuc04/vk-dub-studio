@@ -18,7 +18,6 @@ from vkdub.services.update_service import (
     UpdateInfo,
     apply_update_and_restart,
     download_installer,
-    launch_installer,
 )
 from vkdub.utils.paths import data_root
 from vkdub.version import __version__
@@ -59,7 +58,8 @@ class UpdateDialog(QDialog):
             patch_mb = self.update_info.patch_size_bytes / (1024 * 1024)
             ver_text += (
                 f"<br><span style='color: #34d399; font-weight: bold; font-size: 11px;'>"
-                f"⚡ Hỗ trợ Bản vá siêu nhẹ (~{patch_mb:.1f} MB) — Cập nhật tức thì không cần tải lại bộ cài 300MB</span>"
+                f"⚡ Hỗ trợ Bản vá siêu nhẹ (~{patch_mb:.1f} MB) — Cập nhật tức thì "
+                "không cần tải lại bộ cài 300MB</span>"
             )
         ver_lbl = QLabel(ver_text)
         ver_lbl.setStyleSheet("font-size: 12px;")
@@ -111,7 +111,9 @@ class UpdateDialog(QDialog):
         self.btn_update.setStyleSheet(
             "font-weight: bold; padding: 8px 18px; background-color: #0284c7; color: white;"
         )
-        self.btn_update.clicked.connect(lambda: self._start_download(use_patch=self.update_info.has_patch))
+        self.btn_update.clicked.connect(
+            lambda: self._start_download(use_patch=self.update_info.has_patch)
+        )
         btn_row.addWidget(self.btn_update)
 
         layout.addLayout(btn_row)

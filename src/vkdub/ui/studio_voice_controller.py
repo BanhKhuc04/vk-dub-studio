@@ -280,8 +280,10 @@ class StudioVoiceController(TTSController):
         if backend == "vbee":
             vbee_mode = getattr(load_app_settings(), "vbee_mode", "browser")
             if vbee_mode == "api":
+
                 async def vbee_api_test_operation() -> list[dict]:
-                    assert self.job
+                    job = self.job
+                    assert job
                     from vkdub.providers.vbee_tts import VbeeTTSProvider
                     from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
                     from vkdub.services.tts_usage import TTSUsage
@@ -290,10 +292,10 @@ class StudioVoiceController(TTSController):
                     token = VbeeTokenStore().get()
                     if not app_id or not token:
                         raise ValueError("Chưa lưu App ID hoặc Access Token cho Vbee API.")
-                    self.job.progress.emit(20, "Đang kết nối kiểm tra Vbee API…")
+                    job.progress.emit(20, "Đang kết nối kiểm tra Vbee API…")
                     tts = VbeeTTSProvider(app_id, token, TTSUsage())
                     voices = await tts.list_voices()
-                    self.job.progress.emit(
+                    job.progress.emit(
                         100, f"✓ Kết nối Vbee API thành công ({len(voices)} giọng khả dụng)!"
                     )
                     return read_catalog("vbee")
@@ -302,35 +304,36 @@ class StudioVoiceController(TTSController):
                 return self._local_job("setup", vbee_api_test_operation)
 
             async def vbee_test_operation() -> list[dict]:
-                assert self.job
+                job = self.job
+                assert job
                 from playwright.async_api import async_playwright
 
                 from vkdub.integrations.vbee.automation import VbeeBrowserAutomation
                 from vkdub.integrations.vbee.session import create_vbee_browser_context
                 from vkdub.services.voice_catalog import read_catalog
 
-                self.job.progress.emit(10, "Đang mở trình duyệt Vbee Dubbing Studio...")
+                job.progress.emit(10, "Đang mở trình duyệt Vbee Dubbing Studio...")
                 async with async_playwright() as p:
                     context = await create_vbee_browser_context(p, headless=False)
                     try:
                         automation = VbeeBrowserAutomation(context)
                         await automation.open_dubbing_studio()
-                        self.job.progress.emit(30, "Đang kiểm tra trạng thái đăng nhập Vbee...")
+                        job.progress.emit(30, "Đang kiểm tra trạng thái đăng nhập Vbee...")
                         logged_in = await automation.is_logged_in()
                         if logged_in:
-                            self.job.progress.emit(
+                            job.progress.emit(
                                 100, "✓ Vbee đã đăng nhập sẵn. Sẵn sàng sử dụng!"
                             )
                         else:
-                            self.job.progress.emit(
+                            job.progress.emit(
                                 40, "Vbee chưa đăng nhập. Vui lòng đăng nhập trên cửa sổ vừa mở..."
                             )
                             await automation.wait_for_user_login(
                                 timeout_s=180,
-                                check_cancel=self.job.check_cancel,
-                                progress_callback=lambda msg: self.job.progress.emit(50, msg),
+                                check_cancel=job.check_cancel,
+                                progress_callback=lambda msg: job.progress.emit(50, msg),
                             )
-                            self.job.progress.emit(100, "✓ Đăng nhập Vbee thành công!")
+                            job.progress.emit(100, "✓ Đăng nhập Vbee thành công!")
                     finally:
                         await context.close()
                 return read_catalog("vbee")

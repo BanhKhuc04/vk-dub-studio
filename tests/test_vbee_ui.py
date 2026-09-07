@@ -180,8 +180,12 @@ def test_vbee_controller_api_mode_with_credentials(monkeypatch, tmp_path) -> Non
     monkeypatch.setattr("vkdub.services.app_settings.data_root", lambda: tmp_path)
     save_app_settings(AppSettings(vbee_mode="api"))
 
-    monkeypatch.setattr("vkdub.services.credential_service.VbeeAppStore.get", lambda self: "app-id-123")
-    monkeypatch.setattr("vkdub.services.credential_service.VbeeTokenStore.get", lambda self: "token-456")
+    monkeypatch.setattr(
+        "vkdub.services.credential_service.VbeeAppStore.get", lambda self: "app-id-123"
+    )
+    monkeypatch.setattr(
+        "vkdub.services.credential_service.VbeeTokenStore.get", lambda self: "token-456"
+    )
     monkeypatch.setattr("vkdub.ui.vbee_controller.validate_project_for_vbee", lambda p: None)
 
     window = DummyMainWindow()
@@ -202,4 +206,3 @@ def test_vbee_controller_api_mode_with_credentials(monkeypatch, tmp_path) -> Non
     assert controller.job.provider.app_id == "app-id-123"
     assert controller.job.provider.token == "token-456"
     assert controller.job.speed == 1.1
-

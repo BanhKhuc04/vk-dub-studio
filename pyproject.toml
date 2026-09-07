@@ -28,7 +28,7 @@ qt_api = "pyside6"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-extend-exclude = ["CODEX_MASTER_PROMPT_VK_DUB_STUDIO.md", ".runtime"]
+extend-exclude = ["CODEX_MASTER_PROMPT_VK_DUB_STUDIO.md", ".runtime", "docs/evidence"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

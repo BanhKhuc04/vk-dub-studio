@@ -1,4 +1,4 @@
-"""Install and verify CapCut TTS SDK and Vietnamese voice catalog directly from bundled resources."""
+"""Install and verify the CapCut TTS SDK and bundled Vietnamese voice catalog."""
 
 import hashlib
 import json
@@ -106,7 +106,9 @@ async def setup_capcut(ffmpeg: str, ffprobe: str, progress: Progress) -> list[di
         )
         duration = await audio_duration(probe, ffprobe)
     except Exception as exc:
-        raise ValueError(f"Không thể kết nối dịch vụ CapCut TTS: {exc}. Kiểm tra kết nối mạng của bạn.") from exc
+        raise ValueError(
+            f"Không thể kết nối dịch vụ CapCut TTS: {exc}. Kiểm tra kết nối mạng của bạn."
+        ) from exc
     finally:
         await provider.close()
 
@@ -114,6 +116,7 @@ async def setup_capcut(ffmpeg: str, ffprobe: str, progress: Progress) -> list[di
         marker,
         {"revision": CAPCUT_REVISION, "duration_ms": duration, "tested_voice": rows[0]["id"]},
     )
-    progress(100, f"CapCut đã tạo audio thử thành công! Có {len(rows)} giọng đọc tiếng Việt sẵn sàng.")
+    progress(
+        100, f"CapCut đã tạo audio thử thành công! Có {len(rows)} giọng đọc tiếng Việt sẵn sàng."
+    )
     return rows
-

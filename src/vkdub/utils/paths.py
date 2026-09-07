@@ -21,7 +21,7 @@ def resource_path(relative: str | Path) -> Path:
     rel = Path(relative)
     # 1. PyInstaller temporary extraction directory (onefile or MEIPASS)
     if hasattr(sys, "_MEIPASS"):
-        base = Path(getattr(sys, "_MEIPASS"))
+        base = Path(sys._MEIPASS)
         for candidate in (
             base / rel,
             base / "resources" / rel,

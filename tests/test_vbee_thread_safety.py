@@ -3,17 +3,15 @@
 Proves:
 1. VbeeWorkflowJob runs on a background QThread (worker_thread != main_thread).
 2. Signals emitted from the worker thread (state_changed, progress_changed, succeeded, failed)
-   are marshalled via Qt Queued Connection to the GUI/main thread (QApplication.instance().thread()).
+   are marshalled via Qt Queued Connection to the GUI/main thread.
 3. UI widgets (VbeeWorkflowDialog, QProgressBar, QLabel) are only mutated on the main thread.
 4. The legacy pattern of direct worker callbacks executed directly on the worker thread,
    which led to Qt6Gui.dll STATUS_ACCESS_VIOLATION (0xc0000005).
 """
 
-import time
 from unittest.mock import MagicMock
 
-import pytest
-from PySide6.QtCore import QCoreApplication, QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, QThread, Slot
 from PySide6.QtWidgets import QApplication
 
 from vkdub.integrations.vbee.state import WorkflowState
@@ -144,8 +142,6 @@ def test_vbee_controller_gui_thread_updates(qtbot) -> None:
     controller.dialog = dialog
     qtbot.addWidget(dialog)
 
-    main_thread = QApplication.instance().thread()
-
     def mock_workflow(on_state, on_progress):
         # Emitted from worker thread
         on_state(WorkflowState.UPLOADING_SRT, "Tải lên SRT...")
@@ -175,7 +171,7 @@ def test_vbee_controller_gui_thread_updates(qtbot) -> None:
 
 
 def test_vbee_error_mapping_preserves_technical_details() -> None:
-    """Verify error mapping delivers friendly Vietnamese messages without swallowing the exception."""
+    """Keep friendly Vietnamese error messages without swallowing technical details."""
     from playwright.async_api import Error as PlaywrightError
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 

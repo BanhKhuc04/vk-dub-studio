@@ -230,7 +230,9 @@ class LeftConfigPanel(QFrame):
         self.btn_vbee_export_srt.setToolTip(
             "Tải file phụ đề SRT tiếng Việt đã dịch về máy để tự tạo giọng trên Vbee Studio."
         )
-        self.btn_vbee_export_srt.setStyleSheet("padding: 4px 6px; font-size: 10px; font-weight: 600;")
+        self.btn_vbee_export_srt.setStyleSheet(
+            "padding: 4px 6px; font-size: 10px; font-weight: 600;"
+        )
         self.btn_vbee_export_srt.clicked.connect(self.vbee_export_srt_requested.emit)
         vbee_manual_row.addWidget(self.btn_vbee_export_srt)
 

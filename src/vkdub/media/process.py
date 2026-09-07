@@ -1,13 +1,11 @@
 import os
 import shutil
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 
 from vkdub.media.ffprobe import parse_metadata
-
-
-import sys
 
 
 def find_tool(name: str) -> str | None:
@@ -23,7 +21,7 @@ def find_tool(name: str) -> str | None:
         exe_dir = Path(sys.executable).parent
         base_dirs.extend([exe_dir, exe_dir / "_internal"])
         if hasattr(sys, "_MEIPASS"):
-            base_dirs.append(Path(getattr(sys, "_MEIPASS")))
+            base_dirs.append(Path(sys._MEIPASS))
     else:
         repo_root = Path(__file__).resolve().parents[3]
         base_dirs.extend([repo_root, repo_root / "resources"])

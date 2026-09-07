@@ -1,10 +1,6 @@
 """Unit tests for production packaging paths, resource resolution, and update system."""
 
-import os
 import sys
-from pathlib import Path
-
-import pytest
 
 from vkdub.media.process import find_tool
 from vkdub.services.update_service import UpdateInfo, is_newer_version

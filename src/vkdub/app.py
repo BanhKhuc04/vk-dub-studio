@@ -1,7 +1,7 @@
 import multiprocessing
-from pathlib import Path
 import runpy
 import sys
+from pathlib import Path
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
@@ -40,7 +40,7 @@ def run_cli_or_worker() -> int | None:
             return 0
         except SystemExit as exc:
             return exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
-        except Exception as exc:
+        except Exception:
             import traceback
 
             traceback.print_exc()
@@ -55,7 +55,7 @@ def run_cli_or_worker() -> int | None:
             return 0
         except SystemExit as exc:
             return exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
-        except Exception as exc:
+        except Exception:
             import traceback
 
             traceback.print_exc()

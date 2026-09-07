@@ -103,7 +103,11 @@ async def slice_and_import_vbee_audio(
     # Normalize the master audio file to standard PCM WAV
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     master_wav = target_dir / f"master_vbee_{timestamp_str}.wav"
-    logger.info("[VOICE][FFMPEG] Đang chuẩn hóa file tải về thành WAV PCM: %s -> %s", downloaded_audio.name, master_wav.name)
+    logger.info(
+        "[VOICE][FFMPEG] Đang chuẩn hóa file tải về thành WAV PCM: %s -> %s",
+        downloaded_audio.name,
+        master_wav.name,
+    )
     await convert_to_pcm_wav(downloaded_audio, master_wav, ffmpeg)
 
     master_duration_ms = await audio_duration(master_wav, ffprobe)
@@ -114,7 +118,11 @@ async def slice_and_import_vbee_audio(
     )
 
     # Configure voice settings on the project (preserve existing selection if vbee)
-    if project.voice and project.voice.provider == "vbee" and project.voice.voice_id not in ("unconfigured", ""):
+    if (
+        project.voice
+        and project.voice.provider == "vbee"
+        and project.voice.voice_id not in ("unconfigured", "")
+    ):
         voice_settings = project.voice
     else:
         voice_settings = VoiceSettings(

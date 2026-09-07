@@ -103,8 +103,10 @@ class VbeeVoiceWorkflow:
         self.progress_callback = progress_callback
         self.check_cancel = check_cancel or (lambda: None)
         self.working_dir = working_dir or (data_root() / "vbee_staging")
-        self.speed = speed if speed is not None else (
-            getattr(project.voice, "speed", 1.1) if project and project.voice else 1.1
+        self.speed = (
+            speed
+            if speed is not None
+            else (getattr(project.voice, "speed", 1.1) if project and project.voice else 1.1)
         )
         self.current_state = WorkflowState.IDLE
         self.srt_path: Path | None = None
@@ -144,7 +146,9 @@ class VbeeVoiceWorkflow:
             logger.info("[VBEE][START] Bắt đầu quy trình tạo Voice tự động bằng Vbee Dubbing")
 
             # 1. Validation
-            self._set_state(WorkflowState.VALIDATING, "Đang kiểm tra điều kiện kịch bản và công cụ…")
+            self._set_state(
+                WorkflowState.VALIDATING, "Đang kiểm tra điều kiện kịch bản và công cụ…"
+            )
             self.check_cancel()
             validate_project_for_vbee(self.project)
 
@@ -203,7 +207,9 @@ class VbeeVoiceWorkflow:
                     check_cancel=self.check_cancel,
                     speed=self.speed,
                 )
-                logger.info("[VBEE][DOWNLOAD] File âm thanh tải về hoàn tất: %s", self.downloaded_audio_path)
+                logger.info(
+                    "[VBEE][DOWNLOAD] File âm thanh tải về hoàn tất: %s", self.downloaded_audio_path
+                )
 
                 # 4. Import audio
                 self._set_state(
@@ -224,7 +230,10 @@ class VbeeVoiceWorkflow:
                     ffmpeg=self.ffmpeg,
                     ffprobe=self.ffprobe,
                 )
-            logger.info("[VOICE][IMPORT] Đã nhập xong %d câu thoại vào project.", import_result["lines_count"])
+            logger.info(
+                "[VOICE][IMPORT] Đã nhập xong %d câu thoại vào project.",
+                import_result["lines_count"],
+            )
 
             # 5. Ready!
             self._set_state(

@@ -195,7 +195,9 @@ def apply_update_and_restart(installer_path: Path, silent: bool = False) -> None
     target_exe = (
         Path(exe_path).resolve()
         if exe_path
-        else Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "VK Dub Studio" / "VK Dub Studio.exe"
+        else Path(os.environ.get("PROGRAMFILES", "C:\\Program Files"))
+        / "VK Dub Studio"
+        / "VK Dub Studio.exe"
     )
 
     installer_abs = str(installer_path.resolve())
@@ -252,7 +254,9 @@ def apply_patch_and_restart(patch_zip: Path) -> None:
     bat_lines = [
         "@echo off",
         "timeout /t 2 /nobreak >nul",
-        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path \'{patch_abs}\' -DestinationPath \'{dest_abs}\' -Force"',
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command "
+        f"\"Expand-Archive -Path '{patch_abs}' "
+        f"-DestinationPath '{dest_abs}' -Force\"",
         f'if exist "{target_abs}" start "" "{target_abs}"',
         'del "%~f0"',
     ]
@@ -274,4 +278,3 @@ def apply_patch_and_restart(patch_zip: Path) -> None:
         creationflags=creation_flags,
         close_fds=True,
     )
-

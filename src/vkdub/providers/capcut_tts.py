@@ -1,4 +1,4 @@
-"""CapCut TTS provider running in-process via httpx and bundled SDK, eliminating external python process dependency."""
+"""CapCut TTS provider using httpx and the bundled SDK in-process."""
 
 import asyncio
 import json
@@ -34,16 +34,21 @@ def _speech_url(task: dict[str, Any]) -> str:
     return str(url)
 
 
-def _sync_synthesize_to_file(text: str, upstream_id: str, resource_id: str, output_file: Path) -> None:
+def _sync_synthesize_to_file(
+    text: str, upstream_id: str, resource_id: str, output_file: Path
+) -> None:
     """Synchronous execution of CapCut TTS requests using httpx client."""
     sdk = CapCutClient(session=object())
 
     with httpx.Client(timeout=httpx.Timeout(30, connect=10), follow_redirects=False) as client:
+
         def post(arguments: tuple) -> dict:
             url, headers, body = arguments
             response = client.post(url, headers=headers, content=body.encode())
             if response.status_code != 200:
-                raise TTSError(f"CapCut trả HTTP {response.status_code}. Thử lại hoặc dùng Vbee / VieNeu.")
+                raise TTSError(
+                    f"CapCut trả HTTP {response.status_code}. Thử lại hoặc dùng Vbee / VieNeu."
+                )
             result = response.json()
             if str(result.get("ret", 0)) != "0":
                 raise TTSError("CapCut từ chối yêu cầu. Thử lại hoặc dùng Vbee.")
@@ -113,7 +118,9 @@ class CapCutTTSProvider:
 
             # Execute in background thread to never block Qt main thread
             try:
-                await asyncio.to_thread(_sync_synthesize_to_file, text, upstream_id, resource_id, raw)
+                await asyncio.to_thread(
+                    _sync_synthesize_to_file, text, upstream_id, resource_id, raw
+                )
             except Exception as exc:
                 if isinstance(exc, TTSError):
                     raise
@@ -140,4 +147,3 @@ class CapCutTTSProvider:
             )
 
         return output_path
-

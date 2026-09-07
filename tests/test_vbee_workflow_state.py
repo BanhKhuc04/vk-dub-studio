@@ -108,7 +108,7 @@ def test_duplicate_start_protection(tmp_path: Path) -> None:
 
 
 def test_vbee_workflow_speed_defaults_and_sync() -> None:
-    """Verify VbeeVoiceWorkflow defaults to speed 1.1 when unspecified, and respects explicit speed."""
+    """Default Vbee speed to 1.1 while respecting an explicit speed."""
     from vkdub.integrations.vbee.workflow import VbeeVoiceWorkflow
 
     mock_provider = MagicMock()

@@ -122,9 +122,12 @@ class VbeeWorkflowDialog(QDialog):
         button_row.addWidget(self.stop_button)
 
         self.btn_switch_manual = QPushButton("🖐 Tải SRT làm thủ công")
-        self.btn_switch_manual.setToolTip("Dừng tự động và tải file SRT về máy để bạn tự chuyển đổi trên Vbee.")
+        self.btn_switch_manual.setToolTip(
+            "Dừng tự động và tải file SRT về máy để bạn tự chuyển đổi trên Vbee."
+        )
         self.btn_switch_manual.setStyleSheet(
-            "background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; padding: 6px 12px; font-weight: 500;"
+            "background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; "
+            "padding: 6px 12px; font-weight: 500;"
         )
         self.btn_switch_manual.clicked.connect(self._on_switch_manual_clicked)
         button_row.addWidget(self.btn_switch_manual)

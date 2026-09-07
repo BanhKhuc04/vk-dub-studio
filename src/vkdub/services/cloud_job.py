@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import threading
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -8,9 +9,6 @@ from PySide6.QtCore import QThread, Signal
 from vkdub.integrations.vbee.errors import VbeeError
 from vkdub.providers.gemini_translation import ProviderError
 from vkdub.services.credential_service import redact
-
-
-import logging
 
 logger = logging.getLogger("vkdub.cloud_job")
 

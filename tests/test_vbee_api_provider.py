@@ -1,6 +1,5 @@
 """Unit tests for VbeeApiProvider, dual-mode settings, and Vbee API workflow integration."""
 
-import asyncio
 import json
 import wave
 from pathlib import Path
@@ -10,15 +9,16 @@ import pytest
 
 from vkdub.domain.project import Project
 from vkdub.domain.script import ScriptDocument, ScriptLine
-from vkdub.domain.voice import DEFAULT_LABEL, DEFAULT_VOICE, VoiceSettings
-from vkdub.integrations.vbee.provider import VBEE_API_VOICE_MAP, VbeeApiProvider
+from vkdub.domain.voice import VoiceSettings
+from vkdub.integrations.vbee.provider import VbeeApiProvider
 from vkdub.integrations.vbee.workflow import VbeeVoiceWorkflow
 from vkdub.services.app_settings import AppSettings, load_app_settings, save_app_settings
-from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
 from vkdub.services.health_service import check_tts_backend
 
 
-def _create_synthetic_wav(path: Path, duration_seconds: float = 1.0, sample_rate: int = 24000) -> Path:
+def _create_synthetic_wav(
+    path: Path, duration_seconds: float = 1.0, sample_rate: int = 24000
+) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     num_frames = int(duration_seconds * sample_rate)
     with wave.open(str(path), "wb") as wf:
@@ -65,24 +65,32 @@ def test_health_check_vbee_modes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert res_api_missing.code == "VBEE_API_KEY_MISSING"
 
     # 3. API mode with credentials
-    monkeypatch.setattr("vkdub.services.credential_service.VbeeAppStore.get", lambda self: "app-123")
-    monkeypatch.setattr("vkdub.services.credential_service.VbeeTokenStore.get", lambda self: "tok-456")
+    monkeypatch.setattr(
+        "vkdub.services.credential_service.VbeeAppStore.get", lambda self: "app-123"
+    )
+    monkeypatch.setattr(
+        "vkdub.services.credential_service.VbeeTokenStore.get", lambda self: "tok-456"
+    )
     res_api_ready = check_tts_backend("vbee")
     assert res_api_ready.ok
     assert res_api_ready.code == "VBEE_API_READY"
 
 
 @pytest.mark.anyio
-async def test_vbee_api_provider_execute_dubbing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """VbeeApiProvider synthesizes script lines via API, builds VoiceAssets, and assembles master WAV."""
+async def test_vbee_api_provider_execute_dubbing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Synthesize lines through the API, build VoiceAssets, and assemble master WAV."""
     sent_requests: list[dict] = []
 
     def mock_handler(request: httpx.Request) -> httpx.Response:
-        sent_requests.append({
-            "url": str(request.url),
-            "headers": dict(request.headers),
-            "body": json.loads(request.content.decode("utf-8")),
-        })
+        sent_requests.append(
+            {
+                "url": str(request.url),
+                "headers": dict(request.headers),
+                "body": json.loads(request.content.decode("utf-8")),
+            }
+        )
         return httpx.Response(
             200,
             headers={"content-type": "audio/mpeg"},
@@ -126,6 +134,7 @@ async def test_vbee_api_provider_execute_dubbing(tmp_path: Path, monkeypatch: py
     )
 
     progress_events: list[tuple[int, str]] = []
+
     def progress_cb(pct: int, msg: str) -> None:
         progress_events.append((pct, msg))
 
@@ -161,7 +170,9 @@ async def test_vbee_api_provider_execute_dubbing(tmp_path: Path, monkeypatch: py
 
 
 @pytest.mark.anyio
-async def test_vbee_voice_workflow_with_api_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_vbee_voice_workflow_with_api_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """VbeeVoiceWorkflow orchestrates VbeeApiProvider smoothly through all states."""
     vid = tmp_path / "vid.mp4"
     vid.write_bytes(b"\x00" * 1024)
@@ -173,7 +184,9 @@ async def test_vbee_voice_workflow_with_api_provider(tmp_path: Path, monkeypatch
         video_path=vid,
         target_language="vi",
         script=doc,
-        voice=VoiceSettings(provider="vbee", voice_id="hn_female_ngochuyen_full_48k-fhg", speed=1.1),
+        voice=VoiceSettings(
+            provider="vbee", voice_id="hn_female_ngochuyen_full_48k-fhg", speed=1.1
+        ),
     )
     project.approve(True)
 
@@ -182,11 +195,15 @@ async def test_vbee_voice_workflow_with_api_provider(tmp_path: Path, monkeypatch
     class MockApiProvider:
         name = "vbee_api"
 
-        async def execute_api_dubbing(self, project, ffmpeg, ffprobe, progress_callback, check_cancel, speed=None):
+        async def execute_api_dubbing(
+            self, project, ffmpeg, ffprobe, progress_callback, check_cancel, speed=None
+        ):
             progress_callback(50, "Đang tạo voice Vbee API câu 1/1…")
             from datetime import UTC, datetime
+
             from vkdub.domain.voice import VoiceAsset, audio_key, digest, normalized_text
             from vkdub.services.tts_service import file_hash
+
             wav_file = _create_synthetic_wav(tmp_path / "line_asset.wav")
             key = audio_key(line0.text, project.voice)
             asset = VoiceAsset(

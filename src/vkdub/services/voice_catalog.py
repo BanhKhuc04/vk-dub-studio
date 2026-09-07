@@ -69,7 +69,11 @@ def find_system_python() -> Path | None:
                 if exe.is_file():
                     candidates.append(exe)
 
-    for pattern in ("C:\\Program Files\\Python3*", "C:\\Program Files (x86)\\Python3*", "C:\\Python3*"):
+    for pattern in (
+        "C:\\Program Files\\Python3*",
+        "C:\\Program Files (x86)\\Python3*",
+        "C:\\Python3*",
+    ):
         for matched in glob.glob(pattern):
             exe = Path(matched) / "python.exe"
             if exe.is_file():
@@ -96,7 +100,6 @@ def find_system_python() -> Path | None:
             continue
 
     return None
-
 
 
 VBEE_DEFAULT_CATALOG: list[dict[str, Any]] = [

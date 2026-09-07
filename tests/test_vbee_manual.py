@@ -1,14 +1,14 @@
-﻿"""Tests for manual Vbee workflow (exporting SRT and importing manual audio)."""
+"""Tests for manual Vbee workflow (exporting SRT and importing manual audio)."""
 
-from pathlib import Path
 import wave
+from pathlib import Path
+
 import pytest
 
 from vkdub.domain.project import Project
 from vkdub.domain.script import ScriptDocument, ScriptLine
 from vkdub.integrations.vbee.importer import slice_and_import_vbee_audio
 from vkdub.media.process import find_tool
-from vkdub.ui.vbee_controller import VbeeController
 
 
 class DummyMainWindow:
@@ -16,11 +16,31 @@ class DummyMainWindow:
         self.project = project
         self.busy = False
         self.dirty = False
-        self.tools = type("Tools", (), {"paths": {"ffmpeg": find_tool("ffmpeg") or "ffmpeg", "ffprobe": find_tool("ffprobe") or "ffprobe"}})()
-        self.left = type("Left", (), {
-            "stop_button": type("Btn", (), {"setEnabled": lambda self, v: None, "clicked": type("Sig", (), {"connect": lambda self, f: None})()})(),
-            "job_progress": type("Bar", (), {"setValue": lambda self, v: None})(),
-        })()
+        self.tools = type(
+            "Tools",
+            (),
+            {
+                "paths": {
+                    "ffmpeg": find_tool("ffmpeg") or "ffmpeg",
+                    "ffprobe": find_tool("ffprobe") or "ffprobe",
+                }
+            },
+        )()
+        self.left = type(
+            "Left",
+            (),
+            {
+                "stop_button": type(
+                    "Btn",
+                    (),
+                    {
+                        "setEnabled": lambda self, v: None,
+                        "clicked": type("Sig", (), {"connect": lambda self, f: None})(),
+                    },
+                )(),
+                "job_progress": type("Bar", (), {"setValue": lambda self, v: None})(),
+            },
+        )()
 
     def log(self, msg: str) -> None:
         pass
@@ -79,4 +99,3 @@ async def test_manual_vbee_workflow_flow(tmp_path: Path) -> None:
     assert project.voice.display_name == "Vbee (Thủ công)"
     assert project.voice_ready is True
     assert len(project.current_voices()) == 2
-

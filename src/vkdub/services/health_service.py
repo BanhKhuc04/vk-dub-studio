@@ -144,7 +144,10 @@ def check_tts_backend(backend: str) -> HealthResult:
                     (
                         "Vbee API đã sẵn sàng (Đã lưu App ID & Token)."
                         if ready
-                        else "Chưa cấu hình App ID hoặc Token cho Vbee API. Vui lòng vào Cài đặt -> Voice."
+                        else (
+                            "Chưa cấu hình App ID hoặc Token cho Vbee API. "
+                            "Vui lòng vào Cài đặt -> Voice."
+                        )
                     ),
                     None if ready else "Cài đặt Voice",
                     None if ready else "open_settings_voice",
