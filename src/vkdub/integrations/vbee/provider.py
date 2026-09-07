@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from vkdub.domain.project import Project
+    from vkdub.integrations.vbee.automation import VbeeBrowserAutomation
 
 from vkdub.integrations.vbee.importer import convert_to_pcm_wav
 from vkdub.media.voice_audio import audio_duration
@@ -68,6 +69,8 @@ class VbeeBrowserProvider:
         logger.info("[VBEE][BROWSER] Đang khởi chạy trình duyệt…")
         progress_callback(15, "Đang khởi chạy trình duyệt…")
         check_cancel()
+        target_dir = self.downloads_dir or Path(srt_path.parent)
+        target_dir.mkdir(parents=True, exist_ok=True)
 
         async with async_playwright() as playwright:
             context = await create_vbee_browser_context(
@@ -76,7 +79,9 @@ class VbeeBrowserProvider:
                 headless=self.headless,
             )
             automation = VbeeBrowserAutomation(context, self.downloads_dir)
+            automation.cleanup_partial_downloads(target_dir)
             self._automation = automation
+            completed = False
 
             try:
                 progress_callback(25, "Đang mở Vbee Dubbing Studio…")
@@ -106,8 +111,12 @@ class VbeeBrowserProvider:
                 logger.info("[VBEE][VOICE] Thiết lập giọng đọc 'HN - Ngọc Huyền'…")
                 await automation.ensure_voice_ngoc_huyen()
 
-                target_speed = speed if speed is not None else (
-                    getattr(project.voice, "speed", 1.1) if project and project.voice else 1.1
+                target_speed = (
+                    speed
+                    if speed is not None
+                    else (
+                        getattr(project.voice, "speed", 1.1) if project and project.voice else 1.1
+                    )
                 )
                 speed_label = f"{target_speed:.2f}".rstrip("0").rstrip(".") + "x"
                 progress_callback(52, f"Cấu hình tốc độ {speed_label} & định dạng MP3…")
@@ -124,8 +133,6 @@ class VbeeBrowserProvider:
 
                 progress_callback(65, "Đang định vị dòng công việc…")
                 check_cancel()
-                target_dir = self.downloads_dir or Path(srt_path.parent)
-
                 logger.info("[VBEE][JOB] Định vị dòng công việc khớp với: %s", srt_path.name)
                 job_row = await automation.find_job_row(srt_path.name, timeout_s=45.0)
                 progress_callback(70, "Vbee đang chuyển đổi phụ đề thành voice…")
@@ -144,6 +151,7 @@ class VbeeBrowserProvider:
                 )
 
                 progress_callback(95, "Tải file hoàn tất!")
+                completed = True
                 return audio_path
 
             except Exception as exc:
@@ -151,6 +159,8 @@ class VbeeBrowserProvider:
                 await automation.capture_debug_screenshot("vbee_error")
                 raise
             finally:
+                if not completed:
+                    automation.cleanup_partial_downloads(target_dir)
                 await automation.close()
                 self._automation = None
 
@@ -373,9 +383,9 @@ class VbeeApiProvider:
             master.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
             current_sample = 0
 
-            for index, line in enumerate(lines):
-                asset = imported_assets.get(line.id)
-                if not asset or not asset.output_path.is_file():
+            for line in lines:
+                timeline_asset = imported_assets.get(line.id)
+                if not timeline_asset or not timeline_asset.output_path.is_file():
                     continue
 
                 target_sample = max(0, int(round((line.start_ms / 1000.0) * 24000)))
@@ -388,7 +398,7 @@ class VbeeApiProvider:
                         silence_bytes -= batch
                     current_sample = target_sample
 
-                with wave.open(str(asset.output_path), "rb") as line_src:
+                with wave.open(str(timeline_asset.output_path), "rb") as line_src:
                     while frame_data := line_src.readframes(65536):
                         master.writeframesraw(frame_data)
                         current_sample += len(frame_data) // 2

@@ -196,6 +196,9 @@ DOWNLOAD_FORMAT_WAV = (
 # Error and quota selectors
 QUOTA_ERROR_SELECTORS = (
     "div:has-text('hết ký tự')",
+    "div:has-text('Không đủ điểm')",
+    "div:has-text('không đủ điểm')",
+    "div:has-text('Sắp hết điểm')",
     "div:has-text('không đủ số dư')",
     "div:has-text('không đủ credit')",
     "div:has-text('vượt quá số ký tự')",

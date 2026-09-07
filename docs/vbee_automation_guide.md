@@ -39,6 +39,13 @@ src/vkdub/integrations/vbee/
   *(Ví dụ trên Windows: `C:\Users\<Username>\AppData\Local\VKDubStudio\browser_profiles\vbee`)*
 - Thư mục này nằm hoàn toàn bên ngoài workspace và repository, được bảo vệ trong `.gitignore`.
 - **Trình duyệt sử dụng**: Hệ thống tự động ưu tiên **Microsoft Edge** hoặc **Google Chrome** đã cài sẵn trên Windows, không cần tải thêm Chromium nặng nề.
+- **Quy tắc tái sử dụng**: chỉ có một profile Vbee chuẩn tại đường dẫn trên. Nếu
+  profile đã tồn tại, ứng dụng đọc marker `Last Browser` để mở lại đúng Edge/Chrome
+  đã tạo profile và giữ nguyên phiên đăng nhập; không tạo profile đánh số hoặc profile
+  tạm cho mỗi lần chạy.
+- Không trỏ automation trực tiếp vào profile Edge/Chrome cá nhân đang mở vì Chromium
+  khóa các database cookie/profile. Người dùng chỉ cần đăng nhập một lần trong cửa sổ
+  Vbee do ứng dụng mở; các lần sau profile chuẩn này được tái sử dụng.
 
 ---
 
@@ -88,6 +95,8 @@ graph TD
 | `Vượt hạn mức / hết ký tự / credit` | Tài khoản Vbee hết số dư ký tự | Nâng cấp gói cước hoặc nạp thêm credit trên Vbee, sau đó bấm chạy lại. |
 | `Hết thời gian chờ xử lý (Timeout)` | File SRT quá dài hoặc server Vbee quá tải | Tăng `DEFAULT_PROCESSING_TIMEOUT_S` trong `selectors.py` nếu video dài hơn 1 giờ. |
 | `Không tìm thấy nút Tải xuống` | Giao diện Vbee có thể vừa cập nhật | Kiểm tra lại selectors theo hướng dẫn mục 6 bên dưới. |
+| `Không đủ điểm` / `Sắp hết điểm` | Điểm Vbee thấp hơn chi phí job | Nạp thêm điểm hoặc dùng engine local; job không được báo thành công giả. |
+| Còn file `.crdownload` | Lần tải trước bị ngắt | Ứng dụng tự dọn file tải dở trong thư mục staging ở lần chạy kế tiếp; file audio hoàn chỉnh không bị xóa. |
 
 ---
 

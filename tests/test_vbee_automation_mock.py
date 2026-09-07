@@ -148,6 +148,52 @@ async def test_automation_download_file_failure(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
+async def test_download_is_atomic_and_sanitizes_provider_filename(tmp_path: Path) -> None:
+    mock_context = MagicMock()
+    automation = VbeeBrowserAutomation(mock_context)
+    download = MagicMock()
+    download.suggested_filename = "../../unsafe.exe"
+    download.url = ""
+
+    async def save_as(target: str) -> None:
+        Path(target).write_bytes(b"valid audio")
+
+    download.save_as = AsyncMock(side_effect=save_as)
+    result = await automation._save_download(download, tmp_path)
+
+    assert result.parent == tmp_path
+    assert result.suffix == ".mp3"
+    assert result.read_bytes() == b"valid audio"
+    assert not tuple(tmp_path.glob("*.part"))
+
+
+@pytest.mark.anyio
+async def test_download_rejects_insecure_fallback_and_cleans_partial(tmp_path: Path) -> None:
+    automation = VbeeBrowserAutomation(MagicMock())
+    download = MagicMock()
+    download.suggested_filename = "voice.mp3"
+    download.url = "http://example.com/voice.mp3"
+    download.save_as = AsyncMock(side_effect=OSError("disk interrupted"))
+
+    with pytest.raises(VbeeDownloadError, match="không an toàn"):
+        await automation._save_download(download, tmp_path)
+    assert not tuple(tmp_path.glob("*.part"))
+
+
+def test_partial_download_cleanup_is_scoped(tmp_path: Path) -> None:
+    (tmp_path / "old.crdownload").write_bytes(b"partial")
+    (tmp_path / "old.part").write_bytes(b"partial")
+    completed = tmp_path / "voice.mp3"
+    completed.write_bytes(b"complete")
+
+    VbeeBrowserAutomation.cleanup_partial_downloads(tmp_path)
+
+    assert completed.read_bytes() == b"complete"
+    assert not tuple(tmp_path.glob("*.crdownload"))
+    assert not tuple(tmp_path.glob("*.part"))
+
+
+@pytest.mark.anyio
 async def test_workflow_orchestrator_mocked_provider(tmp_path: Path) -> None:
     """Verify VbeeVoiceWorkflow transitions through states cleanly with a mocked provider."""
     video = tmp_path / "video.mp4"
@@ -321,4 +367,3 @@ async def test_automation_find_job_row_and_completion() -> None:
         timeout_s=2.0,
         poll_interval_s=0.05,
     )
-

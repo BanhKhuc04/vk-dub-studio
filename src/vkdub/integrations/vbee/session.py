@@ -39,6 +39,35 @@ def get_vbee_profile_dir() -> Path:
     return profile_dir
 
 
+def is_vbee_profile_initialized(profile_dir: Path) -> bool:
+    """Return whether ``profile_dir`` already contains a Chromium profile.
+
+    The automation intentionally has one stable profile.  This check is also used
+    for diagnostics so the UI/logs can say whether the signed-in profile is being
+    reused instead of implying that a fresh profile is created for every run.
+    """
+    return (profile_dir / "Local State").is_file() and (profile_dir / "Default").is_dir()
+
+
+def saved_browser_executable(profile_dir: Path) -> str | None:
+    """Read Chromium's ``Last Browser`` marker without trusting arbitrary paths."""
+    marker = profile_dir / "Last Browser"
+    if not marker.is_file():
+        return None
+    try:
+        raw = marker.read_bytes()
+        encoding = (
+            "utf-16" if raw.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in raw else "utf-8"
+        )
+        value = raw.decode(encoding, errors="strict").strip().strip("\x00")
+        candidate = Path(value)
+        if candidate.name.lower() not in {"msedge.exe", "chrome.exe"}:
+            return None
+        return str(candidate) if candidate.is_file() else None
+    except (OSError, UnicodeError):
+        return None
+
+
 def detect_browser_channel() -> str | None:
     """Detect available browser channel on the current system.
 
@@ -68,6 +97,18 @@ def find_edge_executable() -> str | None:
     return None
 
 
+def find_browser_executable(profile_dir: Path | None = None) -> str | None:
+    """Prefer the browser that originally created the persistent Vbee profile."""
+    if profile_dir is not None:
+        saved = saved_browser_executable(profile_dir)
+        if saved:
+            return saved
+    for candidate in (*EDGE_CANDIDATES, *CHROME_CANDIDATES):
+        if Path(candidate).is_file():
+            return candidate
+    return shutil.which("msedge") or shutil.which("chrome")
+
+
 def cleanup_stale_profile_processes(profile_dir: Path) -> None:
     """Terminate any lingering browser processes using this dedicated automation profile."""
     if os.name != "nt":
@@ -76,12 +117,14 @@ def cleanup_stale_profile_processes(profile_dir: Path) -> None:
 
     profile_str = str(profile_dir).replace("/", "\\")
     cmd = (
-        f'Get-CimInstance Win32_Process -Filter "Name = \'msedge.exe\' or Name = \'chrome.exe\'" | '
+        f"Get-CimInstance Win32_Process -Filter \"Name = 'msedge.exe' or Name = 'chrome.exe'\" | "
         f'Where-Object {{ $_.CommandLine -like "*{profile_str}*" }} | '
-        f'ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}'
+        f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
     )
     try:
-        subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, timeout=5)
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", cmd], capture_output=True, timeout=5
+        )
     except Exception as exc:
         logger.debug("cleanup_stale_profile_processes: %s", exc)
 
@@ -115,9 +158,11 @@ async def create_vbee_browser_context(
     channel: str | None = None,
 ) -> BrowserContext:
     """Launch persistent browser context with stored cookies/session."""
-    user_data_dir = profile_dir or get_vbee_profile_dir()
+    user_data_dir = (profile_dir if profile_dir is not None else get_vbee_profile_dir()).resolve()
+    reused_profile = is_vbee_profile_initialized(user_data_dir)
+    user_data_dir.mkdir(parents=True, exist_ok=True)
     cleanup_stale_profile_processes(user_data_dir)
-    edge_exe = find_edge_executable()
+    browser_exe = find_browser_executable(user_data_dir)
 
     launch_args = [
         "--disable-blink-features=AutomationControlled",
@@ -133,9 +178,13 @@ async def create_vbee_browser_context(
         "locale": "vi-VN",
         "accept_downloads": True,
     }
+    if downloads_path is not None:
+        resolved_downloads = downloads_path.resolve()
+        resolved_downloads.mkdir(parents=True, exist_ok=True)
+        context_kwargs["downloads_path"] = str(resolved_downloads)
 
-    if edge_exe:
-        context_kwargs["executable_path"] = edge_exe
+    if browser_exe:
+        context_kwargs["executable_path"] = browser_exe
     elif channel:
         context_kwargs["channel"] = channel
     else:
@@ -145,12 +194,14 @@ async def create_vbee_browser_context(
         else:
             raise RuntimeError(
                 "Không tìm thấy Microsoft Edge hoặc Google Chrome trên máy tính.\n"
-                "Vui lòng cài đặt Microsoft Edge hoặc Google Chrome để sử dụng tính năng tự động hóa Vbee."
+                "Vui lòng cài đặt Microsoft Edge hoặc Google Chrome để sử dụng "
+                "tính năng tự động hóa Vbee."
             )
 
     logger.info(
-        "Khởi tạo trình duyệt Vbee: exe=%s, profile=%s, headless=%s",
-        edge_exe or context_kwargs.get("channel", "bundled"),
+        "%s profile trình duyệt Vbee: exe=%s, profile=%s, headless=%s",
+        "Tái sử dụng" if reused_profile else "Khởi tạo lần đầu",
+        browser_exe or context_kwargs.get("channel", "bundled"),
         user_data_dir,
         headless,
     )
@@ -170,6 +221,7 @@ async def create_vbee_browser_context(
         if "Executable doesn't exist" in err_msg or "channel" in err_msg:
             raise RuntimeError(
                 "Không thể mở trình duyệt điều khiển Vbee. "
-                "Hãy đảm bảo Microsoft Edge hoặc Google Chrome đã được cài đặt trên máy tính của bạn."
+                "Hãy đảm bảo Microsoft Edge hoặc Google Chrome đã được cài đặt "
+                "trên máy tính của bạn."
             ) from exc
         raise

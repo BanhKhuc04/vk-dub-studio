@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
+from uuid import uuid4
 
 from vkdub.integrations.vbee.errors import (
     VbeeAutomationError,
@@ -30,8 +33,6 @@ from vkdub.integrations.vbee.selectors import (
     DEFAULT_POLL_INTERVAL_S,
     DEFAULT_PROCESSING_TIMEOUT_S,
     DOWNLOAD_BUTTON_SELECTORS,
-    DOWNLOAD_FORMAT_MP3,
-    DOWNLOAD_FORMAT_WAV,
     DUBBING_TAB_SELECTORS,
     FILE_INPUT_SELECTORS,
     FORMAT_OPTIONS_MP3,
@@ -101,12 +102,93 @@ class VbeeBrowserAutomation:
         self.page.set_default_navigation_timeout(DEFAULT_NAVIGATION_TIMEOUT_MS)
         return self.page
 
+    @staticmethod
+    def _download_destination(target_dir: Path, suggested_name: str) -> Path:
+        """Return a traversal-safe, non-overwriting destination for Vbee audio."""
+        raw_name = Path(suggested_name.replace("\\", "/")).name
+        suffix = Path(raw_name).suffix.lower()
+        if suffix not in {".mp3", ".wav", ".m4a", ".aac", ".ogg"}:
+            suffix = ".mp3"
+        stem = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(raw_name).stem).strip("._")
+        stem = stem[:100] or "vbee_dubbed_audio"
+        destination = target_dir / f"{stem}{suffix}"
+        if destination.exists():
+            destination = target_dir / f"{stem}_{uuid4().hex[:8]}{suffix}"
+        return destination
+
+    @staticmethod
+    def cleanup_partial_downloads(target_dir: Path) -> None:
+        """Remove only Vbee staging partials; never touch completed user audio."""
+        for pattern in ("*.part", "*.crdownload"):
+            for partial in target_dir.glob(pattern):
+                try:
+                    partial.unlink(missing_ok=True)
+                except OSError:
+                    logger.debug("Không thể dọn file tải dở: %s", partial)
+
+    async def _save_download(self, download: Download, target_dir: Path) -> Path:
+        """Persist a Playwright download atomically with a bounded HTTPS fallback."""
+        import httpx
+
+        destination = self._download_destination(
+            target_dir, download.suggested_filename or "vbee_dubbed_audio.mp3"
+        )
+        temporary = target_dir / f".{destination.name}.{uuid4().hex}.part"
+        max_bytes = 256 * 1024 * 1024
+        try:
+            try:
+                await download.save_as(str(temporary))
+            except Exception as save_error:
+                logger.debug(
+                    "download.save_as failed (%s); attempting bounded direct fetch",
+                    save_error,
+                )
+
+            if not temporary.is_file() or temporary.stat().st_size == 0:
+                url = str(download.url or "")
+                parsed = urlsplit(url)
+                if (
+                    parsed.scheme != "https"
+                    or not parsed.hostname
+                    or parsed.username is not None
+                    or parsed.password is not None
+                ):
+                    raise VbeeDownloadError("Vbee trả đường dẫn tải audio không an toàn.")
+                downloaded = 0
+                try:
+                    async with httpx.AsyncClient(
+                        timeout=httpx.Timeout(60, connect=15), follow_redirects=False
+                    ) as client:
+                        async with client.stream("GET", url) as response:
+                            response.raise_for_status()
+                            with temporary.open("wb") as output:
+                                async for chunk in response.aiter_bytes():
+                                    downloaded += len(chunk)
+                                    if downloaded > max_bytes:
+                                        raise VbeeDownloadError(
+                                            "File audio Vbee vượt giới hạn an toàn 256 MB."
+                                        )
+                                    output.write(chunk)
+                except httpx.HTTPError:
+                    raise VbeeDownloadError(
+                        "Không thể tải file audio Vbee qua kết nối HTTPS."
+                    ) from None
+
+            if not temporary.is_file() or temporary.stat().st_size == 0:
+                raise VbeeDownloadError("Vbee trả file audio rỗng.")
+            os.replace(temporary, destination)
+            return destination
+        finally:
+            temporary.unlink(missing_ok=True)
+
     async def dismiss_popups(self) -> None:
         """Dismiss common onboarding modals, policy consent dialogs, and announcement banners."""
         try:
             page = await self.get_or_create_page()
             # 1. Policy consent modal
-            cb = page.locator("input[type='checkbox'], .ant-checkbox-input, span.ant-checkbox").first
+            cb = page.locator(
+                "input[type='checkbox'], .ant-checkbox-input, span.ant-checkbox"
+            ).first
             if await cb.is_visible():
                 await cb.click()
                 await page.wait_for_timeout(300)
@@ -409,7 +491,6 @@ class VbeeBrowserAutomation:
                 continue
 
         # 2. Open speed dropdown
-        opened = False
         for selector in (
             ".speed [data-testid='ArrowDropDownIcon']",
             ".speed .MuiAutocomplete-popupIndicator",
@@ -417,10 +498,9 @@ class VbeeBrowserAutomation:
             *SPEED_TRIGGER,
         ):
             try:
-                elem = page.locator(selector).first
-                if await elem.is_visible():
-                    await elem.click()
-                    opened = True
+                trigger_locator = page.locator(selector).first
+                if await trigger_locator.is_visible():
+                    await trigger_locator.click()
                     try:
                         await page.wait_for_timeout(500)
                     except Exception:
@@ -434,7 +514,9 @@ class VbeeBrowserAutomation:
         target_pattern = re.compile(rf"^\s*{re.escape(target_str)}(\s|$)", re.IGNORECASE)
 
         try:
-            options = page.locator("li.MuiMenuItem-root, .MuiAutocomplete-listbox li, ul[role='listbox'] li")
+            options = page.locator(
+                "li.MuiMenuItem-root, .MuiAutocomplete-listbox li, ul[role='listbox'] li"
+            )
             count = await options.count()
             for i in range(count):
                 opt = options.nth(i)
@@ -442,7 +524,9 @@ class VbeeBrowserAutomation:
                 if target_pattern.match(txt) or txt.lower().startswith(target_str.lower()):
                     await opt.click()
                     selected = True
-                    logger.info("Đã chọn tốc độ %s từ dropdown: %s", target_str, txt.replace("\n", " "))
+                    logger.info(
+                        "Đã chọn tốc độ %s từ dropdown: %s", target_str, txt.replace("\n", " ")
+                    )
                     try:
                         await page.wait_for_timeout(500)
                     except Exception:
@@ -461,9 +545,9 @@ class VbeeBrowserAutomation:
                 *(SPEED_OPTIONS_1X if target_str == "1x" else ()),
             ):
                 try:
-                    elem = page.locator(selector).first
-                    if await elem.is_visible():
-                        await elem.click()
+                    option_locator = page.locator(selector).first
+                    if await option_locator.is_visible():
+                        await option_locator.click()
                         selected = True
                         logger.info("Đã chọn tốc độ %s qua selector: %s", target_str, selector)
                         try:
@@ -497,9 +581,8 @@ class VbeeBrowserAutomation:
                 elem = await page.query_selector(selector)
                 if elem and await elem.is_visible():
                     cls = await elem.get_attribute("class") or ""
-                    checked = (
-                        await elem.get_attribute("checked")
-                        or await elem.get_attribute("aria-checked")
+                    checked = await elem.get_attribute("checked") or await elem.get_attribute(
+                        "aria-checked"
                     )
                     if "checked" in cls or "active" in cls or checked == "true":
                         logger.info("Định dạng MP3 đã được chọn sẵn.")
@@ -627,9 +710,12 @@ class VbeeBrowserAutomation:
                     continue
 
             try:
-                row = page.locator(
-                    f"tr:has-text('{stem}'), .MuiTableRow-root:has-text('{stem}'), .ant-table-row:has-text('{stem}')"
-                ).first
+                row_selector = (
+                    f"tr:has-text('{stem}'), "
+                    f".MuiTableRow-root:has-text('{stem}'), "
+                    f".ant-table-row:has-text('{stem}')"
+                )
+                row = page.locator(row_selector).first
                 if await row.is_visible():
                     logger.info("Đã tìm thấy dòng công việc qua direct row locator: %s", stem)
                     return row
@@ -721,6 +807,7 @@ class VbeeBrowserAutomation:
         """Trigger and verify audio download exclusively from the specified job row."""
         page = await self.get_or_create_page()
         target_dir.mkdir(parents=True, exist_ok=True)
+        self.cleanup_partial_downloads(target_dir)
         logger.info("Kích hoạt tải file âm thanh từ dòng công việc…")
 
         download_btn = None
@@ -742,38 +829,14 @@ class VbeeBrowserAutomation:
                 pass
 
         if not download_btn:
-            raise VbeeDownloadError(
-                "Không tìm thấy nút tải xuống trên dòng công việc tương ứng."
-            )
+            raise VbeeDownloadError("Không tìm thấy nút tải xuống trên dòng công việc tương ứng.")
 
         try:
             async with page.expect_download(timeout=timeout_ms) as download_info:
                 await download_btn.click()
 
             download: Download = await download_info.value
-            suggested_name = download.suggested_filename or "vbee_dubbed_audio.mp3"
-            destination = target_dir / suggested_name
-
-            saved = False
-            try:
-                await download.save_as(str(destination))
-                if destination.is_file() and destination.stat().st_size > 0:
-                    saved = True
-            except Exception as save_err:
-                logger.debug("download.save_as failed (%s); attempting direct fetch from download.url", save_err)
-
-            if not saved and download.url:
-                import httpx
-                logger.info("Tải trực tiếp file audio từ presigned S3 URL...")
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    resp = await client.get(download.url)
-                    resp.raise_for_status()
-                    destination.write_bytes(resp.content)
-                    if destination.is_file() and destination.stat().st_size > 0:
-                        saved = True
-
-            if not saved or not destination.is_file() or destination.stat().st_size == 0:
-                raise VbeeDownloadError(f"Tải file thất bại hoặc file rỗng: {destination}")
+            destination = await self._save_download(download, target_dir)
 
             logger.info(
                 "Tải file audio thành công: %s (%d bytes)",
@@ -850,6 +913,7 @@ class VbeeBrowserAutomation:
         """Trigger the download of the completed audio file and save to target_dir."""
         page = await self.get_or_create_page()
         target_dir.mkdir(parents=True, exist_ok=True)
+        self.cleanup_partial_downloads(target_dir)
 
         logger.info("Đang kích hoạt tải file âm thanh từ Vbee…")
 
@@ -873,29 +937,7 @@ class VbeeBrowserAutomation:
                 await download_btn.click()
 
             download: Download = await download_info.value
-            suggested_name = download.suggested_filename or "vbee_dubbed_audio.mp3"
-            destination = target_dir / suggested_name
-
-            saved = False
-            try:
-                await download.save_as(str(destination))
-                if destination.is_file() and destination.stat().st_size > 0:
-                    saved = True
-            except Exception as save_err:
-                logger.debug("download.save_as failed (%s); attempting direct fetch from download.url", save_err)
-
-            if not saved and download.url:
-                import httpx
-                logger.info("Tải trực tiếp file audio từ presigned S3 URL...")
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    resp = await client.get(download.url)
-                    resp.raise_for_status()
-                    destination.write_bytes(resp.content)
-                    if destination.is_file() and destination.stat().st_size > 0:
-                        saved = True
-
-            if not saved or not destination.is_file() or destination.stat().st_size == 0:
-                raise VbeeDownloadError(f"Tải file thất bại hoặc file rỗng: {destination}")
+            destination = await self._save_download(download, target_dir)
 
             logger.info(
                 "Tải thành công file audio từ Vbee: %s (%d bytes)",

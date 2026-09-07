@@ -1,4 +1,4 @@
-"""Controller wiring MainWindow, Project, and Vbee Voice automation workflow with thread-safe Qt architecture."""
+"""Thread-safe UI controller for the Vbee voice automation workflow."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from vkdub.integrations.vbee.errors import VbeeError, VbeeValidationError
 from vkdub.integrations.vbee.provider import VbeeBrowserProvider, VoiceProvider
 from vkdub.integrations.vbee.state import WorkflowState
 from vkdub.integrations.vbee.workflow import VbeeVoiceWorkflow, validate_project_for_vbee
+from vkdub.services.credential_service import redact
 from vkdub.ui.vbee_workflow_dialog import VbeeWorkflowDialog
 from vkdub.utils.paths import data_root, workspace_root
 
@@ -28,11 +29,11 @@ logger = logging.getLogger("vkdub.vbee")
 
 
 def map_vbee_error_message(exc: Exception) -> str:
-    """Map any technical exception from Vbee workflow to a clear, user-friendly Vietnamese message."""
+    """Map a Vbee exception to a clear, user-friendly Vietnamese message."""
     if isinstance(exc, VbeeError):
         return str(exc)
 
-    msg = str(exc)
+    msg = redact(str(exc))
     exc_type = type(exc).__name__
 
     if any(
@@ -53,7 +54,10 @@ def map_vbee_error_message(exc: Exception) -> str:
         return f"Không thể ghi file hoặc truy cập thư mục dự án ({msg})."
 
     if "existing browser session" in msg or "ProcessSingleton" in msg:
-        return "Cửa sổ trình duyệt Vbee cũ đang bị kẹt. Hệ thống đã tự động dọn dẹp, vui lòng nhấn Tạo Voice lại."
+        return (
+            "Cửa sổ trình duyệt Vbee cũ đang bị kẹt. Hệ thống đã tự động "
+            "dọn dẹp, vui lòng nhấn Tạo Voice lại."
+        )
 
     if "Executable doesn't exist" in msg:
         return "Không tìm thấy trình duyệt Microsoft Edge hoặc Google Chrome trên máy tính."
@@ -138,7 +142,7 @@ class VbeeWorkflowJob(QThread):
             logger.info("Vbee workflow cancelled by user.")
             self.cancelled.emit()
         except Exception as exc:
-            tb = traceback.format_exc()
+            tb = redact(traceback.format_exc())
             logger.error("Vbee workflow execution error: %s\n%s", exc, tb)
             friendly_msg = map_vbee_error_message(exc)
             self.failed.emit(friendly_msg, tb)
@@ -182,6 +186,7 @@ class VbeeController(QObject):
 
         # Check Vbee mode (Browser vs API)
         from vkdub.services.app_settings import load_app_settings
+
         settings = load_app_settings()
         vbee_mode = getattr(settings, "vbee_mode", "browser")
 
@@ -189,6 +194,7 @@ class VbeeController(QObject):
         token: str | None = None
         if vbee_mode == "api":
             from vkdub.services.credential_service import VbeeAppStore, VbeeTokenStore
+
             app_id = VbeeAppStore().get()
             token = VbeeTokenStore().get()
             if not app_id or not token:
@@ -214,6 +220,7 @@ class VbeeController(QObject):
 
         if project.voice:
             from dataclasses import is_dataclass, replace
+
             if is_dataclass(project.voice):
                 project.voice = replace(project.voice, speed=speed)
             else:
@@ -223,6 +230,7 @@ class VbeeController(QObject):
         staging_dir = data_root() / "vbee_staging"
         if vbee_mode == "api" and app_id and token:
             from vkdub.integrations.vbee.provider import VbeeApiProvider
+
             provider: VoiceProvider = VbeeApiProvider(
                 app_id=app_id,
                 token=token,
@@ -332,16 +340,21 @@ class VbeeController(QObject):
         """Export approved or translated Vietnamese SRT file for manual Vbee dubbing."""
         project = self.window.project
         if not project.script or not project.script.lines:
-            self.window._error("Dự án chưa có kịch bản tiếng Việt. Vui lòng bóc băng và dịch kịch bản trước khi xuất SRT.")
+            self.window._error(
+                "Dự án chưa có kịch bản tiếng Việt. Vui lòng bóc băng và dịch "
+                "kịch bản trước khi xuất SRT."
+            )
             return None
 
         import re
         from datetime import datetime
+
         from vkdub.services.srt_service import write_srt
 
         slug = (
-            re.sub(r"[^a-zA-Z0-9_-]", "_", project.video_path.stem if project.video_path else "project")
-            .strip("_")[:30]
+            re.sub(
+                r"[^a-zA-Z0-9_-]", "_", project.video_path.stem if project.video_path else "project"
+            ).strip("_")[:30]
             or "project"
         )
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -369,7 +382,8 @@ class VbeeController(QObject):
             "Các bước thực hiện thủ công:\n"
             "1. Tải file SRT này lên Vbee Studio (vbee.vn) để tạo giọng đọc.\n"
             "2. Sau khi Vbee chuyển đổi xong, tải file âm thanh (MP3/WAV) về máy tính.\n"
-            "3. Bấm nút '📁 Nhập Audio Vbee (Thủ công)' trên VK Dub Studio để tự động cắt ghép vào video!",
+            "3. Bấm nút '📁 Nhập Audio Vbee (Thủ công)' trên VK Dub Studio "
+            "để tự động cắt ghép vào video!",
             parent=self.window if isinstance(self.window, QWidget) else None,
         )
         btn_open = box.addButton("Mở thư mục chứa file", QMessageBox.ButtonRole.ActionRole)
@@ -388,7 +402,9 @@ class VbeeController(QObject):
 
         project = self.window.project
         if not project.script or not project.script.lines:
-            self.window._error("Dự án chưa có kịch bản để đồng bộ âm thanh. Vui lòng dịch kịch bản trước.")
+            self.window._error(
+                "Dự án chưa có kịch bản để đồng bộ âm thanh. Vui lòng dịch kịch bản trước."
+            )
             return False
 
         from vkdub.integrations.vbee.importer import slice_and_import_vbee_audio
@@ -447,7 +463,8 @@ class VbeeController(QObject):
         self.window.left.stop_button.clicked.connect(self.stop_workflow)
         self.window.left.job_progress.setValue(10)
         self.window.log(
-            f"Đang phân tích và cắt ghép file âm thanh Vbee ({audio_path.name}) theo {len(project.script.lines)} câu kịch bản…"
+            f"Đang phân tích và cắt ghép file âm thanh Vbee ({audio_path.name}) "
+            f"theo {len(project.script.lines)} câu kịch bản…"
         )
         self.window._refresh()
         job.start()
@@ -464,8 +481,8 @@ class VbeeController(QObject):
             self.window if isinstance(self.window, QWidget) else None,
             "Nhập Audio Vbee thành công",
             f"{msg}\n\n"
-            "Tất cả các câu thoại đã sẵn sàng. Bạn có thể nghe thử từng câu trên danh sách kịch bản "
+            "Tất cả các câu thoại đã sẵn sàng. Bạn có thể nghe thử từng câu "
+            "trên danh sách kịch bản "
             "và bấm 'BẮT ĐẦU XỬ LÝ' (hoặc Xuất CapCut) để hoàn tất video!",
         )
         self.workflow_finished.emit(True, msg)
-

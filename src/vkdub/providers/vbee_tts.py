@@ -1,11 +1,12 @@
 import asyncio
+import json
 from pathlib import Path
 
 import httpx
 
 from vkdub.domain.voice import Voice
 from vkdub.providers.tts import TTSError
-from vkdub.services.credential_service import remember_secret
+from vkdub.services.credential_service import redact, remember_secret
 from vkdub.services.tts_usage import TTSUsage
 
 TTS_URL = "https://api.vbee.vn/v1/tts"
@@ -21,9 +22,6 @@ SYNC_LABELS = {
 MAX_AUDIO_BYTES = 32 * 1024 * 1024
 
 
-import json
-
-
 def response_error(status: int, payload: httpx.Response | bytes | None = None) -> TTSError:
     detail = ""
     if payload is not None:
@@ -34,7 +32,11 @@ def response_error(status: int, payload: httpx.Response | bytes | None = None) -
                 raw = payload.decode("utf-8", errors="ignore")
             data = json.loads(raw)
             if isinstance(data, dict):
-                if "error" in data and isinstance(data["error"], dict) and "message" in data["error"]:
+                if (
+                    "error" in data
+                    and isinstance(data["error"], dict)
+                    and "message" in data["error"]
+                ):
                     detail = redact(str(data["error"]["message"]))
                 elif "error_message" in data:
                     detail = redact(str(data["error_message"]))
@@ -46,22 +48,25 @@ def response_error(status: int, payload: httpx.Response | bytes | None = None) -
             pass
 
     if status in (401, 403):
-        return TTSError(
-            f"Vbee từ chối xác thực/quyền API ({detail or 'Kiểm tra App ID, token, hạn token và gói API'})."
-        )
+        auth_detail = detail or "Kiểm tra App ID, token, hạn token và gói API"
+        return TTSError(f"Vbee từ chối xác thực/quyền API ({auth_detail}).")
     if status == 429:
         return TTSError(f"Vbee giới hạn yêu cầu đồng thời/quota ({detail or 'Chờ rồi thử lại'}).")
     if status == 400:
         if "not supported in user package" in detail:
             return TTSError(
-                "Gói tài khoản Vbee của bạn chưa hỗ trợ Realtime API (This feature is not supported in user package). "
-                "Vui lòng chọn chế độ 'Trình duyệt tự động (Vbee Dubbing Studio)' để dùng trực tiếp với gói cước hiện tại!"
+                "Gói tài khoản Vbee của bạn chưa hỗ trợ Realtime API "
+                "(This feature is not supported in user package). Vui lòng chọn chế độ "
+                "'Trình duyệt tự động (Vbee Dubbing Studio)' để dùng trực tiếp "
+                "với gói cước hiện tại!"
             )
         return TTSError(
             f"Vbee từ chối yêu cầu: {detail or 'kiểm tra credit, mã giọng và quyền Realtime API.'}"
         )
+    detail_suffix = f": {detail}" if detail else ""
     return TTSError(
-        f"Vbee trả lỗi HTTP {status}{f': {detail}' if detail else ''}. Kiểm tra credit/gói API rồi thử lại; chưa tự gửi lại."
+        f"Vbee trả lỗi HTTP {status}{detail_suffix}. "
+        "Kiểm tra credit/gói API rồi thử lại; chưa tự gửi lại."
     )
 
 
@@ -154,10 +159,18 @@ class VbeeTTSProvider:
                 try:
                     data = resp.json()
                     err_msg = ""
-                    if isinstance(data, dict) and "error" in data and isinstance(data["error"], dict):
+                    if (
+                        isinstance(data, dict)
+                        and "error" in data
+                        and isinstance(data["error"], dict)
+                    ):
                         err_msg = data["error"].get("message", "")
                     if "not supported in user package" in err_msg:
-                        return False, "gói tài khoản hiện tại (Vbee for Educators) chưa mở quyền Realtime API"
+                        return (
+                            False,
+                            "gói tài khoản hiện tại (Vbee for Educators) "
+                            "chưa mở quyền Realtime API",
+                        )
                     if "voiceCode" in err_msg or "voice" in err_msg.lower():
                         return True, "Hỗ trợ Realtime API"
                     return False, err_msg or f"HTTP {resp.status_code}"
