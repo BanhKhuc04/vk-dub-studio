@@ -54,6 +54,30 @@
     };
   }
 
+  function safeClick(elem) {
+    if (!elem) return false;
+    try {
+      if (typeof elem.click === "function") {
+        elem.click();
+        return true;
+      }
+      if (elem.parentElement && typeof elem.parentElement.click === "function") {
+        elem.parentElement.click();
+        return true;
+      }
+      const evt = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      });
+      elem.dispatchEvent(evt);
+      return true;
+    } catch (err) {
+      console.warn("[VbeeAdapter] safeClick error:", err);
+      return false;
+    }
+  }
+
   function findElementByText(selector, textMatch, exact = false) {
     const elems = Array.from(document.querySelectorAll(selector));
     return elems.find((el) => {
@@ -76,7 +100,7 @@
     const termsCheckbox = document.querySelector("input[type='checkbox'], .ant-checkbox-input, span.ant-checkbox");
     if (termsCheckbox) {
       if (!termsCheckbox.checked && !termsCheckbox.classList.contains("ant-checkbox-checked")) {
-        termsCheckbox.click();
+        safeClick(termsCheckbox);
         await new Promise((r) => setTimeout(r, 400));
       }
       const agreeBtn =
@@ -84,79 +108,94 @@
         findElementByText("button", "Đồng ý") ||
         findElementByText("button", "Tiếp tục");
       if (agreeBtn) {
-        agreeBtn.click();
+        safeClick(agreeBtn);
         await new Promise((r) => setTimeout(r, 1200));
       }
     }
 
-    // 3. Locate SRT file input
-    let fileInput = null;
-    for (let i = 0; i < 20; i++) {
-      fileInput = document.querySelector("input[type='file'][accept*='.srt'], input[type='file']");
-      if (fileInput) break;
-      await new Promise((r) => setTimeout(r, 500));
+    // 3. Check if subtitles are already populated in table
+    const existingRows = document.querySelectorAll("tr, .ant-table-row, div[class*='subtitle-item']");
+    if (existingRows.length > 3) {
+      console.log("[VbeeAdapter] Subtitles already loaded in table. Reusing existing upload.");
+    } else {
+      // Locate SRT file input
+      let fileInput = null;
+      for (let i = 0; i < 20; i++) {
+        fileInput = document.querySelector("input[type='file'][accept*='.srt'], input[type='file']");
+        if (fileInput) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      if (!fileInput) {
+        throw new Error("Không tìm thấy ô tải file SRT trên giao diện Vbee Dubbing.");
+      }
+
+      // Upload SRT content via HTML5 File and DataTransfer
+      console.log("[VbeeAdapter] Uploading translated SRT content...");
+      const srtBlob = new Blob([srt_content], { type: "text/plain;charset=utf-8" });
+      const srtFile = new File([srtBlob], "translated.srt", { type: "text/plain" });
+      const dt = new DataTransfer();
+      dt.items.add(srtFile);
+      fileInput.files = dt.files;
+      fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      fileInput.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 2000));
     }
-
-    if (!fileInput) {
-      throw new Error("Không tìm thấy ô tải file SRT trên giao diện Vbee Dubbing.");
-    }
-
-    // 3. Upload SRT content via HTML5 File and DataTransfer
-    console.log("[VbeeAdapter] Uploading translated SRT content...");
-    const srtBlob = new Blob([srt_content], { type: "text/plain;charset=utf-8" });
-    const srtFile = new File([srtBlob], "translated.srt", { type: "text/plain" });
-    const dt = new DataTransfer();
-    dt.items.add(srtFile);
-    fileInput.files = dt.files;
-    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-    fileInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-    await new Promise((r) => setTimeout(r, 2000));
 
     // 4. Select Voice: Ngọc Huyền
-    console.log(`[VbeeAdapter] Checking voice selection for: ${voice_name}...`);
-    const pageText = document.body.innerText || "";
-    if (!pageText.includes("Ngọc Huyền")) {
-      const voiceTrigger =
-        document.querySelector("div[class*='voice-select']") ||
-        document.querySelector("div[class*='select-voice']") ||
-        findElementByText("div, span, button", "Chọn giọng") ||
-        findElementByText("div, span, button", "Giọng đọc");
+    try {
+      console.log(`[VbeeAdapter] Checking voice selection for: ${voice_name}...`);
+      const pageText = document.body.innerText || "";
+      if (!pageText.includes("Ngọc Huyền")) {
+        const voiceTrigger =
+          document.querySelector("div[class*='voice-select']") ||
+          document.querySelector("div[class*='select-voice']") ||
+          findElementByText("div, span, button", "Chọn giọng") ||
+          findElementByText("div, span, button", "Giọng đọc");
 
-      if (voiceTrigger) {
-        voiceTrigger.click();
-        await new Promise((r) => setTimeout(r, 800));
-        const voiceOpt =
-          findElementByText("div[role='option'], div.ant-select-item-option, span, li", voice_name) ||
-          findElementByText("div, span, li", "HN - Ngọc Huyền");
-        if (voiceOpt) {
-          voiceOpt.click();
-          console.log("[VbeeAdapter] Voice selected: Ngọc Huyền");
+        if (voiceTrigger) {
+          safeClick(voiceTrigger);
+          await new Promise((r) => setTimeout(r, 800));
+          const voiceOpt =
+            findElementByText("div[role='option'], div.ant-select-item-option, span, li", voice_name) ||
+            findElementByText("div, span, li", "HN - Ngọc Huyền");
+          if (voiceOpt) {
+            safeClick(voiceOpt);
+            console.log("[VbeeAdapter] Voice selected: Ngọc Huyền");
+          }
         }
       }
+    } catch (voiceErr) {
+      console.warn("[VbeeAdapter] Voice configuration notice:", voiceErr);
     }
 
     await new Promise((r) => setTimeout(r, 600));
 
     // 5. Select Speed: 1.1x
-    console.log(`[VbeeAdapter] Configuring speed: ${speed}...`);
-    const speedTrigger =
-      document.querySelector(".speed [data-testid='ArrowDropDownIcon']") ||
-      document.querySelector(".speed button") ||
-      document.querySelector("div[class*='speed']") ||
-      findElementByText("button, span, div", "1x", true) ||
-      findElementByText("button, span, div", "1.0x", true);
+    try {
+      console.log(`[VbeeAdapter] Configuring speed: ${speed}...`);
+      const speedTrigger =
+        document.querySelector(".speed button") ||
+        document.querySelector("button:has([data-testid*='ArrowDrop'])") ||
+        document.querySelector(".speed") ||
+        document.querySelector("div[class*='speed']") ||
+        findElementByText("button, span, div", "1x", true) ||
+        findElementByText("button, span, div", "1.0x", true) ||
+        document.querySelector("[data-testid='ArrowDropDownIcon']");
 
-    if (speedTrigger) {
-      speedTrigger.click();
-      await new Promise((r) => setTimeout(r, 800));
-      const speedOpt =
-        findElementByText("li.MuiMenuItem-root, div[role='option'], span", speed) ||
-        findElementByText("li, div, span", "1.1x");
-      if (speedOpt) {
-        speedOpt.click();
-        console.log("[VbeeAdapter] Speed configured to: 1.1x");
+      if (speedTrigger) {
+        safeClick(speedTrigger);
+        await new Promise((r) => setTimeout(r, 800));
+        const speedOpt =
+          findElementByText("li.MuiMenuItem-root, div[role='option'], span, li", speed) ||
+          findElementByText("li, div, span", "1.1x");
+        if (speedOpt) {
+          safeClick(speedOpt);
+          console.log("[VbeeAdapter] Speed configured to: 1.1x");
+        }
       }
+    } catch (speedErr) {
+      console.warn("[VbeeAdapter] Speed configuration notice (continuing):", speedErr);
     }
 
     await new Promise((r) => setTimeout(r, 600));
@@ -168,24 +207,28 @@
       findElementByText("button", "Bắt đầu chuyển") ||
       findElementByText("button", "Tạo thuyết minh") ||
       findElementByText("button", "Tạo voice") ||
-      findElementByText("button", "Chuyển đổi");
+      findElementByText("button", "Chuyển đổi") ||
+      document.querySelector("button.ant-btn-primary");
 
     if (!submitBtn) {
       throw new Error("Không tìm thấy nút 'Chuyển phụ đề' trên Vbee.");
     }
 
-    submitBtn.click();
+    safeClick(submitBtn);
     await new Promise((r) => setTimeout(r, 1200));
 
     // Handle confirmation modal if present
-    const confirmBtn =
-      findElementByText("button.ant-btn-primary, button", "Xác nhận") ||
-      findElementByText("button.ant-btn-primary, button", "Đồng ý") ||
-      findElementByText("button", "Tiếp tục");
-
-    if (confirmBtn) {
-      confirmBtn.click();
-      console.log("[VbeeAdapter] Confirmed conversion modal.");
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const confirmBtn =
+        findElementByText("button.ant-btn-primary, button", "Xác nhận") ||
+        findElementByText("button.ant-btn-primary, button", "Đồng ý") ||
+        findElementByText("button", "Tiếp tục");
+      if (confirmBtn) {
+        safeClick(confirmBtn);
+        console.log("[VbeeAdapter] Confirmed conversion modal.");
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 400));
     }
 
     // 7. Poll for completion
@@ -211,9 +254,8 @@
 
       if (downloadBtn) {
         console.log("[VbeeAdapter] Completion detected! Fetching audio...");
-        // Check if there is an explicit audio src or link
         let audioUrl = null;
-        if (downloadBtn.tagName.toLowerCase() === "a" && downloadBtn.href) {
+        if (downloadBtn.tagName && downloadBtn.tagName.toLowerCase() === "a" && downloadBtn.href) {
           audioUrl = downloadBtn.href;
         } else {
           const audioElem = document.querySelector("audio[src], source[src]");
@@ -238,10 +280,8 @@
           }
         }
 
-        // Trigger download button as well to ensure file downloads to disk if needed
-        try {
-          downloadBtn.click();
-        } catch (e) {}
+        // Trigger safe click on download button as well to ensure file downloads to disk if needed
+        safeClick(downloadBtn);
 
         return {
           success: true,

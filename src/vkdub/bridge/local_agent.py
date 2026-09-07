@@ -304,6 +304,22 @@ class LocalAgent(QObject):
                 logger.info("Đã tải master audio Vbee từ URL: %s", target_audio_path)
                 return target_audio_path
 
+            # Fallback: check if browser downloaded MP3 to user's Downloads directory
+            downloads_dir = Path.home() / "Downloads"
+            if downloads_dir.is_dir():
+                import shutil
+                import time
+                mp3_files = sorted(
+                    downloads_dir.glob("*.mp3"),
+                    key=lambda f: f.stat().st_mtime,
+                    reverse=True,
+                )
+                if mp3_files and (time.time() - mp3_files[0].stat().st_mtime) < 300:
+                    target_audio_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(mp3_files[0], target_audio_path)
+                    logger.info("Đã lấy master audio Vbee từ thư mục Downloads: %s", mp3_files[0])
+                    return target_audio_path
+
             raise RuntimeError("Extension báo thành công nhưng không có dữ liệu audio hợp lệ.")
         finally:
             self._pending_requests.pop(req_id, None)
