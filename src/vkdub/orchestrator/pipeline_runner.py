@@ -138,9 +138,6 @@ class PipelineRunner(QThread):
                         "4.1", SubstepStatus.RUNNING, 40, "Đang trích xuất audio..."
                     )
                     from vkdub.media.audio_extract import extract_audio
-                    from vkdub.providers.transcription_provider import (
-                        FasterWhisperProvider,
-                    )
 
                     wav_path = self.output_dir / "audio_source.wav"
                     extract_audio(self.project.video_path, wav_path)
@@ -151,14 +148,33 @@ class PipelineRunner(QThread):
                         65,
                         "Đang nhận diện giọng nói (Whisper)...",
                     )
-                    provider = FasterWhisperProvider(model_size="base")
-                    transcript = provider.transcribe(wav_path)
-                    self.project.transcript = transcript
+                    from faster_whisper import WhisperModel
 
+                    from vkdub.domain.transcript import srt_timestamp
+
+                    model_size = "base"
+                    if (
+                        hasattr(self.project, "transcription_settings")
+                        and self.project.transcription_settings
+                    ):
+                        model_size = (
+                            getattr(self.project.transcription_settings, "model", "base") or "base"
+                        )
+
+                    whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
+                    segments_gen, _ = whisper.transcribe(str(wav_path), beam_size=5)
+
+                    cues = []
+                    for idx, seg in enumerate(segments_gen, 1):
+                        start_tc = srt_timestamp(seg.start)
+                        end_tc = srt_timestamp(seg.end)
+                        text = seg.text.strip()
+                        if text:
+                            cues.append(f"{idx}\n{start_tc} --> {end_tc}\n{text}\n")
+
+                    orig_srt_content = "\n".join(cues)
                     orig_srt_path = self.output_dir / "original.srt"
-                    from vkdub.services.srt_service import write_transcript_to_srt
-
-                    write_transcript_to_srt(orig_srt_path, transcript)
+                    orig_srt_path.write_text(orig_srt_content, encoding="utf-8")
                 else:
                     raise ValueError("Dự án chưa chọn video MP4 và chưa có phụ đề gốc để xử lý.")
 
