@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "VK Dub Studio Bridge",
+  "version": "1.0.0",
+  "description": "Microsoft Edge & Chrome Bridge for VK Dub Studio Automation (ChatGPT & Vbee)",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0rUwetRNAsoPBo0o0hVtgMJJL0bQfOUs5LiCdDlMg242irjOt4L75Qr3+322+SHDUEA/lYcQglaEHKD3tSlE/pwUIhekHHadAAZnYladqLEApp9Lk1587C82LnfK9K+qmI1PM7jviNJxFdFHtHttF3O00eFYrPWw0P9ygtL92mEFFxcV1qh3lG8zWiJtRe1Ph2oOw5YjWuDFm+5WrtgfFA0xJgn9hK76Y8aCtTK+oQXGhBnzrb5p9wSDC7s6NRHUjBytONPXD1o1OonDmnfLi7ZnUjJjzHx8GX54tBcZ/7F/tBWqvUoZEwN/xIiERxxjvh4WFhnRcAu1r6yo5i5QjQIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "tabs",
+    "storage",
+    "cookies"
+  ],
+  "host_permissions": [
+    "*://chatgpt.com/*",
+    "*://*.chatgpt.com/*",
+    "*://vbee.vn/*",
+    "*://*.vbee.vn/*"
+  ],
+  "background": {
+    "service_worker": "background/serviceWorker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://chatgpt.com/*", "*://*.chatgpt.com/*"],
+      "js": ["content/chatgptAdapter.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["*://vbee.vn/*", "*://*.vbee.vn/*"],
+      "js": ["content/vbeeAdapter.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_title": "VK Dub Studio Bridge"
+  },
+  "icons": {
+    "48": "icons/icon48.png"
+  }
+}

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from vkdub.domain.transcript import MODELS
 from vkdub.services.app_settings import load_app_settings
+from vkdub.ui.browser_bridge_widget import BrowserBridgeWidget
 from vkdub.version import APP_CREDIT, __version__
 
 
@@ -38,6 +39,12 @@ class LeftConfigPanel(QFrame):
     vbee_voice_requested = Signal()
     vbee_export_srt_requested = Signal()
     vbee_manual_audio_requested = Signal()
+    chatgpt_translate_requested = Signal()
+    import_chatgpt_srt_requested = Signal()
+    approve_script_requested = Signal()
+    toggle_mask_requested = Signal()
+    open_browser_requested = Signal()
+    refresh_bridge_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -88,173 +95,178 @@ class LeftConfigPanel(QFrame):
         layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(10)
 
-        # 1. VIDEO SECTION
-        layout.addWidget(label("VIDEO", "eyebrow"))
-        self.import_button = QPushButton("📂 CHỌN VIDEO")
+        # ---------------------------------------------------------
+        # CẦU NỐI TRÌNH DUYỆT (H6 BRIDGE STATUS)
+        # ---------------------------------------------------------
+        self.browser_bridge = BrowserBridgeWidget()
+        self.browser_bridge.open_browser_requested.connect(self.open_browser_requested.emit)
+        self.browser_bridge.refresh_requested.connect(self.refresh_bridge_requested.emit)
+        layout.addWidget(self.browser_bridge)
+
+        sep_bridge = QFrame()
+        sep_bridge.setFrameShape(QFrame.Shape.HLine)
+        sep_bridge.setStyleSheet("color: #21262d;")
+        layout.addWidget(sep_bridge)
+
+        # =========================================================
+        # BƯỚC 1: VIDEO & KHUNG CHE MỜ
+        # =========================================================
+        layout.addWidget(label("BƯỚC 1: VIDEO & CHE MỜ", "eyebrow"))
+        self.import_button = QPushButton("📂 BƯỚC 1: CHỌN VIDEO")
         self.import_button.setObjectName("primary")
         self.import_button.setEnabled(False)
-        self.import_button.setStyleSheet("font-size: 13px; padding: 8px; font-weight: bold;")
+        self.import_button.setStyleSheet("font-size: 13px; padding: 9px; font-weight: bold;")
         layout.addWidget(self.import_button)
 
         self.video_info = QLabel("Chưa chọn video MP4")
         self.video_info.setWordWrap(True)
         self.video_info.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
         layout.addWidget(self.video_info)
-        self.video_path = self.video_info  # Backward compatibility
+        self.video_path = self.video_info
 
-        # Quick project actions
-        project_actions = QHBoxLayout()
+        step1_tools = QHBoxLayout()
+        self.btn_toggle_mask = QPushButton("▣ Khung che mờ")
+        self.btn_toggle_mask.setToolTip("Bật hoặc căn chỉnh khung che mờ phụ đề cũ trên video")
+        self.btn_toggle_mask.setStyleSheet("padding: 4px 6px; font-size: 11px;")
+        self.btn_toggle_mask.clicked.connect(self.toggle_mask_requested.emit)
+        step1_tools.addWidget(self.btn_toggle_mask)
+
+        # Quick project actions (Lưu/Mở project)
         self.save_button = QPushButton("💾 Lưu")
         self.save_button.setToolTip("Lưu project (.vkdub)")
         self.load_button = QPushButton("📂 Mở")
         self.load_button.setToolTip("Mở project (.vkdub)")
-        self.output_button = QPushButton("📁 Thư mục")
-        self.output_button.setToolTip("Chọn thư mục xuất video/project")
-        for btn in (self.save_button, self.load_button, self.output_button):
-            btn.setStyleSheet("padding: 4px 6px; font-size: 11px;")
-            project_actions.addWidget(btn)
-        layout.addLayout(project_actions)
+        self.output_button = QPushButton("📁")
         self.output_button.hide()
-
+        for btn in (self.save_button, self.load_button):
+            btn.setStyleSheet("padding: 4px 6px; font-size: 11px;")
+            step1_tools.addWidget(btn)
+        layout.addLayout(step1_tools)
         self.output_path = QLabel("Chưa chọn thư mục")
-        self.output_path.setWordWrap(True)
-        self.output_path.setStyleSheet("color: #929fb5; font-size: 11px;")
-        layout.addWidget(self.output_path)
         self.output_path.hide()
-
-        sep_capcut = QFrame()
-        sep_capcut.setFrameShape(QFrame.Shape.HLine)
-        sep_capcut.setStyleSheet("color: #293245;")
-        layout.addWidget(sep_capcut)
-
-        # 2. CAPCUT DESTINATION
-        layout.addWidget(label("ĐÍCH ĐẾN CAPCUT", "eyebrow"))
-        capcut_box = QHBoxLayout()
-        self.capcut_dest_lbl = QLabel("CapCut Draft Root")
-        self.capcut_dest_lbl.setStyleSheet("color: #94a3b8; font-size: 11px;")
-        self.capcut_dest_lbl.setWordWrap(True)
-        capcut_box.addWidget(self.capcut_dest_lbl, 1)
-
-        self.btn_capcut_folder = QPushButton("Đổi…")
-        self.btn_capcut_folder.setStyleSheet("padding: 2px 6px; font-size: 10px;")
-        self.btn_capcut_folder.clicked.connect(self.capcut_folder_requested.emit)
-        capcut_box.addWidget(self.btn_capcut_folder)
-        layout.addLayout(capcut_box)
 
         sep1 = QFrame()
         sep1.setFrameShape(QFrame.Shape.HLine)
         sep1.setStyleSheet("color: #293245;")
         layout.addWidget(sep1)
 
-        # 3. NGÔN NGỮ SECTION
-        layout.addWidget(label("NGÔN NGỮ", "eyebrow"))
-        lang_form = QVBoxLayout()
-        lang_form.setSpacing(4)
-        lang_form.addWidget(label("Ngôn ngữ gốc"))
-        self.source_language = QComboBox()
-        for title, code in (
-            ("Tự động nhận diện", "auto"),
-            ("Tiếng Trung (zh)", "zh"),
-            ("Tiếng Anh (en)", "en"),
-            ("Tiếng Việt (vi)", "vi"),
-            ("Tiếng Nhật (ja)", "ja"),
-            ("Tiếng Hàn (ko)", "ko"),
-        ):
-            self.source_language.addItem(title, code)
-        self.source_language.setAccessibleName("Ngôn ngữ nguồn")
-        lang_form.addWidget(self.source_language)
+        # =========================================================
+        # BƯỚC 2: DỊCH QUA CHATGPT (TRÌNH DUYỆT MẶC ĐỊNH)
+        # =========================================================
+        layout.addWidget(label("BƯỚC 2: DỊCH CHATGPT", "eyebrow"))
+        self.btn_open_chatgpt = QPushButton("🤖 BƯỚC 2: MỞ CHATGPT DỊCH")
+        self.btn_open_chatgpt.setToolTip(
+            "Tự động mở ChatGPT trên Edge/Chrome có sẵn tài khoản công ty, copy prompt dịch và mở file SRT gốc để nạp."
+        )
+        self.btn_open_chatgpt.setStyleSheet(
+            "background: #10a37f; color: white; font-weight: bold; font-size: 12px; padding: 8px; border-radius: 4px;"
+        )
+        self.btn_open_chatgpt.clicked.connect(self.chatgpt_translate_requested.emit)
+        layout.addWidget(self.btn_open_chatgpt)
 
-        lang_form.addWidget(label("Dịch sang"))
-        self.target_language = QComboBox()
-        self.target_language.addItem("Tiếng Việt", "vi")
-        self.target_language.setEnabled(False)
-        lang_form.addWidget(self.target_language)
-        layout.addLayout(lang_form)
+        self.btn_import_chatgpt_srt = QPushButton("📥 Nạp file SRT đã dịch từ ChatGPT")
+        self.btn_import_chatgpt_srt.setToolTip("Nạp file SRT tiếng Việt bạn đã tải về từ ChatGPT")
+        self.btn_import_chatgpt_srt.setStyleSheet(
+            "padding: 5px; font-size: 11px; font-weight: 600; color: #38bdf8;"
+        )
+        self.btn_import_chatgpt_srt.clicked.connect(self.import_chatgpt_srt_requested.emit)
+        layout.addWidget(self.btn_import_chatgpt_srt)
 
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet("color: #293245;")
         layout.addWidget(sep2)
 
-        # 4. GIỌNG ĐỌC SECTION
-        layout.addWidget(label("GIỌNG ĐỌC", "eyebrow"))
-        voice_col = QVBoxLayout()
-        voice_col.setSpacing(4)
-        self.voice_combo = QComboBox()
-        self.voice_combo.addItem("Chưa có giọng đã xác minh", "")
-        self.voice_combo.setEnabled(False)
-        self.voice_combo.setAccessibleName("Giọng đọc mặc định")
-        self.voice_combo.currentIndexChanged.connect(lambda *_: self.voice_settings_changed.emit())
-        voice_col.addWidget(self.voice_combo)
+        # =========================================================
+        # BƯỚC 3: KIỂM TRA & CHỐT KỊCH BẢN
+        # =========================================================
+        layout.addWidget(label("BƯỚC 3: CHỐT KỊCH BẢN", "eyebrow"))
+        self.lbl_review_status = QLabel("Chờ nạp phụ đề dịch")
+        self.lbl_review_status.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        layout.addWidget(self.lbl_review_status)
 
-        speed_row = QHBoxLayout()
-        speed_lbl = label("Tốc độ:")
-        self.speed_combo = QComboBox()
-        for s in ("0.8x", "0.9x", "1.0x (Chuẩn)", "1.1x", "1.2x", "1.3x"):
-            self.speed_combo.addItem(s, float(s.split("x")[0]))
-        self.speed_combo.setCurrentIndex(self.speed_combo.findData(load_app_settings().voice_speed))
-        self.speed_combo.currentIndexChanged.connect(lambda *_: self.voice_settings_changed.emit())
-        speed_row.addWidget(speed_lbl)
-        speed_row.addWidget(self.speed_combo, 1)
-        voice_col.addLayout(speed_row)
-
-        self.listen_test_button = QPushButton("▶ Nghe thử")
-        self.listen_test_button.setStyleSheet("padding: 5px; font-size: 11px;")
-        self.listen_test_button.clicked.connect(self.test_listen_requested.emit)
-        voice_actions = QHBoxLayout()
-        voice_actions.addWidget(self.listen_test_button)
-        self.manage_voices_button = QPushButton("⚙ Quản lý giọng")
-        self.manage_voices_button.clicked.connect(self.manage_voices_requested.emit)
-        voice_actions.addWidget(self.manage_voices_button)
-        voice_col.addLayout(voice_actions)
-
-        # Vbee Workflow Options (Automatic + Manual)
-        vbee_container = QVBoxLayout()
-        vbee_container.setSpacing(4)
-
-        self.btn_vbee_voice = QPushButton("⚡ Tạo voice Vbee (Tự động)")
-        self.btn_vbee_voice.setToolTip(
-            "Tự động xuất SRT tiếng Việt, mở Vbee Dubbing Studio, tạo voice và đồng bộ vào project."
+        self.btn_approve_script = QPushButton("✔ BƯỚC 3: CHỐT KỊCH BẢN (DUYỆT)")
+        self.btn_approve_script.setToolTip("Xác nhận kịch bản dịch đã chuẩn xác để sẵn sàng tạo Voice")
+        self.btn_approve_script.setStyleSheet(
+            "background: #059669; color: white; font-weight: bold; font-size: 12px; padding: 8px; border-radius: 4px;"
         )
-        self.btn_vbee_voice.setStyleSheet(
-            "background: #0284c7; color: #ffffff; font-weight: bold; padding: 6px 8px; "
-            "font-size: 11px; border-radius: 4px; margin-top: 4px;"
-        )
-        self.btn_vbee_voice.clicked.connect(self.vbee_voice_requested.emit)
-        vbee_container.addWidget(self.btn_vbee_voice)
-
-        vbee_manual_row = QHBoxLayout()
-        vbee_manual_row.setSpacing(4)
-
-        self.btn_vbee_export_srt = QPushButton("⬇ Tải SRT Vbee")
-        self.btn_vbee_export_srt.setToolTip(
-            "Tải file phụ đề SRT tiếng Việt đã dịch về máy để tự tạo giọng trên Vbee Studio."
-        )
-        self.btn_vbee_export_srt.setStyleSheet(
-            "padding: 4px 6px; font-size: 10px; font-weight: 600;"
-        )
-        self.btn_vbee_export_srt.clicked.connect(self.vbee_export_srt_requested.emit)
-        vbee_manual_row.addWidget(self.btn_vbee_export_srt)
-
-        self.btn_vbee_manual_audio = QPushButton("📁 Nhập Audio Vbee")
-        self.btn_vbee_manual_audio.setToolTip(
-            "Chọn file audio (MP3/WAV) đã tạo từ Vbee để tự động cắt ghép và đồng bộ vào dự án."
-        )
-        self.btn_vbee_manual_audio.setStyleSheet(
-            "padding: 4px 6px; font-size: 10px; font-weight: 600; color: #38bdf8;"
-        )
-        self.btn_vbee_manual_audio.clicked.connect(self.vbee_manual_audio_requested.emit)
-        vbee_manual_row.addWidget(self.btn_vbee_manual_audio)
-
-        vbee_container.addLayout(vbee_manual_row)
-        voice_col.addLayout(vbee_container)
-
-        layout.addLayout(voice_col)
+        self.btn_approve_script.clicked.connect(self.approve_script_requested.emit)
+        layout.addWidget(self.btn_approve_script)
 
         sep3 = QFrame()
         sep3.setFrameShape(QFrame.Shape.HLine)
         sep3.setStyleSheet("color: #293245;")
         layout.addWidget(sep3)
+
+        # =========================================================
+        # BƯỚC 4: TẠO VOICE VBEE (NGỌC HUYỀN 1.1x)
+        # =========================================================
+        layout.addWidget(label("BƯỚC 4: TẠO VOICE VBEE", "eyebrow"))
+        vbee_info_lbl = QLabel("Giọng: HN - Ngọc Huyền  •  Tốc độ: 1.1x\n(Dùng profile công ty, giữ nguyên audio không cắt)")
+        vbee_info_lbl.setStyleSheet("color: #38bdf8; font-size: 10px; font-style: italic;")
+        layout.addWidget(vbee_info_lbl)
+
+        self.btn_vbee_voice = QPushButton("⚡ BƯỚC 4: TẠO VOICE VBEE TỰ ĐỘNG")
+        self.btn_vbee_voice.setToolTip(
+            "Mở Vbee Studio với tài khoản công ty, tạo giọng Ngọc Huyền 1.1x và gắn audio nguyên khối vào dự án."
+        )
+        self.btn_vbee_voice.setStyleSheet(
+            "background: #0284c7; color: white; font-weight: bold; font-size: 12px; padding: 8px; border-radius: 4px;"
+        )
+        self.btn_vbee_voice.clicked.connect(self.vbee_voice_requested.emit)
+        layout.addWidget(self.btn_vbee_voice)
+
+        vbee_manual_row = QHBoxLayout()
+        self.btn_vbee_export_srt = QPushButton("⬇ Tải SRT Vbee")
+        self.btn_vbee_export_srt.setStyleSheet("padding: 3px 6px; font-size: 10px;")
+        self.btn_vbee_export_srt.clicked.connect(self.vbee_export_srt_requested.emit)
+        vbee_manual_row.addWidget(self.btn_vbee_export_srt)
+
+        self.btn_vbee_manual_audio = QPushButton("📁 Nhập Audio Vbee")
+        self.btn_vbee_manual_audio.setStyleSheet("padding: 3px 6px; font-size: 10px; color: #38bdf8;")
+        self.btn_vbee_manual_audio.clicked.connect(self.vbee_manual_audio_requested.emit)
+        vbee_manual_row.addWidget(self.btn_vbee_manual_audio)
+        layout.addLayout(vbee_manual_row)
+
+        sep4 = QFrame()
+        sep4.setFrameShape(QFrame.Shape.HLine)
+        sep4.setStyleSheet("color: #293245;")
+        layout.addWidget(sep4)
+
+        # =========================================================
+        # BƯỚC 5: XUẤT CAPCUT
+        # =========================================================
+        layout.addWidget(label("BƯỚC 5: XUẤT CAPCUT", "eyebrow"))
+        capcut_box = QHBoxLayout()
+        self.capcut_dest_lbl = QLabel("CapCut Draft Root")
+        self.capcut_dest_lbl.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        self.btn_capcut_folder = QPushButton("Đổi…")
+        self.btn_capcut_folder.setStyleSheet("padding: 2px 4px; font-size: 10px;")
+        self.btn_capcut_folder.clicked.connect(self.capcut_folder_requested.emit)
+        capcut_box.addWidget(self.capcut_dest_lbl, 1)
+        capcut_box.addWidget(self.btn_capcut_folder)
+        layout.addLayout(capcut_box)
+
+        # Backward compatibility language & voice settings kept accessible
+        self.source_language = QComboBox()
+        for title, code in (("Tự động nhận diện", "auto"), ("Tiếng Trung (zh)", "zh"), ("Tiếng Anh (en)", "en")):
+            self.source_language.addItem(title, code)
+        self.target_language = QComboBox()
+        self.target_language.addItem("Tiếng Việt", "vi")
+        self.voice_combo = QComboBox()
+        self.voice_combo.addItem("HN - Ngọc Huyền", "vbee-ngoc-huyen")
+        self.voice_combo.currentIndexChanged.connect(lambda *_: self.voice_settings_changed.emit())
+        self.speed_combo = QComboBox()
+        for s in ("0.8x", "0.9x", "1.0x (Chuẩn)", "1.1x", "1.2x", "1.3x"):
+            self.speed_combo.addItem(s, float(s.split("x")[0]))
+        curr_spd = load_app_settings().voice_speed
+        idx = self.speed_combo.findData(curr_spd)
+        self.speed_combo.setCurrentIndex(idx if idx >= 0 else self.speed_combo.findData(1.1))
+        self.speed_combo.currentIndexChanged.connect(lambda *_: self.voice_settings_changed.emit())
+        self.listen_test_button = QPushButton("▶ Nghe thử")
+        self.listen_test_button.clicked.connect(self.test_listen_requested.emit)
+        self.manage_voices_button = QPushButton("⚙ Quản lý giọng")
+        self.manage_voices_button.clicked.connect(self.manage_voices_requested.emit)
 
         # 5. TIẾN TRÌNH & CTA CHÍNH SECTION
         layout.addWidget(label("QUY TRÌNH & HÀNH ĐỘNG", "eyebrow"))

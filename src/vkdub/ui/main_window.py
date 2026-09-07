@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vkdub.bridge.local_agent import LocalAgent
 from vkdub.domain.mask import MaskItem
 from vkdub.domain.project import Project
 from vkdub.domain.subtitle import SubtitleStyle
@@ -148,6 +149,10 @@ class MainWindow(QMainWindow):
         self.left.open_capcut_folder_requested.connect(self.capcut_export.open_folder)
         self.left.export_video_requested.connect(self.render_controller.open_export_dialog)
         self.left.export_capcut_requested.connect(self.capcut_export.start)
+        self.left.chatgpt_translate_requested.connect(self._on_chatgpt_translate_clicked)
+        self.left.import_chatgpt_srt_requested.connect(self._on_import_chatgpt_srt_clicked)
+        self.left.approve_script_requested.connect(self._on_approve_script_clicked)
+        self.left.toggle_mask_requested.connect(self.add_blur_mask)
         self.preview.mask_requested.connect(self.add_blur_mask)
         self.preview.blur_requested.connect(self.add_blur_zone)
         self.preview.subtitle_requested.connect(self.open_subtitle_settings)
@@ -168,6 +173,14 @@ class MainWindow(QMainWindow):
         self.autosave_timer.timeout.connect(self._on_autosave_timer)
         self.autosave_timer.start()
 
+        # H6 Browser Bridge: Local Agent integration
+        self.local_agent = LocalAgent(parent=self)
+        self.local_agent.status_updated.connect(self.left.browser_bridge.update_status)
+        self.local_agent.log_emitted.connect(self.log)
+        self.left.open_browser_requested.connect(lambda: self.local_agent.open_browser("https://chatgpt.com"))
+        self.left.refresh_bridge_requested.connect(self.local_agent.request_status)
+        self.local_agent.start()
+
         self._refresh()
         self.log("Sẵn sàng — VK Dub Studio 2.1.")
         QTimer.singleShot(0, self.detect_tools)
@@ -176,6 +189,14 @@ class MainWindow(QMainWindow):
         self.recovery_timer.timeout.connect(self._check_crash_recovery)
         self.recovery_timer.start(500)
         QTimer.singleShot(2500, self._check_background_update)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        if hasattr(self, "local_agent") and self.local_agent:
+            try:
+                self.local_agent.stop()
+            except Exception:
+                pass
+        super().closeEvent(event)
 
     def _on_autosave_timer(self) -> None:
         if load_app_settings().autosave and self.dirty and not self.busy and self.project.script:
@@ -389,6 +410,85 @@ class MainWindow(QMainWindow):
         self.dirty = True
         self._refresh()
         self.statusBar().showMessage("Đã xóa vùng xóa chữ.", 4000)
+
+    def _on_chatgpt_translate_clicked(self) -> None:
+        if not self.project or not self.project.video_path:
+            QMessageBox.warning(self, "Chưa chọn video", "Vui lòng chọn video ở Bước 1 trước.")
+            return
+        if not (self.project.script or self.project.transcript):
+            QMessageBox.warning(
+                self,
+                "Chưa có phụ đề gốc",
+                "Vui lòng nhấn '▶ Bóc băng gốc' ở Bước 1 để tạo phụ đề trước khi gửi sang ChatGPT.",
+            )
+            return
+        try:
+            from vkdub.services.chatgpt_bridge import prepare_chatgpt_translation
+
+            srt_path, prompt = prepare_chatgpt_translation(self.project)
+            self.log(f"Đã mở ChatGPT và sao chép prompt dịch vào Clipboard. File SRT: {srt_path.name}")
+            QMessageBox.information(
+                self,
+                "Đã mở ChatGPT & Copy Prompt",
+                f"1. Trình duyệt mặc định đã mở ChatGPT với tài khoản hiện tại của bạn.\n\n"
+                f"2. Prompt dịch và nội dung SRT đã được tự động copy vào Clipboard (nhấn Ctrl+V để dán).\n\n"
+                f"3. Thư mục chứa file '{srt_path.name}' đã được mở để bạn kéo thả trực tiếp vào chat.\n\n"
+                f"Sau khi ChatGPT dịch xong, hãy tải file SRT về và nhấn nút '📥 Nạp file SRT đã dịch'.",
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Lỗi mở ChatGPT", f"Không thể chuẩn bị file SRT dịch: {exc}")
+
+    def _on_import_chatgpt_srt_clicked(self) -> None:
+        if not self.project:
+            QMessageBox.warning(self, "Chưa có dự án", "Vui lòng chọn video trước khi nạp file SRT.")
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Chọn file SRT tiếng Việt đã dịch từ ChatGPT",
+            str(self.project.output_directory or Path.home()),
+            "Phụ đề SRT (*.srt);;Tất cả tệp (*.*)",
+        )
+        if not path:
+            return
+        try:
+            from vkdub.services.chatgpt_bridge import import_translated_srt
+
+            doc = import_translated_srt(self.project, Path(path))
+            self.review.set_script(doc, self.project.is_approved)
+            if hasattr(self.left, "lbl_review_status"):
+                self.left.lbl_review_status.setText(f"Đã nạp {len(doc.lines)} câu từ {Path(path).name}")
+                self.left.lbl_review_status.setStyleSheet("color: #34d399; font-weight: bold; font-size: 11px;")
+            self.dirty = True
+            self._refresh()
+            self.log(f"Đã nạp thành công {len(doc.lines)} câu phụ đề dịch từ {Path(path).name}.")
+            QMessageBox.information(
+                self,
+                "Nạp phụ đề thành công",
+                f"Đã nạp {len(doc.lines)} câu phụ đề tiếng Việt.\n"
+                f"Vui lòng kiểm tra lại kịch bản ở khung bên phải và nhấn '✔ BƯỚC 3: CHỐT KỊCH BẢN' để tiếp tục.",
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Lỗi nạp phụ đề", f"Không thể nạp file SRT: {exc}")
+
+    def _on_approve_script_clicked(self) -> None:
+        if not self.project.script or not self.project.script.lines:
+            QMessageBox.warning(self, "Chưa có kịch bản", "Chưa có kịch bản phụ đề dịch để chốt.")
+            return
+        self.review.review_checkbox.setChecked(True)
+        ok = self.review_controller.approve()
+        if ok:
+            self._refresh()
+            self.log("Đã chốt duyệt kịch bản thành công! Sẵn sàng cho Bước 4: Tạo Voice Vbee.")
+            QMessageBox.information(
+                self,
+                "Đã chốt kịch bản",
+                "Kịch bản dịch đã được xác nhận thành công!\n\n"
+                "Tiếp theo: Nhấn '⚡ BƯỚC 4: TẠO VOICE VBEE TỰ ĐỘNG' để tạo âm thanh.",
+            )
+        else:
+            QMessageBox.warning(
+                self, "Không thể duyệt", "Vui lòng kiểm tra lại lỗi câu kịch bản trước khi duyệt."
+            )
 
     def open_subtitle_settings(self) -> None:
         if self.subtitle_dialog is None:

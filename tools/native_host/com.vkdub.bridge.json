@@ -1,0 +1,9 @@
+{
+  "name": "com.vkdub.bridge",
+  "description": "VK Dub Studio Native Messaging Bridge Host",
+  "path": "d:\\ToolVideo\\tools\\native_host\\vkdub_host.bat",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://bnpmffibedppchkljkcaidgijekgfmgl/"
+  ]
+}
