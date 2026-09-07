@@ -93,3 +93,23 @@ def test_worker_runs_off_ui_thread(qtbot, tmp_path, monkeypatch):
     assert observed[0] != ui_thread
     assert len(ticks) >= 3
     assert list((tmp_path / "temp").iterdir()) == []
+
+
+def test_frozen_worker_uses_explicit_dispatch_flag(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setenv("VKDUB_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    commands = []
+
+    def process(args, directory, cancel, report, **kwargs):
+        commands.append(args)
+        (directory / "result.json").write_text(
+            json.dumps({"kind": "model", "model": "tiny"}), encoding="utf-8"
+        )
+        return 0
+
+    monkeypatch.setattr("vkdub.services.transcription_service.run_process", process)
+    job = LocalJob({"kind": "model", "model": "tiny"})
+    with qtbot.waitSignal(job.succeeded, timeout=5000):
+        job.start()
+    assert job.wait(3000)
+    assert commands[0][1] == "--vkdub-transcription-worker"

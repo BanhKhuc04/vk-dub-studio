@@ -148,14 +148,26 @@ class LocalJob(QThread):
                         )
                 request_file, result_file = directory / "request.json", directory / "result.json"
                 request_file.write_text(json.dumps(self.request), encoding="utf-8")
+                worker_command = [sys.executable]
+                if getattr(sys, "frozen", False):
+                    worker_command.extend(
+                        [
+                            "--vkdub-transcription-worker",
+                            str(request_file),
+                            str(result_file),
+                        ]
+                    )
+                else:
+                    worker_command.extend(
+                        [
+                            "-m",
+                            "vkdub.services.transcription_runner",
+                            str(request_file),
+                            str(result_file),
+                        ]
+                    )
                 code = run_process(
-                    [
-                        sys.executable,
-                        "-m",
-                        "vkdub.services.transcription_runner",
-                        str(request_file),
-                        str(result_file),
-                    ],
+                    worker_command,
                     directory,
                     self.cancel_event,
                     self.progress.emit,

@@ -1,6 +1,8 @@
 """Unit tests for production packaging paths, resource resolution, and update system."""
 
 import sys
+import tomllib
+from pathlib import Path
 
 from vkdub.media.process import find_tool
 from vkdub.services.update_service import UpdateInfo, is_newer_version
@@ -53,7 +55,7 @@ def test_update_manifest_structure():
         patch_sha256="b" * 64,
         patch_size_bytes=3000000,
     )
-    assert info.has_patch is True
+    assert info.has_patch is False
     assert is_newer_version(info.version, __version__) is True
     assert is_newer_version("2.1.1", info.version) is False
     assert is_newer_version(__version__, __version__) is False
@@ -73,6 +75,39 @@ def test_cli_dispatcher_detects_subprocesses(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["app.py"])
     assert run_cli_or_worker() is None
 
+    monkeypatch.setattr(sys, "argv", ["app.py", "--vkdub-smoke-test"])
+    assert run_cli_or_worker() == 0
+
+
+def test_cli_dispatcher_runs_explicit_transcription_worker(monkeypatch):
+    from vkdub.app import run_cli_or_worker
+
+    monkeypatch.setattr(
+        "vkdub.services.transcription_runner.main",
+        lambda: 23,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["VK Dub Studio.exe", "--vkdub-transcription-worker", "request.json", "result.json"],
+    )
+    assert run_cli_or_worker() == 23
+    assert sys.argv == ["vkdub.services.transcription_runner", "request.json", "result.json"]
+
+
+def test_minimal_entrypoint_smoke_dispatch(monkeypatch):
+    import app
+
+    monkeypatch.setattr(sys, "argv", ["VK Dub Studio.exe", "--vkdub-smoke-test"])
+    assert app._run() == 0
+
+
+def test_release_versions_are_synchronized():
+    package_data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    assert package_data["project"]["version"] == __version__
+    installer_text = Path("installer/VK-Dub-Studio.iss").read_text(encoding="utf-8")
+    assert f'#define MyAppVersion "{__version__}"' in installer_text
+
 
 def test_bundled_model_detected_by_model_service():
     from vkdub.services.model_service import model_directory, model_ready
@@ -81,4 +116,3 @@ def test_bundled_model_detected_by_model_service():
     path = model_directory("base")
     assert path.is_dir()
     assert (path / "model.bin").is_file()
-

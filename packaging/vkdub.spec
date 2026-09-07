@@ -47,7 +47,6 @@ hiddenimports = [
     'PySide6.QtMultimedia',
     'PySide6.QtMultimediaWidgets',
     'httpx',
-    'sounddevice',
     'numpy',
     'ctranslate2',
     'faster_whisper',
@@ -70,7 +69,6 @@ hiddenimports = [
     'vkdub.integrations.capcut.capcut_tts_api',
     'vkdub.providers.capcut_tts',
     'vkdub.providers.vbee_tts',
-    'vkdub.providers.vieneu_tts',
     'vkdub.services.update_service',
 ]
 hiddenimports += collect_submodules('vkdub')
@@ -123,4 +121,4 @@ coll = COLLECT(
     upx=False,
     upx_exclude=[],
     name='VK Dub Studio',
-)
+)

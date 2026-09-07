@@ -5,6 +5,7 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -14,6 +15,23 @@ DEFAULT_UPDATE_FEED_STABLE = (
 DEFAULT_UPDATE_FEED_BETA = (
     "https://raw.githubusercontent.com/BanhKhuc04/vk-dub-studio/main/latest-beta.json"
 )
+MAX_INSTALLER_BYTES = 1024 * 1024 * 1024
+SEMVER_PATTERN = re.compile(
+    r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
+
+
+def _is_trusted_https_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname
+        and not parsed.username
+        and not parsed.password
+        and not parsed.fragment
+    )
 
 
 def parse_version(version_str: str) -> tuple[int, ...]:
@@ -50,23 +68,22 @@ class UpdateInfo:
     patch_size_bytes: int = 0
 
     def __post_init__(self) -> None:
-        if not self.version or not isinstance(self.version, str):
+        if not isinstance(self.version, str) or not SEMVER_PATTERN.fullmatch(self.version):
             raise ValueError("Phiên bản cập nhật không hợp lệ.")
-        if not self.installer_url or not isinstance(self.installer_url, str):
+        if not isinstance(self.installer_url, str) or not _is_trusted_https_url(self.installer_url):
             raise ValueError("Đường dẫn tải bản cài đặt không hợp lệ.")
         cleaned_sha = self.sha256.strip().lower()
         if not re.fullmatch(r"[0-9a-f]{64}", cleaned_sha):
             raise ValueError("Mã băm SHA-256 của bản cập nhật không hợp lệ.")
-        if self.patch_sha256:
-            cleaned_patch_sha = self.patch_sha256.strip().lower()
-            if not re.fullmatch(r"[0-9a-f]{64}", cleaned_patch_sha):
-                raise ValueError("Mã băm SHA-256 của bản vá không hợp lệ.")
         if not isinstance(self.changelog, tuple):
             raise ValueError("Nhật ký thay đổi không đúng cấu trúc.")
+        if not 0 <= self.file_size_bytes <= MAX_INSTALLER_BYTES:
+            raise ValueError("Kích thước bản cập nhật không hợp lệ.")
 
     @property
     def has_patch(self) -> bool:
-        return bool(self.patch_url and self.patch_sha256)
+        """Hot patches are intentionally disabled until updates can be transactional."""
+        return False
 
     @classmethod
     def from_dict(cls, data: dict) -> "UpdateInfo":
@@ -104,10 +121,12 @@ def fetch_update_info(
     timeout_sec: float = 8.0,
 ) -> UpdateInfo | None:
     """Fetch and parse update information from the remote feed URL."""
+    if not _is_trusted_https_url(feed_url):
+        return None
     try:
         with httpx.Client(timeout=timeout_sec, follow_redirects=True) as client:
             resp = client.get(feed_url)
-            if resp.status_code != 200:
+            if resp.status_code != 200 or not _is_trusted_https_url(str(resp.url)):
                 return None
             data = resp.json()
             return UpdateInfo.from_dict(data)
@@ -135,146 +154,95 @@ def download_installer(
     is_cancelled: Callable[[], bool] | None = None,
     timeout_sec: float = 60.0,
 ) -> bool:
-    """Stream download installer file and verify SHA-256 checksum."""
+    """Download an HTTPS installer atomically and verify its size, type, and hash."""
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_target = target_path.with_suffix(f"{target_path.suffix}.tmp")
+    temp_target = target_path.with_suffix(f"{target_path.suffix}.part")
+
+    if not _is_trusted_https_url(url):
+        return False
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256.strip()):
+        return False
 
     try:
+        temp_target.unlink(missing_ok=True)
         with httpx.Client(timeout=timeout_sec, follow_redirects=True) as client:
             with client.stream("GET", url) as response:
                 if response.status_code != 200:
                     return False
-                total = int(response.headers.get("content-length", 0))
+                final_url = str(getattr(response, "url", url))
+                if not _is_trusted_https_url(final_url):
+                    return False
+                total = int(response.headers.get("content-length", 0) or 0)
+                if total < 0 or total > MAX_INSTALLER_BYTES:
+                    return False
                 downloaded = 0
-                with open(temp_target, "wb") as f:
+                header = b""
+                with open(temp_target, "xb") as f:
                     for chunk in response.iter_bytes(chunk_size=32768):
                         if is_cancelled and is_cancelled():
                             temp_target.unlink(missing_ok=True)
                             return False
+                        if not chunk:
+                            continue
                         f.write(chunk)
                         downloaded += len(chunk)
+                        header = (header + chunk)[:2]
+                        if downloaded > MAX_INSTALLER_BYTES:
+                            temp_target.unlink(missing_ok=True)
+                            return False
                         if progress_callback:
                             progress_callback(downloaded, total)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+        if total and downloaded != total:
+            temp_target.unlink(missing_ok=True)
+            return False
+        if header != b"MZ":
+            temp_target.unlink(missing_ok=True)
+            return False
 
         # Verify checksum before promoting file
         if not verify_sha256(temp_target, expected_sha256):
             temp_target.unlink(missing_ok=True)
             return False
 
-        if target_path.exists():
-            target_path.unlink()
-        temp_target.rename(target_path)
+        os.replace(temp_target, target_path)
         return True
     except Exception:
         temp_target.unlink(missing_ok=True)
         return False
 
 
-def launch_installer(installer_path: Path) -> subprocess.Popen:
-    """Launch the downloaded Windows installer executable."""
+def apply_update_and_restart(
+    installer_path: Path,
+    expected_sha256: str,
+    silent: bool = False,
+) -> None:
+    """Reverify and launch the full installer without invoking a command shell."""
     if not installer_path.is_file():
         raise FileNotFoundError(f"Tệp cài đặt không tồn tại: {installer_path}")
-    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-    return subprocess.Popen([str(installer_path)], creationflags=creation_flags)
+    with open(installer_path, "rb") as installer:
+        if installer.read(2) != b"MZ":
+            raise ValueError("Tệp cập nhật không phải bộ cài Windows hợp lệ.")
+    if not verify_sha256(installer_path, expected_sha256):
+        raise ValueError("Bộ cài đã thay đổi sau khi tải; từ chối cập nhật.")
 
-
-def apply_update_and_restart(installer_path: Path, silent: bool = False) -> None:
-    """Launch installer to upgrade the application, then relaunch VK Dub Studio.
-
-    Writes a temporary .bat file to avoid cmd.exe escaping issues with
-    backslash paths on Windows.
-    """
-    import sys
-    import tempfile
-
-    if not installer_path.is_file():
-        raise FileNotFoundError(f"Tệp cài đặt không tồn tại: {installer_path}")
-
-    # Resolve the app executable path
-    exe_path = sys.executable if getattr(sys, "frozen", False) else ""
-    target_exe = (
-        Path(exe_path).resolve()
-        if exe_path
-        else Path(os.environ.get("PROGRAMFILES", "C:\\Program Files"))
-        / "VK Dub Studio"
-        / "VK Dub Studio.exe"
-    )
-
-    installer_abs = str(installer_path.resolve())
-    target_abs = str(target_exe)
-    args = "/SILENT /CLOSEAPPLICATIONS" if silent else "/CLOSEAPPLICATIONS"
-
-    # Write a temporary .bat file — avoids backslash escaping issues when
-    # passing long paths inline to cmd.exe /c "..."
-    bat_lines = [
-        "@echo off",
-        "timeout /t 2 /nobreak >nul",
-        f'start "" /wait "{installer_abs}" {args}',
-        f'if exist "{target_abs}" start "" "{target_abs}"',
-    ]
-    bat_content = "\r\n".join(bat_lines) + "\r\n"
-
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix=".bat",
-        prefix="vkdub_update_",
-        delete=False,
-        encoding="utf-8",
-    )
-    tmp.write(bat_content)
-    tmp.close()
+    args = [str(installer_path.resolve()), "/CLOSEAPPLICATIONS"]
+    if silent:
+        args.extend(["/SILENT", "/SUPPRESSMSGBOXES"])
 
     creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     subprocess.Popen(
-        ["cmd.exe", "/c", tmp.name],
+        args,
         creationflags=creation_flags,
         close_fds=True,
     )
 
 
 def apply_patch_and_restart(patch_zip: Path) -> None:
-    """Extract lightweight update patch and restart VK Dub Studio.
-
-    Avoids downloading the full 300MB installer when only Python code or resources change.
-    """
-    import sys
-    import tempfile
-
-    if not patch_zip.is_file():
-        raise FileNotFoundError(f"Tệp bản vá không tồn tại: {patch_zip}")
-
-    exe_path = sys.executable if getattr(sys, "frozen", False) else ""
-    target_dir = Path(exe_path).parent if exe_path else Path(__file__).resolve().parents[2]
-    target_exe = Path(exe_path).resolve() if exe_path else target_dir / "VK Dub Studio.exe"
-
-    patch_abs = str(patch_zip.resolve())
-    dest_abs = str(target_dir.resolve())
-    target_abs = str(target_exe)
-
-    bat_lines = [
-        "@echo off",
-        "timeout /t 2 /nobreak >nul",
-        "powershell -NoProfile -ExecutionPolicy Bypass -Command "
-        f"\"Expand-Archive -Path '{patch_abs}' "
-        f"-DestinationPath '{dest_abs}' -Force\"",
-        f'if exist "{target_abs}" start "" "{target_abs}"',
-        'del "%~f0"',
-    ]
-    bat_content = "\r\n".join(bat_lines) + "\r\n"
-
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix=".bat",
-        prefix="vkdub_patch_",
-        delete=False,
-        encoding="utf-8",
-    )
-    tmp.write(bat_content)
-    tmp.close()
-
-    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-    subprocess.Popen(
-        ["cmd.exe", "/c", tmp.name],
-        creationflags=creation_flags,
-        close_fds=True,
+    """Reject legacy in-place patches, which cannot guarantee rollback safety."""
+    raise RuntimeError(
+        "Bản vá trực tiếp đã bị vô hiệu hóa để bảo vệ dữ liệu. "
+        "Vui lòng cập nhật bằng bộ cài đầy đủ đã xác thực."
     )

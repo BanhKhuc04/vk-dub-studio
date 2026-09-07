@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
                 if ans == QMessageBox.StandardButton.Yes:
                     self.save()
 
-            apply_update_and_restart(target, silent=False)
+            apply_update_and_restart(target, info.sha256, silent=False)
             app = QApplication.instance()
             if app is not None:
                 app.quit()

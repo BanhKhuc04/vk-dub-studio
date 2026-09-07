@@ -48,19 +48,10 @@ class UpdateDialog(QDialog):
         header.setStyleSheet("font-size: 16px; font-weight: bold; color: #34d399;")
         layout.addWidget(header)
 
-        # Version comparison
-        # Version comparison & patch indicator
         ver_text = (
             f"Phiên bản hiện tại: <b>v{__version__}</b> ➔ "
             f"Phiên bản mới: <b style='color: #38bdf8;'>v{self.update_info.version}</b>"
         )
-        if self.update_info.has_patch:
-            patch_mb = self.update_info.patch_size_bytes / (1024 * 1024)
-            ver_text += (
-                f"<br><span style='color: #34d399; font-weight: bold; font-size: 11px;'>"
-                f"⚡ Hỗ trợ Bản vá siêu nhẹ (~{patch_mb:.1f} MB) — Cập nhật tức thì "
-                "không cần tải lại bộ cài 300MB</span>"
-            )
         ver_lbl = QLabel(ver_text)
         ver_lbl.setStyleSheet("font-size: 12px;")
         layout.addWidget(ver_lbl)
@@ -98,22 +89,12 @@ class UpdateDialog(QDialog):
         self.btn_later.clicked.connect(self.reject)
         btn_row.addWidget(self.btn_later)
 
-        if self.update_info.has_patch:
-            self.btn_full_installer = QPushButton("Tải bộ cài đầy đủ")
-            self.btn_full_installer.setToolTip("Tải file Setup exe đầy đủ (~300MB)")
-            self.btn_full_installer.clicked.connect(lambda: self._start_download(use_patch=False))
-            btn_row.addWidget(self.btn_full_installer)
-
-        self.btn_update = QPushButton(
-            "⚡ CẬP NHẬT NHANH (BẢN VÁ)" if self.update_info.has_patch else "CẬP NHẬT NGAY"
-        )
+        self.btn_update = QPushButton("CẬP NHẬT NGAY")
         self.btn_update.setObjectName("primary")
         self.btn_update.setStyleSheet(
             "font-weight: bold; padding: 8px 18px; background-color: #0284c7; color: white;"
         )
-        self.btn_update.clicked.connect(
-            lambda: self._start_download(use_patch=self.update_info.has_patch)
-        )
+        self.btn_update.clicked.connect(self._start_download)
         btn_row.addWidget(self.btn_update)
 
         layout.addLayout(btn_row)
@@ -121,11 +102,8 @@ class UpdateDialog(QDialog):
         self.download_progress.connect(self._on_progress)
         self.download_finished.connect(self._on_finished)
 
-    def _start_download(self, use_patch: bool = True) -> None:
-        self._is_patch = use_patch and self.update_info.has_patch
+    def _start_download(self) -> None:
         self.btn_update.setEnabled(False)
-        if hasattr(self, "btn_full_installer"):
-            self.btn_full_installer.setEnabled(False)
         self.btn_later.setText("Hủy tải")
         self.progress_bar.show()
         self.lbl_status.show()
@@ -133,16 +111,8 @@ class UpdateDialog(QDialog):
         cache_dir = data_root() / "updates"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        if self._is_patch:
-            self.lbl_status.setText("Đang kết nối tải bản vá siêu nhẹ (~vài MB)…")
-            target_path = cache_dir / f"VK-Dub-Studio-Patch-v{self.update_info.version}.zip"
-            download_url = self.update_info.patch_url
-            expected_hash = self.update_info.patch_sha256
-        else:
-            self.lbl_status.setText("Đang kết nối tải bản cài đặt đầy đủ…")
-            target_path = cache_dir / f"VK-Dub-Studio-Setup-v{self.update_info.version}.exe"
-            download_url = self.update_info.installer_url
-            expected_hash = self.update_info.sha256
+        self.lbl_status.setText("Đang kết nối tải bộ cài đã xác thực…")
+        target_path = cache_dir / f"VK-Dub-Studio-Setup-v{self.update_info.version}.exe"
 
         self._target_path = target_path
 
@@ -151,9 +121,9 @@ class UpdateDialog(QDialog):
                 self.download_progress.emit(d, t)
 
             success = download_installer(
-                url=download_url,
+                url=self.update_info.installer_url,
                 target_path=target_path,
-                expected_sha256=expected_hash,
+                expected_sha256=self.update_info.sha256,
                 progress_callback=on_prog,
                 is_cancelled=lambda: self._cancelled,
             )
@@ -183,19 +153,12 @@ class UpdateDialog(QDialog):
 
     def _on_finished(self, success: bool, message: str) -> None:
         self.btn_update.setEnabled(True)
-        if hasattr(self, "btn_full_installer"):
-            self.btn_full_installer.setEnabled(True)
         self.lbl_status.setText(message)
         if success:
             self.progress_bar.setValue(100)
-            is_patch = getattr(self, "_is_patch", False)
-            title = "Bản vá đã sẵn sàng" if is_patch else "Sẵn sàng cài đặt"
+            title = "Sẵn sàng cài đặt"
             text = (
-                f"Bản vá siêu nhẹ v{self.update_info.version} đã tải xong.\n"
-                "Ứng dụng sẽ khởi động lại trong 2 giây để cập nhật ngay.\n"
-                "Bạn có muốn tiếp tục?"
-                if is_patch
-                else f"Bản cập nhật v{self.update_info.version} đã sẵn sàng.\n"
+                f"Bản cập nhật v{self.update_info.version} đã sẵn sàng.\n"
                 "Ứng dụng sẽ đóng lại để tiến hành cài đặt ngay bây giờ.\n"
                 "Bạn có muốn tiếp tục?"
             )
@@ -207,12 +170,11 @@ class UpdateDialog(QDialog):
             )
             if ret == QMessageBox.StandardButton.Yes:
                 try:
-                    if is_patch:
-                        from vkdub.services.update_service import apply_patch_and_restart
-
-                        apply_patch_and_restart(self._target_path)
-                    else:
-                        apply_update_and_restart(self._target_path, silent=False)
+                    apply_update_and_restart(
+                        self._target_path,
+                        self.update_info.sha256,
+                        silent=False,
+                    )
                     app = QApplication.instance()
                     if app is not None:
                         app.quit()

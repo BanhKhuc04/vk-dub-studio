@@ -12,9 +12,11 @@ Workflow:
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,6 +25,23 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from vkdub.version import APP_BRANDING, __version__  # noqa: E402
+
+
+def verify_version_sync() -> None:
+    """Fail the build when package, runtime, and installer versions drift."""
+    package_data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    package_version = str(package_data["project"]["version"])
+    installer_text = (ROOT / "installer" / "VK-Dub-Studio.iss").read_text(encoding="utf-8")
+    match = re.search(r'#define MyAppVersion "([^"]+)"', installer_text)
+    installer_version = match.group(1) if match else ""
+    versions = {
+        "runtime": __version__,
+        "package": package_version,
+        "installer": installer_version,
+    }
+    if len(set(versions.values())) != 1:
+        details = ", ".join(f"{name}={value or '<missing>'}" for name, value in versions.items())
+        raise RuntimeError(f"Release version mismatch: {details}")
 
 
 def find_iscc() -> Path | None:
@@ -115,54 +134,7 @@ def build_installer(iscc_path: Path) -> Path:
     return installer_file
 
 
-def build_patch_zip(dist_dir: Path) -> Path:
-    """Build lightweight update patch zip (~2-4 MB) excluding heavy offline models and tools."""
-    import zipfile
-
-    print("\n=======================================================")
-    print(f" 2.5. BUILDING LIGHTWEIGHT PATCH PACKAGE (v{__version__})")
-    print("=======================================================")
-    patch_file = ROOT / "dist" / f"VKDubStudio-Patch-{__version__}.zip"
-    if patch_file.exists():
-        patch_file.unlink()
-
-    # Unchanging static binary packages to exclude from lightweight patch
-    exclude_dirs = {
-        "models",
-        "tools",
-        "PySide6",
-        "playwright",
-        "ctranslate2",
-        "onnxruntime",
-        "numpy.libs",
-        "av.libs",
-        "numpy",
-        "av",
-        "shiboken6",
-        "torch",
-        "hf_xet",
-        "tokenizers",
-        "scipy",
-        "sounddevice",
-        "PIL",
-    }
-
-    with zipfile.ZipFile(patch_file, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-        for root, _dirs, files in os.walk(dist_dir):
-            rel_root = Path(root).relative_to(dist_dir)
-            if any(part in exclude_dirs for part in rel_root.parts):
-                continue
-            for file in files:
-                full_path = Path(root) / file
-                arc_name = str(rel_root / file) if str(rel_root) != "." else file
-                zf.write(full_path, arc_name)
-
-    patch_size_mb = patch_file.stat().st_size / (1024 * 1024)
-    print(f"✓ Lightweight patch created successfully at:\n  {patch_file} ({patch_size_mb:.2f} MB)")
-    return patch_file
-
-
-def update_manifest(installer_path: Path, patch_path: Path | None = None) -> Path:
+def update_manifest(installer_path: Path) -> Path:
     print("\n=======================================================")
     print(" 3. GENERATING UPDATE MANIFEST (latest.json)")
     print("=======================================================")
@@ -184,19 +156,10 @@ def update_manifest(installer_path: Path, patch_path: Path | None = None) -> Pat
             "thực thi trực tiếp in-process (không cần subprocess)",
             "Vá triệt để lỗi kết nối VieNeu: Tự động dò tìm Python hệ thống, không còn "
             "lỗi khi gọi từ bản đóng gói .exe",
-            "Hỗ trợ Bản cập nhật siêu nhẹ (Hot-patch ~3MB): Tải nhanh trong 2 giây "
-            "thay vì tải lại toàn bộ bộ cài 300MB",
+            "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS, xác thực SHA-256 trước khi chạy",
             "Bảo toàn toàn bộ dự án, cấu hình và phiên đăng nhập qua các lần cập nhật",
         ],
     }
-
-    if patch_path and patch_path.is_file():
-        manifest["patch_url"] = (
-            "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/"
-            f"v{__version__}/{patch_path.name}"
-        )
-        manifest["patch_sha256"] = calculate_sha256(patch_path)
-        manifest["patch_size_bytes"] = patch_path.stat().st_size
 
     manifest_file = ROOT / "packaging" / "latest.json"
     content = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
@@ -205,12 +168,6 @@ def update_manifest(installer_path: Path, patch_path: Path | None = None) -> Pat
     print(f"✓ Manifest updated at {manifest_file} and {ROOT / 'latest.json'}:")
     print(f"  • Version:     v{__version__}")
     print(f"  • Installer:   {file_size / (1024 * 1024):.2f} MB")
-    if patch_path and patch_path.is_file():
-        print(
-            "  • Patch Size:  "
-            f"{patch_path.stat().st_size / (1024 * 1024):.2f} MB "
-            "(Tiết kiệm 99% dung lượng!)"
-        )
     return manifest_file
 
 
@@ -220,6 +177,7 @@ def main() -> None:
     print(f" Production Packaging & Installer Pipeline (v{__version__})")
     print("*******************************************************")
 
+    verify_version_sync()
     iscc = find_iscc()
     if not iscc:
         print("ERROR: Inno Setup Compiler (ISCC.exe) not found on system.", file=sys.stderr)
@@ -228,17 +186,15 @@ def main() -> None:
 
     stage_tools()
     dist_dir = build_pyinstaller()
-    patch_file = build_patch_zip(dist_dir)
     installer = build_installer(iscc)
-    manifest = update_manifest(installer, patch_file)
+    manifest = update_manifest(installer)
 
     print("\n=======================================================")
     print(" SUCCESSFUL PRODUCTION BUILD SUMMARY")
     print("=======================================================")
     print(f" 1. Application Bundle:  {dist_dir}")
-    print(f" 2. Lightweight Patch:   {patch_file}")
-    print(f" 3. Windows Installer:   {installer}")
-    print(f" 4. Update Manifest:     {manifest}")
+    print(f" 2. Windows Installer:   {installer}")
+    print(f" 3. Update Manifest:     {manifest}")
     print("=======================================================\n")
 
 

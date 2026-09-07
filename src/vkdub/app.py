@@ -31,6 +31,16 @@ def run_cli_or_worker() -> int | None:
     if not args:
         return None
 
+    # Frozen applications use explicit internal flags instead of emulating
+    # ``python -m`` through the PyInstaller bootloader.
+    if args[0] == "--vkdub-smoke-test":
+        return 0
+    if args[0] == "--vkdub-transcription-worker" and len(args) == 3:
+        from vkdub.services.transcription_runner import main as run_transcription_worker
+
+        sys.argv = ["vkdub.services.transcription_runner", args[1], args[2]]
+        return run_transcription_worker()
+
     # Case 1: python -m <module_name> [args...]
     if args[0] == "-m" and len(args) > 1:
         module_name = args[1]
@@ -93,4 +103,3 @@ def main() -> int:
     window = MainWindow()
     window.show()
     return app.exec()
-

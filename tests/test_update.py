@@ -5,6 +5,8 @@ import pytest
 
 from vkdub.services.update_service import (
     UpdateInfo,
+    apply_patch_and_restart,
+    apply_update_and_restart,
     download_installer,
     fetch_update_info,
     is_newer_version,
@@ -59,6 +61,26 @@ def test_update_info_model():
             }
         )
 
+    with pytest.raises(ValueError, match="Phiên bản"):
+        UpdateInfo.from_dict(
+            {
+                "version": "../../payload",
+                "installer_url": "https://example.com/setup.exe",
+                "sha256": valid_hash,
+                "changelog": [],
+            }
+        )
+
+    with pytest.raises(ValueError, match="Đường dẫn"):
+        UpdateInfo.from_dict(
+            {
+                "version": "1.1.0",
+                "installer_url": "http://example.com/setup.exe",
+                "sha256": valid_hash,
+                "changelog": [],
+            }
+        )
+
 
 def test_verify_sha256(tmp_path):
     sample = tmp_path / "sample.exe"
@@ -84,6 +106,7 @@ def test_fetch_update_info_mock():
 
     mock_resp = MagicMock()
     mock_resp.status_code = 200
+    mock_resp.url = "https://example.com/latest.json"
     mock_resp.json.return_value = mock_payload
 
     with patch("httpx.Client.get", return_value=mock_resp):
@@ -96,14 +119,17 @@ def test_fetch_update_info_mock():
     with patch("httpx.Client.get", return_value=mock_resp):
         assert fetch_update_info("https://example.com/latest.json") is None
 
+    assert fetch_update_info("http://example.com/latest.json") is None
+
 
 def test_download_installer_checksum_mismatch(tmp_path):
     target = tmp_path / "installer.exe"
-    fake_data = b"Fake installer bytes"
+    fake_data = b"MZFake installer bytes"
 
     class FakeResponse:
         status_code = 200
         headers = {"content-length": str(len(fake_data))}
+        url = "https://cdn.example.com/test.exe"
 
         def iter_bytes(self, chunk_size=32768):
             yield fake_data
@@ -145,6 +171,69 @@ def test_download_installer_checksum_mismatch(tmp_path):
         assert success is True
         assert target.is_file()
         assert target.read_bytes() == fake_data
+        assert not target.with_suffix(".exe.part").exists()
+
+
+def test_download_installer_rejects_insecure_redirect_and_non_executable(tmp_path):
+    target = tmp_path / "installer.exe"
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-length": "4"}
+        url = "http://cdn.example.com/test.exe"
+
+        def iter_bytes(self, chunk_size=32768):
+            yield b"nope"
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def stream(self, method, url):
+            class StreamContext:
+                def __enter__(self):
+                    return FakeResponse()
+
+                def __exit__(self, *args):
+                    pass
+
+            return StreamContext()
+
+    with patch("httpx.Client", return_value=FakeClient()):
+        assert (
+            download_installer(
+                "https://example.com/test.exe", target, hashlib.sha256(b"nope").hexdigest()
+            )
+            is False
+        )
+    assert not target.exists()
+
+
+def test_apply_update_reverifies_before_launch(tmp_path):
+    installer = tmp_path / "setup.exe"
+    payload = b"MZverified installer"
+    installer.write_bytes(payload)
+    expected_hash = hashlib.sha256(payload).hexdigest()
+
+    with patch("subprocess.Popen") as popen:
+        apply_update_and_restart(installer, expected_hash, silent=True)
+        args = popen.call_args.args[0]
+        assert args[0] == str(installer.resolve())
+        assert "/CLOSEAPPLICATIONS" in args
+        assert "/SILENT" in args
+
+    installer.write_bytes(b"MZtampered")
+    with patch("subprocess.Popen") as popen, pytest.raises(ValueError, match="đã thay đổi"):
+        apply_update_and_restart(installer, expected_hash)
+    popen.assert_not_called()
+
+
+def test_legacy_patch_application_is_disabled(tmp_path):
+    with pytest.raises(RuntimeError, match="vô hiệu hóa"):
+        apply_patch_and_restart(tmp_path / "legacy.zip")
 
 
 def test_update_dialog_ui(qtbot):

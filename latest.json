@@ -1,18 +1,15 @@
 {
   "version": "2.1.4",
-  "published_at": "2026-09-07T00:13:18Z",
+  "published_at": "2026-09-07T04:24:54Z",
   "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.4/VKDubStudio-Setup-2.1.4.exe",
-  "sha256": "00037538f8db975bfe31e2c905cdcf1642bb838f082d58705701e24cc4660f76",
-  "file_size_bytes": 300848849,
+  "sha256": "6123fb0fbf761b1ac7a838371521188e3c682d724501e898f0f0e6528381e0ba",
+  "file_size_bytes": 309985720,
   "changelog": [
     "VK Dub Studio v2.1.4 — Bản cập nhật vá lỗi và cải tiến trải nghiệm",
     "Bổ sung quy trình Vbee thủ công: Tải file SRT tiếng Việt về máy và Nhập file audio Vbee để tự động cắt ghép, đồng bộ",
     "Vá triệt để lỗi kết nối CapCut Voice: Tích hợp sẵn bộ SDK và chuyển sang thực thi trực tiếp in-process (không cần subprocess)",
     "Vá triệt để lỗi kết nối VieNeu: Tự động dò tìm Python hệ thống, không còn lỗi khi gọi từ bản đóng gói .exe",
-    "Hỗ trợ Bản cập nhật siêu nhẹ (Hot-patch ~3MB): Tải nhanh trong 2 giây thay vì tải lại toàn bộ bộ cài 300MB",
+    "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS, xác thực SHA-256 trước khi chạy",
     "Bảo toàn toàn bộ dự án, cấu hình và phiên đăng nhập qua các lần cập nhật"
-  ],
-  "patch_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.4/VKDubStudio-Patch-2.1.4.zip",
-  "patch_sha256": "45a7aa80365d4fb78de0f2698970bc16fe4a95c6a966a5795645427bfbac57ae",
-  "patch_size_bytes": 20411369
+  ]
 }
