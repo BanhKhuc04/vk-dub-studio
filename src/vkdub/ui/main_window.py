@@ -116,12 +116,13 @@ class MainWindow(QMainWindow):
         self.health_banner = HealthBanner()
         self.health_banner.action_requested.connect(self._on_banner_action)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter = self.splitter
         splitter.setChildrenCollapsible(False)
         splitter.addWidget(self.stepper)
         splitter.addWidget(self.preview)
         splitter.addWidget(self.step_stack)
-        splitter.setSizes([240, 610, 530])
+        splitter.setSizes([220, 560, 600])
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setStretchFactor(2, 1)
@@ -175,6 +176,7 @@ class MainWindow(QMainWindow):
         self.local_agent.start()
 
         # TopBar connections
+        self.top_bar.new_requested.connect(self.new_project)
         self.top_bar.settings_requested.connect(self.open_settings)
         self.top_bar.save_requested.connect(self.save)
         self.top_bar.open_requested.connect(self.choose_project)
@@ -275,6 +277,7 @@ class MainWindow(QMainWindow):
         self.left.pipeline_retry_step_requested.connect(self._retry_pipeline_step)
         self.left.step4_pipeline.view_log_requested.connect(self.open_log_viewer)
 
+        self._shortcut("Project mới", QKeySequence.StandardKey.New, self.new_project)
         self._shortcut("Lưu project", QKeySequence.StandardKey.Save, self.save)
         self._shortcut("Mở project", QKeySequence.StandardKey.Open, self.choose_project)
         self._shortcut("Xem log hệ thống", QKeySequence("F12"), self.open_log_viewer)
@@ -466,6 +469,11 @@ class MainWindow(QMainWindow):
             elif step_idx != 2 and not self.project.masks:
                 self.preview.video.interactive_mask_mode = False
                 self.preview.video.update()
+            if step_idx == 4 and hasattr(self, "splitter"):
+                cur = self.splitter.sizes()
+                if len(cur) == 3 and cur[2] < 620:
+                    tot = sum(cur)
+                    self.splitter.setSizes([200, max(420, tot - 200 - 640), 640])
 
     def _on_download_url_requested(self, url: str) -> None:
         if not url:
@@ -834,6 +842,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "diagnostics_drawer"):
             self.diagnostics_drawer.set_expanded(True)
 
+        if hasattr(self, "top_bar") and not getattr(self.top_bar, "_timer_running", False):
+            self.top_bar.start_timer()
+
         self.log(
             "🚀 Bắt đầu quy trình xử lý tự động 4 bước (Whisper → ChatGPT → Kịch bản → Vbee)..."
         )
@@ -1127,6 +1138,9 @@ class MainWindow(QMainWindow):
         )
         if has_voice:
             self.project.master_voice_path = artifacts.timeline_master_audio
+            if self.project.script:
+                self.project.is_approved = True
+                self.project.approved_revision_hash = self.project.revision_hash
             self.left.step4_pipeline.overall_badge.setText("✔ Hoàn thành (4/4)")
             self.left.step4_pipeline.overall_badge.setStyleSheet("color: #3fb950; font-weight: bold;")
             self.left.lbl_review_status.setText(
@@ -1139,19 +1153,16 @@ class MainWindow(QMainWindow):
             if hasattr(self, "stepper"):
                 self.stepper.update_step_summary(3, "✓", "Hoàn tất (4/4)", "#3fb950")
                 line_count = len(self.project.script.lines) if self.project.script else 0
-                self.stepper.update_step_summary(4, "✓", f"{line_count} câu", "#3fb950")
-                self.stepper.update_step_summary(5, "●", "Sẵn sàng xuất", "#58a6ff")
+                self.stepper.update_step_summary(4, "✓", f"Sẵn sàng xuất ({line_count} câu)", "#3fb950")
 
             self.review_controller.bind_project()
+            self.review_controller.refresh()
             self._refresh()
             self.log("🎉 Quy trình xử lý tự động hoàn tất! Đã có voice Vbee timeline.")
-            self.notify_success("Xử lý hoàn tất!", "Kịch bản và audio timeline đã sẵn sàng.")
-            QMessageBox.information(
-                self,
-                "Hoàn tất tạo giọng đọc",
-                "Toàn bộ quy trình (Bóc băng → ChatGPT → Kịch bản → Vbee Voice) đã hoàn tất!\n\n"
-                "Audio timeline đã sẵn sàng. Bạn có thể sang Bước 06 để xuất CapCut hoặc render video.",
-            )
+            self.notify_success("Xử lý hoàn tất!", "Kịch bản và audio timeline đã sẵn sàng. Chuyển sang xuất video / CapCut.")
+
+            if hasattr(self, "switch_to_step"):
+                self.switch_to_step(4)  # Chuyển ngay sang Bước 05 để xem kịch bản và xuất CapCut
         else:
             # Tạm dừng ở Bước 4.3 để người dùng duyệt kịch bản
             self.left.step4_pipeline.overall_badge.setText("✔ Đã dịch (3/4)")
@@ -1880,6 +1891,8 @@ class MainWindow(QMainWindow):
         self.preview.load(path)
         if metadata:
             self.preview.show_metadata(metadata)
+        if hasattr(self, "top_bar"):
+            self.top_bar.start_timer()
         self._refresh()
         self.log(f"Đã nhập video: {path.name} (đã tạo Khung che phụ đề)")
 
@@ -1995,6 +2008,37 @@ class MainWindow(QMainWindow):
         self.log(f"Đã lưu project: {path.name}")
         self.notify_success("Đã lưu dự án", f"Lưu thành công: {path.name}")
         return True
+
+    def new_project(self) -> None:
+        """Khởi tạo một dự án mới hoàn toàn."""
+        if self.busy:
+            return
+        if not self._confirm_discard():
+            return
+        self.project = Project()
+        self.project_file = None
+        self.dirty = False
+        self.video_metadata = None
+        self._script_play_end_ms = None
+        self.preview.load(None)
+        self.preview.video.set_masks([])
+        self.preview.video.interactive_mask_mode = False
+        if hasattr(self, "step1_panel"):
+            self.step1_panel.set_video_info(None, None)
+            self.step1_panel.url_input.clear()
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.set_masks([])
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.reset_state()
+        if hasattr(self.left, "step4_pipeline") and hasattr(self.left.step4_pipeline, "reset_state"):
+            self.left.step4_pipeline.reset_state()
+        if hasattr(self, "top_bar"):
+            self.top_bar.reset_timer()
+        self.review_controller.bind_project()
+        self.switch_to_step(0)
+        self._refresh()
+        self.log("✨ Đã tạo dự án mới.")
+        self.notify_success("Dự án mới", "Đã khởi tạo dự án mới thành công.")
 
     def choose_project(self) -> None:
         if self.busy or not self.tools_ready:

@@ -1,15 +1,15 @@
 {
-  "version": "2.1.14",
-  "published_at": "2026-09-08T20:33:40Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.14/VKDubStudio-Setup-2.1.14.exe",
-  "sha256": "eb21d82f059d1b84341a7d29a3ce9ba29a56ec8d19a4d3f5ac3955745fa8f2f3",
-  "file_size_bytes": 301828992,
+  "version": "2.1.15",
+  "published_at": "2026-09-08T21:19:15Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.15/VKDubStudio-Setup-2.1.15.exe",
+  "sha256": "3702060b6c2016f29871a6ac7dd93ddf294f45aba67b15eb817f080dbf7fd989",
+  "file_size_bytes": 301836990,
   "changelog": [
-    "VK Dub Studio v2.1.14 — Nâng cấp toàn diện ChatGPT Bridge, Quản lý tiến trình & Giao diện tối giản",
-    "ChatGPT: Tự động làm mới chat, chờ nút gửi mở khóa (kiểm tra aria-disabled/upload file), hỗ trợ bấm tay không bị mất kết quả, cập nhật % tiến độ",
-    "Dừng tức thì: Sửa lỗi bấm Dừng không dừng, hủy tiến trình trong < 0.5s và kích hoạt lại ngay nút 'Bắt đầu xử lý toàn bộ'",
-    "Giao diện Bước 3: Tối giản thành 3 nút trực quan: '🔴 Sub ở dưới', '🔴 Sub ở trên', '🌫 Thêm làm mờ'",
-    "Trình duyệt: Chặn hoàn toàn hiện tượng tự động giật focus hoặc nhảy tab trình duyệt làm phiền khi người dùng đang làm việc khác",
-    "Bảo vệ ngôn ngữ: Chặn triệt để tiếng Trung lọt vào phụ đề dịch và giọng đọc Vbee bằng cơ chế đối soát timecode thông minh"
+    "VK Dub Studio v2.1.15 — Tự động chuyển xuất CapCut, Project mới, Đồng hồ đếm giờ, Tinh giản kịch bản & Hiệu ứng xịn xò",
+    "Tự động chuyển bước: Khi quy trình 4 bước hoàn tất, hệ thống tự động giải phóng trạng thái bận và chuyển ngay sang Bước 05 để sẵn sàng xuất CapCut/MP4",
+    "Nút Project mới: Bổ sung nút '✨ Project mới' (Ctrl+N) nổi bật trên TopBar để bắt đầu dự án mới chỉ với 1 click",
+    "Đồng hồ đếm thời gian: Đồng hồ Execution Timer trên TopBar đếm từ lúc chọn mở video đến khi xuất CapCut xong thì dừng và báo tổng thời gian",
+    "Tinh giản kịch bản: Mở rộng vùng xem kịch bản, loại bỏ các nút thừa (thêm câu, thao tác khác...), giữ lại Tìm kiếm và 4 nút Nạp/Tải SRT dịch & gốc",
+    "Hiệu ứng xịn xò: Thiết kế khung tỏa sáng gradient romantic glassmorphism kèm animation trái tim nhịp đập cho dòng chữ tặng em bé Trang Vũ"
   ]
 }

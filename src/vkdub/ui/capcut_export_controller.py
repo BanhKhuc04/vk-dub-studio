@@ -60,6 +60,8 @@ class CapCutExportController(QObject):
                 "Xuất CapCut thành công!",
                 f"1 video, {result.audio_segments} voice tiếng Việt, {result.caption_segments} phụ đề.",
             )
+        if hasattr(self.window, "top_bar"):
+            self.window.top_bar.stop_timer()
         if result.applied_mask_count:
             self.window.log(
                 f"Đã áp dụng {result.applied_mask_count} vùng xóa chữ vào video trong CapCut."

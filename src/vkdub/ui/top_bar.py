@@ -15,8 +15,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QVBoxLayout,
     QWidget,
 )
+
+import time
 
 from vkdub.bridge.protocol import BridgeStatus
 from vkdub.version import APP_CREDIT, __version__
@@ -25,6 +28,7 @@ from vkdub.version import APP_CREDIT, __version__
 class TopBar(QFrame):
     """Clean, high-tech creative suite top bar."""
 
+    new_requested = Signal()
     settings_requested = Signal()
     save_requested = Signal()
     open_requested = Signal()
@@ -100,6 +104,30 @@ class TopBar(QFrame):
         sep.setStyleSheet("color: #1a2436; font-size: 12px;")
         brand_box.addWidget(sep)
 
+        # Nút Project mới
+        self.btn_new = QPushButton("✨ Project mới")
+        self.btn_new.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #b45309, stop:1 #d97706);
+                color: #ffffff;
+                border: 1px solid #f59e0b;
+                border-radius: 5px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d97706, stop:1 #f59e0b);
+                border-color: #fde68a;
+            }
+            QPushButton:pressed {
+                background-color: #92400e;
+            }
+        """)
+        self.btn_new.setToolTip("Khởi tạo dự án mới (Ctrl+N)")
+        self.btn_new.clicked.connect(self.new_requested.emit)
+        brand_box.addWidget(self.btn_new)
+
         self.lbl_project_name = QLabel("📄 Project mới")
         self.lbl_project_name.setStyleSheet("""
             font-size: 11px;
@@ -128,19 +156,31 @@ class TopBar(QFrame):
         layout.addLayout(brand_box)
         layout.addStretch(1)
 
-        # Center branding credit
-        self.lbl_credit = QLabel(APP_CREDIT)
-        self.lbl_credit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_credit.setStyleSheet("""
-            color: #72d7c1;
-            font-size: 10px;
-            font-style: italic;
-            font-weight: 600;
-            line-height: 1.25;
-            background: transparent;
+        # Center branding credit with special romantic glow effect
+        self.credit_card = QFrame()
+        self.credit_card.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(225, 29, 72, 0.10), stop:0.5 rgba(236, 72, 153, 0.16), stop:1 rgba(147, 51, 234, 0.10));
+                border: 1px solid qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #f43f5e, stop:0.5 #ec4899, stop:1 #a855f7);
+                border-radius: 7px;
+                padding: 1px 12px;
+            }
         """)
-        layout.addWidget(self.lbl_credit)
+        credit_layout = QVBoxLayout(self.credit_card)
+        credit_layout.setContentsMargins(8, 2, 8, 2)
+        credit_layout.setSpacing(1)
 
+        self.lbl_credit_author = QLabel("✨ Sản phẩm tạo bởi <b style='color: #67e8f9;'>vanhkhuc.dev</b>")
+        self.lbl_credit_author.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_credit_author.setStyleSheet("font-size: 9px; color: #94a3b8; font-weight: 600; background: transparent;")
+        credit_layout.addWidget(self.lbl_credit_author)
+
+        self.lbl_credit = QLabel("💖 Dành tặng em bé <b style='color: #ffe4e6;'>Trang Vũ</b> &lt;3")
+        self.lbl_credit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_credit.setStyleSheet("font-size: 10px; color: #f472b6; font-weight: 700; background: transparent;")
+        credit_layout.addWidget(self.lbl_credit)
+
+        layout.addWidget(self.credit_card)
         layout.addStretch(1)
 
         # ---------------------------------------------------------
@@ -197,6 +237,24 @@ class TopBar(QFrame):
         self.btn_refresh_bridge.clicked.connect(self.refresh_bridge_requested.emit)
         status_box.addWidget(self.btn_refresh_bridge)
 
+        # Execution clock badge (Đồng hồ đếm thời gian từ chọn video đến xuất CapCut)
+        self.timer_badge = QLabel("⏱ 00:00")
+        self.timer_badge.setObjectName("timerBadge")
+        self.timer_badge.setStyleSheet("""
+            QLabel#timerBadge {
+                color: #94a3b8;
+                font-size: 11px;
+                font-weight: 700;
+                font-family: 'Consolas', 'Segoe UI', monospace;
+                padding: 3px 10px;
+                border-radius: 5px;
+                background-color: #0c1424;
+                border: 1px solid #1e293b;
+            }
+        """)
+        self.timer_badge.setToolTip("Đồng hồ đếm thời gian thực hiện (từ lúc chọn video đến khi xuất CapCut xong)")
+        status_box.addWidget(self.timer_badge)
+
         layout.addLayout(status_box)
 
         # ---------------------------------------------------------
@@ -231,6 +289,100 @@ class TopBar(QFrame):
         self._pulse_timer.setInterval(1200)
         self._pulse_timer.timeout.connect(self._on_pulse)
         self._pulse_timer.start()
+
+        # Execution Clock state
+        self._timer_start_time: float | None = None
+        self._timer_running = False
+        self._clock_timer = QTimer(self)
+        self._clock_timer.setInterval(1000)
+        self._clock_timer.timeout.connect(self._on_clock_tick)
+
+        # Romantic heartbeat animation timer
+        self._heart_state = False
+        self._heart_timer = QTimer(self)
+        self._heart_timer.setInterval(1200)
+        self._heart_timer.timeout.connect(self._on_heart_pulse)
+        self._heart_timer.start()
+
+    def _on_heart_pulse(self) -> None:
+        self._heart_state = not self._heart_state
+        heart = "💖" if self._heart_state else "💗"
+        self.lbl_credit.setText(f"{heart} Dành tặng em bé <b style='color: #ffe4e6;'>Trang Vũ</b> &lt;3")
+
+    def start_timer(self) -> None:
+        self._timer_start_time = time.monotonic()
+        self._timer_running = True
+        self._clock_timer.start(1000)
+        self._update_timer_style(running=True)
+        self._on_clock_tick()
+
+    def stop_timer(self) -> None:
+        if not self._timer_running and not self._timer_start_time:
+            return
+        self._timer_running = False
+        self._clock_timer.stop()
+        if self._timer_start_time:
+            elapsed_s = int(time.monotonic() - self._timer_start_time)
+            mm = elapsed_s // 60
+            ss = elapsed_s % 60
+            self.timer_badge.setText(f"🎉 Hoàn tất: {mm:02d}:{ss:02d}")
+        self._update_timer_style(finished=True)
+
+    def reset_timer(self) -> None:
+        self._timer_running = False
+        self._timer_start_time = None
+        self._clock_timer.stop()
+        self.timer_badge.setText("⏱ 00:00")
+        self._update_timer_style(running=False, finished=False)
+
+    def _on_clock_tick(self) -> None:
+        if not self._timer_running or not self._timer_start_time:
+            return
+        elapsed_s = int(time.monotonic() - self._timer_start_time)
+        mm = elapsed_s // 60
+        ss = elapsed_s % 60
+        self.timer_badge.setText(f"⏱ {mm:02d}:{ss:02d}")
+
+    def _update_timer_style(self, running: bool = False, finished: bool = False) -> None:
+        if finished:
+            self.timer_badge.setStyleSheet("""
+                QLabel#timerBadge {
+                    color: #34d399;
+                    font-size: 11px;
+                    font-weight: 800;
+                    font-family: 'Consolas', 'Segoe UI', monospace;
+                    padding: 3px 10px;
+                    border-radius: 5px;
+                    background-color: #064e3b;
+                    border: 1px solid #059669;
+                }
+            """)
+        elif running:
+            self.timer_badge.setStyleSheet("""
+                QLabel#timerBadge {
+                    color: #38bdf8;
+                    font-size: 11px;
+                    font-weight: 800;
+                    font-family: 'Consolas', 'Segoe UI', monospace;
+                    padding: 3px 10px;
+                    border-radius: 5px;
+                    background-color: #082f49;
+                    border: 1px solid #0284c7;
+                }
+            """)
+        else:
+            self.timer_badge.setStyleSheet("""
+                QLabel#timerBadge {
+                    color: #94a3b8;
+                    font-size: 11px;
+                    font-weight: 700;
+                    font-family: 'Consolas', 'Segoe UI', monospace;
+                    padding: 3px 10px;
+                    border-radius: 5px;
+                    background-color: #0c1424;
+                    border: 1px solid #1e293b;
+                }
+            """)
 
     def _on_pulse(self) -> None:
         self._pulse_state = not self._pulse_state

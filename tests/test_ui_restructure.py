@@ -241,9 +241,58 @@ def test_step5_review_and_export_outputs(window, tmp_path):
     review = window.review
     assert "KỊCH BẢN" in review.findChildren(object)[0].__class__.__name__ or review.summary.text().startswith("2 câu")
     assert review.btn_search_toggle.isVisible()
-    assert review.buttons["add"].isVisible()
-    assert review.more_button.isVisible()
+    assert review.btn_load_trans.isVisible()
+    assert review.btn_save_trans.isVisible()
+    assert review.btn_load_source.isVisible()
+    assert review.btn_save_source.isVisible()
+    assert not review.more_button.isVisible()
 
     # Primary export outputs at bottom
     assert review.export_video_button.isVisible()
     assert review.export_capcut_button.isVisible()
+
+
+def test_top_bar_new_project_and_timer(window, tmp_path):
+    """Verify New Project button and execution timer in TopBar."""
+    top_bar = window.top_bar
+    assert top_bar.btn_new.isVisible()
+    assert top_bar.timer_badge.isVisible()
+    assert "⏱ 00:00" in top_bar.timer_badge.text()
+
+    # Start timer
+    top_bar.start_timer()
+    assert top_bar._timer_running is True
+
+    # Stop timer
+    top_bar.stop_timer()
+    assert top_bar._timer_running is False
+    assert "🎉" in top_bar.timer_badge.text() or "Hoàn tất" in top_bar.timer_badge.text()
+
+    # Reset timer
+    top_bar.reset_timer()
+    assert "⏱ 00:00" in top_bar.timer_badge.text()
+
+    # Test new_project resets state
+    window.project.video_path = tmp_path / "test.mp4"
+    window.dirty = False
+    window.new_project()
+    assert window.project.video_path is None
+    assert window.dirty is False
+    assert window.step_stack.currentIndex() == 0
+
+
+def test_review_load_source_srt(window, tmp_path):
+    """Verify loading raw/untranslated SRT into project.transcript."""
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"dummy")
+    window.project.video_path = video
+
+    raw_srt = tmp_path / "source.srt"
+    raw_srt.write_text("1\n00:00:01,000 --> 00:00:03,000\n你好世界\n", encoding="utf-8")
+
+    ok = window.review_controller.load_source_srt(raw_srt)
+    assert ok is True
+    assert window.project.transcript is not None
+    assert len(window.project.transcript.segments) == 1
+    assert window.project.transcript.segments[0].text == "你好世界"
+

@@ -650,6 +650,7 @@ class PipelineRunner(QThread):
                 self.state, "Xử lý tự động hoàn tất! Sẵn sàng duyệt và xuất CapCut."
             )
             self._save_current_checkpoint()
+            self.pipeline_completed.emit(self.artifacts)
         except InterruptedError:
             logger.info("Pipeline cancelled by user.")
             self.log_emitted.emit("⏹ Quy trình tự động đã được dừng lại theo yêu cầu.")

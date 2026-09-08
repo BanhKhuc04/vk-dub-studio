@@ -354,6 +354,8 @@ class ReviewController(QObject):
                 )
             elif name == "load":
                 self.choose_srt()
+            elif name == "load_source":
+                self.choose_source_srt()
             elif name == "import_vbee":
                 if hasattr(self.window, "vbee_controller") and self.window.vbee_controller:
                     self.window.vbee_controller.import_manual_audio_dialog()
@@ -505,3 +507,80 @@ class ReviewController(QObject):
         )
         write_srt(path, source, self.window.project.duration_ms)
         self.window.log("Đã lưu SRT chưa dịch.")
+
+    def choose_source_srt(self) -> None:
+        if self.window.project.video_path is None:
+            self.window.log("Vui lòng chọn video trước khi nạp file phụ đề gốc.")
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self.window, "Mở file phụ đề SRT gốc (chưa dịch)", "", "SRT (*.srt);;Tất cả tệp (*.*)"
+        )
+        if path:
+            self.load_source_srt(Path(path))
+
+    def load_source_srt(self, path: Path) -> bool:
+        if self.window.busy or self.window.project.video_path is None:
+            return False
+        try:
+            import shutil
+            from vkdub.domain.transcript import SubtitleSegment, Transcript
+            from vkdub.services.srt_validator import parse_cues
+            from vkdub.utils.paths import workspace_root
+
+            raw_text = path.read_text(encoding="utf-8", errors="replace")
+            cues = parse_cues(raw_text)
+            if not cues:
+                raise ValueError("Tệp phụ đề SRT không chứa câu thoại nào hợp lệ.")
+
+            segments = tuple(
+                SubtitleSegment(
+                    id=c.index,
+                    start=c.start_ms / 1000.0,
+                    end=c.end_ms / 1000.0,
+                    text=c.text,
+                )
+                for c in cues
+            )
+            total_dur = (cues[-1].end_ms / 1000.0) if cues else 0.0
+            transcript = Transcript(
+                segments=segments,
+                language=self.window.project.source_language or "zh",
+                requested_language="auto",
+                duration=total_dur,
+                model="base",
+                device="cpu",
+                fingerprint="0" * 64,
+                cache_key="0" * 64,
+            )
+            self.window.project.transcript = transcript
+
+            # Copy to export folder as original.srt for pipeline compatibility
+            out_name = self.window.project.video_path.stem or "dubbing"
+            output_dir = workspace_root() / "export" / out_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            dest_orig = output_dir / "original.srt"
+            shutil.copy2(path, dest_orig)
+
+            if hasattr(self.window, "step4_panel"):
+                from vkdub.orchestrator.pipeline_state import SubstepStatus
+                self.window.step4_panel.update_substep(
+                    "4.1",
+                    SubstepStatus.SUCCESS,
+                    100,
+                    f"Đã nạp file phụ đề gốc ({len(segments)} câu)",
+                    artifact=dest_orig,
+                )
+
+            self.window.log(f"✓ Đã nạp thành công phụ đề gốc: {path.name} ({len(segments)} câu)")
+            if hasattr(self.window, "notify_success"):
+                self.window.notify_success(
+                    "Nạp SRT gốc thành công",
+                    f"Đã nạp {len(segments)} câu thoại gốc từ {path.name}.",
+                )
+            self.window._refresh()
+            self.refresh()
+            return True
+        except Exception as exc:
+            self.window._error(f"Không thể nạp file SRT gốc: {exc}")
+            return False
+

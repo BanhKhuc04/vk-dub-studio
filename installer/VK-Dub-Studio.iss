@@ -2,7 +2,7 @@
 ; Produces: VKDubStudio-Setup-X.Y.Z.exe
 
 #ifndef MyAppVersion
-#define MyAppVersion "2.1.14"
+#define MyAppVersion "2.1.15"
 #endif
 
 #define MyAppName "VK Dub Studio"

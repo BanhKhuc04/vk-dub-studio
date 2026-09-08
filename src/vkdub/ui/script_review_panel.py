@@ -42,7 +42,7 @@ class ScriptReviewPanel(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("panel")
-        self.setMinimumWidth(320)
+        self.setMinimumWidth(480)
         self.document: ScriptDocument | None = None
         self.transcript: Transcript | None = None
         self.editor: ScriptRowEditor | None = None
@@ -82,7 +82,9 @@ class ScriptReviewPanel(QFrame):
         layout.addWidget(self.stage)
 
         # ---------------------------------------------------------
-        # Toolbar: Search, + Add cue, More (...)
+        # Toolbar: Tinh giản tối đa theo yêu cầu
+        # Giữ: Tìm kiếm, Nạp/Tải SRT dịch, Nạp/Tải SRT gốc
+        # Loại bỏ: Thêm câu, Thao tác khác (...)
         # ---------------------------------------------------------
         toolbar = QHBoxLayout()
         toolbar.setSpacing(6)
@@ -97,10 +99,11 @@ class ScriptReviewPanel(QFrame):
             ("undo", "↶ Hoàn tác"),
             ("redo", "↷ Làm lại"),
             ("search", "🔍 Tìm/Thay"),
-            ("load", "📂 Nhập SRT"),
-            ("save", "⬇ Xuất SRT"),
+            ("load", "📂 Nạp SRT dịch"),
+            ("save", "⬇ Tải SRT dịch"),
+            ("load_source", "📂 Nạp SRT gốc"),
+            ("save_source", "⬇ Tải SRT gốc"),
             ("import_vbee", "🎵 Nhập Audio Vbee"),
-            ("save_source", "⬇ SRT chưa dịch"),
             ("validate", "✔ Kiểm tra SRT"),
             ("prepare", "🔄 Tạo lại voice"),
         ):
@@ -108,64 +111,71 @@ class ScriptReviewPanel(QFrame):
             btn.clicked.connect(lambda checked=False, name=action: self.action_requested.emit(name))
             self.buttons[action] = btn
 
-        # Search toggle button
+        # 1. Nút tìm kiếm (duy nhất trong nhóm thao tác)
         self.btn_search_toggle = QPushButton("🔍 Tìm kiếm")
-        self.btn_search_toggle.setStyleSheet("padding: 5px 10px; font-size: 11px; font-weight: 600;")
+        self.btn_search_toggle.setStyleSheet("""
+            QPushButton {
+                background: #0f172a; color: #94a3b8; border: 1px solid #1e293b;
+                border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 600;
+            }
+            QPushButton:hover { background: #1e293b; color: #38bdf8; border-color: #0284c7; }
+        """)
         self.btn_search_toggle.clicked.connect(self._toggle_search_box)
         toolbar.addWidget(self.btn_search_toggle)
 
-        # + Add cue button
-        add_btn = self.buttons["add"]
-        add_btn.setStyleSheet("padding: 5px 10px; font-size: 11px; font-weight: 600; background-color: #21262d;")
-        toolbar.addWidget(add_btn)
+        # 2. Nạp/Tải SRT dịch (Tiếng Việt)
+        self.btn_load_trans = self.buttons["load"]
+        self.btn_load_trans.setStyleSheet("""
+            QPushButton {
+                background: #0c1a2d; color: #38bdf8; border: 1px solid #1e3a5f;
+                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+            }
+            QPushButton:hover { background: #132742; border-color: #38bdf8; color: #ffffff; }
+        """)
+        self.btn_load_trans.setToolTip("Nạp file phụ đề SRT tiếng Việt đã dịch vào kịch bản")
+        toolbar.addWidget(self.btn_load_trans)
+
+        self.btn_save_trans = self.buttons["save"]
+        self.btn_save_trans.setStyleSheet("""
+            QPushButton {
+                background: #0c1a2d; color: #38bdf8; border: 1px solid #1e3a5f;
+                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+            }
+            QPushButton:hover { background: #132742; border-color: #38bdf8; color: #ffffff; }
+        """)
+        self.btn_save_trans.setToolTip("Tải/xuất file phụ đề SRT tiếng Việt hoàn chỉnh về máy")
+        toolbar.addWidget(self.btn_save_trans)
+
+        # 3. Nạp/Tải SRT gốc (Chưa dịch)
+        self.btn_load_source = self.buttons["load_source"]
+        self.btn_load_source.setStyleSheet("""
+            QPushButton {
+                background: #181126; color: #c084fc; border: 1px solid #3b2057;
+                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+            }
+            QPushButton:hover { background: #241738; border-color: #a855f7; color: #ffffff; }
+        """)
+        self.btn_load_source.setToolTip("Nạp file phụ đề SRT gốc chưa dịch")
+        toolbar.addWidget(self.btn_load_source)
+
+        self.btn_save_source = self.buttons["save_source"]
+        self.btn_save_source.setStyleSheet("""
+            QPushButton {
+                background: #181126; color: #c084fc; border: 1px solid #3b2057;
+                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+            }
+            QPushButton:hover { background: #241738; border-color: #a855f7; color: #ffffff; }
+        """)
+        self.btn_save_source.setToolTip("Tải/xuất file phụ đề SRT gốc chưa dịch về máy")
+        toolbar.addWidget(self.btn_save_source)
 
         toolbar.addStretch(1)
 
-        # More (...) menu
+        # Compatibility dummies
         self.more_button = QToolButton()
-        self.more_button.setText("Thao tác khác ⋯")
-        self.more_button.setStyleSheet("padding: 5px 10px; font-size: 11px; font-weight: 600;")
-        self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        more_menu = QMenu(self)
-        self.more_button.setMenu(more_menu)
+        self.more_button.hide()
+        self._overflow_actions = []
 
-        menu_items = [
-            ("load", "📂 Nhập SRT bản dịch"),
-            ("save", "⬇ Xuất SRT đã dịch"),
-            ("validate", "✔ Kiểm tra timeline & kịch bản"),
-            ("prepare", "🔄 Tạo lại giọng đọc (Voice)"),
-            (None, "---"),
-            ("split", "✂ Tách câu"),
-            ("merge_previous", "⇈ Gộp với câu trước"),
-            ("merge_next", "⇊ Gộp với câu sau"),
-            ("delete", "✖ Xóa câu đang chọn"),
-            (None, "---"),
-            ("undo", "↶ Hoàn tác (Undo)"),
-            ("redo", "↷ Làm lại (Redo)"),
-            ("save_source", "⬇ Xuất SRT gốc chưa dịch"),
-            ("import_vbee", "🎵 Nhập audio Vbee thủ công"),
-        ]
-
-        self._overflow_actions: list[tuple[QAction, QPushButton]] = []
-        for code, m_title in menu_items:
-            if code is None:
-                more_menu.addSeparator()
-            elif code in self.buttons:
-                b = self.buttons[code]
-                b.setParent(self)
-                b.setFixedSize(0, 0)
-                b.setStyleSheet("min-width:0;max-width:0;min-height:0;max-height:0;padding:0;margin:0;border:none;")
-                b.show()
-                act = more_menu.addAction(m_title)
-                act.triggered.connect(b.click)
-                self._overflow_actions.append((act, b))
-
-        def refresh_more_actions() -> None:
-            for act, b in self._overflow_actions:
-                act.setEnabled(b.isEnabled())
-
-        more_menu.aboutToShow.connect(refresh_more_actions)
-        toolbar.addWidget(self.more_button)
         layout.addLayout(toolbar)
 
         # Search / Replace box (toggleable)
