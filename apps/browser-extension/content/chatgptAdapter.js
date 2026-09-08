@@ -137,13 +137,22 @@
     if (!assistantMessages.length) return null;
     const lastMessage = assistantMessages[assistantMessages.length - 1];
 
-    // Priority 1: Check code blocks (pre code)
+    // Priority 1: Check code blocks (pre code, pre)
     const codeBlocks = Array.from(lastMessage.querySelectorAll("pre code, pre"));
-    for (let i = codeBlocks.length - 1; i >= 0; i--) {
-      const codeText = codeBlocks[i].innerText || codeBlocks[i].textContent || "";
+    const validSrtParts = [];
+    for (const block of codeBlocks) {
+      const codeText = block.innerText || block.textContent || "";
       if (codeText.includes("-->") && /\d{1,2}:\d{2}:\d{2}/.test(codeText)) {
-        return cleanSRTText(codeText);
+        const cleaned = cleanSRTText(codeText);
+        if (cleaned) {
+          validSrtParts.push(cleaned);
+        }
       }
+    }
+
+    if (validSrtParts.length > 0) {
+      // If AI continued generation across multiple code blocks, join them
+      return validSrtParts.join("\n\n");
     }
 
     // Priority 2: Full message text if code block was not formatted by AI
@@ -169,13 +178,72 @@
     return cleaned;
   }
 
-  async function executeTranslation({ srt_content, prompt_instruction, request_id }) {
+  async function findChatGPTFileInput() {
+    // Check if input[type='file'] already exists in DOM
+    let fileInput = document.querySelector("input[type='file']");
+    if (fileInput) return fileInput;
+
+    // Try finding the attach button (plus / paperclip / upload)
+    const attachBtn = (
+      document.querySelector("button[data-testid='attach-button']") ||
+      document.querySelector("button[aria-label*='Attach']") ||
+      document.querySelector("button[aria-label*='Đính kèm']") ||
+      document.querySelector("button[aria-label*='Tệp đính kèm']") ||
+      document.querySelector("button[aria-label*='Upload']") ||
+      document.querySelector("form button:has(svg path[d*='M16.5'])") ||
+      document.querySelector("form button:has(svg path[d*='M12'])") ||
+      document.querySelector("form button[aria-haspopup]")
+    );
+
+    if (attachBtn) {
+      try {
+        attachBtn.click();
+        await new Promise((r) => setTimeout(r, 400));
+        fileInput = document.querySelector("input[type='file']");
+        if (fileInput) return fileInput;
+
+        // Check for menu item 'Upload from computer' / 'Tải lên từ máy tính'
+        const menuItems = Array.from(
+          document.querySelectorAll("[role='menuitem'], button, div[role='button']")
+        );
+        const uploadItem = menuItems.find((el) =>
+          /upload from computer|tải lên từ máy tính|upload|tải lên|tệp/i.test(
+            el.textContent || ""
+          )
+        );
+        if (uploadItem) {
+          uploadItem.click();
+          await new Promise((r) => setTimeout(r, 400));
+          fileInput = document.querySelector("input[type='file']");
+        }
+      } catch (e) {
+        console.warn("[ChatGPTAdapter] Error clicking attach button:", e);
+      }
+    }
+
+    return fileInput || document.querySelector("input[type='file']");
+  }
+
+  function findContinueButton() {
+    return (
+      document.querySelector("button[data-testid='continue-button']") ||
+      document.querySelector("button[data-testid='continue-generating-button']") ||
+      Array.from(document.querySelectorAll("button")).find((b) =>
+        /continue generating|tiếp tục tạo|tiếp tục sinh|continue/i.test(
+          (b.innerText || b.textContent || "").trim()
+        )
+      )
+    );
+  }
+
+  async function executeTranslation({ srt_content, prompt_instruction, filename, request_id }) {
     console.log("[ChatGPTAdapter] Executing translation for request:", request_id);
+    const targetFilename = filename || "original.srt";
 
     try {
       chrome.runtime.sendMessage({
         action: "LOG_EVENT",
-        message: "ChatGPT: Đang chuẩn bị gửi kịch bản vào ô nhập liệu...",
+        message: `ChatGPT: Đang chuẩn bị tải file ${targetFilename} lên...`,
       });
     } catch (e) {}
 
@@ -191,34 +259,82 @@
       throw new Error("Không tìm thấy ô nhập tin nhắn trên giao diện ChatGPT.");
     }
 
-    // 2. Build full prompt
-    const defaultInstruction =
-      "Dịch lại toàn bộ file phụ đề SRT này sang tiếng Việt:\n" +
-      "- Sát nghĩa, đúng bối cảnh và cảm xúc nhân vật, văn phong tự nhiên.\n" +
-      "- Giữ nguyên 100% định dạng SRT, số thứ tự từng câu và mốc thời gian (timecode).\n" +
-      "- Không gộp câu, không tách câu, không bỏ sót bất kỳ dòng nào.\n" +
-      "- Tuyệt đối không thay đổi hay làm lệch bất kỳ mốc thời gian nào.\n" +
-      "- Xuất toàn bộ phụ đề SRT đã dịch đầy đủ trong một khối mã (code block ```srt).\n\n" +
-      "--- NỘI DUNG PHỤ ĐỀ SRT GỐC ---\n" +
-      srt_content +
-      "\n--- HẾT ---";
+    // 2. Attempt to attach .srt as file
+    let fileAttached = false;
+    try {
+      const fileInput = await findChatGPTFileInput();
+      if (fileInput) {
+        const file = new File([srt_content], targetFilename, {
+          type: "text/plain",
+          lastModified: Date.now(),
+        });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+        fileInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+        fileAttached = true;
+        console.log("[ChatGPTAdapter] File attached successfully:", targetFilename);
+        try {
+          chrome.runtime.sendMessage({
+            action: "LOG_EVENT",
+            message: `ChatGPT: Đã đính kèm file ${targetFilename} thành công. Đang tải lên...`,
+          });
+        } catch (e) {}
+        // Give ChatGPT time to mount attachment pill
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    } catch (attachErr) {
+      console.warn("[ChatGPTAdapter] File attachment failed, falling back to text prompt:", attachErr);
+      fileAttached = false;
+    }
 
-    const promptText = prompt_instruction
-      ? `${prompt_instruction}\n\n${srt_content}`
-      : defaultInstruction;
+    // 3. Build appropriate prompt
+    let promptText = "";
+    if (fileAttached) {
+      const defaultFileInstruction =
+        `Dịch toàn bộ nội dung file phụ đề ${targetFilename} đính kèm sang tiếng Việt:\n` +
+        "- Sát nghĩa, tự nhiên, đúng bối cảnh và cảm xúc câu chuyện.\n" +
+        "- Giữ nguyên 100% định dạng SRT, số thứ tự từng câu và mốc thời gian (timecode).\n" +
+        "- Không gộp câu, không tách câu, không bỏ sót bất kỳ câu nào.\n" +
+        "- Xuất toàn bộ nội dung file phụ đề SRT tiếng Việt hoàn chỉnh trong khối mã ```srt.";
+
+      promptText = prompt_instruction || defaultFileInstruction;
+    } else {
+      try {
+        chrome.runtime.sendMessage({
+          action: "LOG_EVENT",
+          message: "ChatGPT: Không tìm thấy ô tải file, đang dùng phương thức dự phòng (dán toàn bộ phụ đề vào ô chat)...",
+        });
+      } catch (e) {}
+      const defaultInstruction =
+        "Dịch lại toàn bộ file phụ đề SRT này sang tiếng Việt:\n" +
+        "- Sát nghĩa, đúng bối cảnh và cảm xúc nhân vật, văn phong tự nhiên.\n" +
+        "- Giữ nguyên 100% định dạng SRT, số thứ tự từng câu và mốc thời gian (timecode).\n" +
+        "- Không gộp câu, không tách câu, không bỏ sót bất kỳ dòng nào.\n" +
+        "- Tuyệt đối không thay đổi hay làm lệch bất kỳ mốc thời gian nào.\n" +
+        "- Xuất toàn bộ phụ đề SRT đã dịch đầy đủ trong một khối mã (code block ```srt).\n\n" +
+        "--- NỘI DUNG PHỤ ĐỀ SRT GỐC ---\n" +
+        srt_content +
+        "\n--- HẾT ---";
+
+      promptText = prompt_instruction
+        ? `${prompt_instruction}\n\n${srt_content}`
+        : defaultInstruction;
+    }
 
     // Record assistant message count prior to sending new prompt
     const initialAssistantCount = document.querySelectorAll(
       "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
     ).length;
 
-    // 3. Inject text into input element
+    // 4. Inject prompt text
     insertPromptText(inputEl, promptText);
     await new Promise((r) => setTimeout(r, 800));
 
-    // 4. Click send button
+    // 5. Click send button (wait up to 12s if file is still uploading)
     let sendBtn = null;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 40; i++) {
       sendBtn = findSendButton();
       if (sendBtn && !sendBtn.disabled) break;
       inputEl.dispatchEvent(new Event("input", { bubbles: true }));
@@ -228,7 +344,6 @@
     if (sendBtn && !sendBtn.disabled) {
       sendBtn.click();
     } else {
-      // Fallback: trigger Enter key
       inputEl.focus();
       inputEl.dispatchEvent(
         new KeyboardEvent("keydown", {
@@ -257,14 +372,14 @@
     try {
       chrome.runtime.sendMessage({
         action: "LOG_EVENT",
-        message: "ChatGPT: Đã gửi kịch bản sang AI. Đang chờ AI bắt đầu phản hồi...",
+        message: "ChatGPT: Đã gửi yêu cầu sang AI. Đang chờ AI bắt đầu phản hồi...",
       });
     } catch (e) {}
 
-    // 5. Wait for streaming to begin
+    // 6. Wait for streaming to begin
     let hasStarted = false;
     const waitStart = Date.now();
-    while (Date.now() - waitStart < 15000) {
+    while (Date.now() - waitStart < 20000) {
       const currentAssistantCount = document.querySelectorAll(
         "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
       ).length;
@@ -276,7 +391,7 @@
     }
 
     const startTime = Date.now();
-    const maxWaitMs = 360000; // 6 minutes max
+    const maxWaitMs = 600000; // 10 minutes max for full file translation
     let lastLogTime = 0;
 
     while (Date.now() - startTime < maxWaitMs) {
@@ -293,6 +408,23 @@
 
       const generating = isGenerating();
       const now = Date.now();
+
+      // Auto-click Continue Generating if response paused
+      if (!generating) {
+        const continueBtn = findContinueButton();
+        if (continueBtn && !continueBtn.disabled) {
+          console.log("[ChatGPTAdapter] Detected Continue Generating button. Clicking...");
+          try {
+            chrome.runtime.sendMessage({
+              action: "LOG_EVENT",
+              message: "ChatGPT: Phát hiện nội dung dài, đang tự động bấm 'Tiếp tục tạo'...",
+            });
+          } catch (e) {}
+          continueBtn.click();
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+      }
 
       if (now - lastLogTime > 3000) {
         lastLogTime = now;
@@ -313,10 +445,17 @@
         } catch (e) {}
       }
 
-      if (!generating && (hasStarted || (Date.now() - startTime > 4000))) {
-        // Wait an extra 1.5s to ensure DOM finalized
+      if (!generating && (hasStarted || Date.now() - startTime > 4000)) {
         await new Promise((r) => setTimeout(r, 1500));
         if (!isGenerating()) {
+          // Double check continue button again before completing
+          const continueBtn = findContinueButton();
+          if (continueBtn && !continueBtn.disabled) {
+            continueBtn.click();
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+
           const assistantMessages = Array.from(
             document.querySelectorAll(
               "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
@@ -345,7 +484,7 @@
       await new Promise((r) => setTimeout(r, 1000));
     }
 
-    throw new Error("Quá thời gian chờ phản hồi từ ChatGPT (hơn 6 phút).");
+    throw new Error("Quá thời gian chờ phản hồi từ ChatGPT (hơn 10 phút).");
   }
 
   // Clear previous message listener to avoid duplicates

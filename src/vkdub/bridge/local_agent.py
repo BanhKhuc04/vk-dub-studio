@@ -373,7 +373,8 @@ class LocalAgent(QObject):
         self,
         srt_content: str,
         prompt_instruction: str = "",
-        timeout_s: float = 360.0,
+        filename: str = "original.srt",
+        timeout_s: float = 600.0,
     ) -> str:
         """Execute ChatGPT translation through the browser extension synchronously.
 
@@ -398,14 +399,15 @@ class LocalAgent(QObject):
                 {
                     "srt_content": srt_content,
                     "prompt_instruction": prompt_instruction,
+                    "filename": filename,
                     "request_id": req_id,
                 },
             )
             if not sent:
                 raise RuntimeError("Không thể gửi lệnh dịch sang extension Microsoft Edge.")
 
-            logger.info("Đã gửi yêu cầu dịch sang ChatGPT (request_id=%s). Đang chờ...", req_id)
-            self.log_emitted.emit("Đã gửi phụ đề sang ChatGPT qua Edge. Đang chờ phản hồi...")
+            logger.info("Đã gửi yêu cầu dịch sang ChatGPT (request_id=%s, file=%s). Đang chờ...", req_id, filename)
+            self.log_emitted.emit(f"Đã gửi file {filename} sang ChatGPT qua Edge. Đang chờ phản hồi...")
             t_start = time.monotonic()
             completed = False
             while True:

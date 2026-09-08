@@ -64,52 +64,62 @@ def ms_to_timecode(ms: int) -> str:
 
 
 def parse_cues(raw_srt: str) -> list[Cue]:
-    """Parse raw SRT text into a structured list of Cue objects."""
+    """Parse raw SRT text into a structured list of Cue objects.
+
+    Robust to missing blank lines, code fences, numbered dots (e.g. '1.'),
+    and conversational headers/footers.
+    """
     cleaned = raw_srt.replace("\r\n", "\n").replace("\r", "\n").strip()
     # Remove UTF-8 BOM if present
     if cleaned.startswith("\ufeff"):
         cleaned = cleaned[1:]
 
     # Remove markdown code block fences if present (e.g. ```srt ... ```)
-    cleaned = re.sub(r"^```[a-zA-Z]*\n", "", cleaned)
-    cleaned = re.sub(r"\n```$", "", cleaned)
+    cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\n?```$", "", cleaned, flags=re.MULTILINE)
 
-    blocks = re.split(r"\n\s*\n+", cleaned)
+    lines = [line.strip() for line in cleaned.split("\n")]
+    # Locate all line indices that match TIMECODE_PATTERN
+    tc_indices: list[tuple[int, re.Match[str]]] = []
+    for i, line in enumerate(lines):
+        match = TIMECODE_PATTERN.search(line)
+        if match:
+            tc_indices.append((i, match))
+
+    if not tc_indices:
+        return []
+
     cues: list[Cue] = []
-
-    for block in blocks:
-        lines = [line.strip() for line in block.strip().split("\n") if line.strip()]
-        if not lines:
-            continue
-
-        # Find line containing timecode
-        tc_index = -1
-        tc_match = None
-        for idx, line in enumerate(lines):
-            match = TIMECODE_PATTERN.search(line)
-            if match:
-                tc_index = idx
-                tc_match = match
-                break
-
-        if not tc_match or tc_index == -1:
-            continue
-
+    for k, (tc_idx, tc_match) in enumerate(tc_indices):
         start_raw = tc_match.group(1).replace(".", ",")
         end_raw = tc_match.group(2).replace(".", ",")
         start_ms = timecode_to_ms(start_raw)
         end_ms = timecode_to_ms(end_raw)
 
-        # Cue number is usually the line before timecode
+        # Cue index is usually the line before tc_idx (e.g. '1' or '1.')
         cue_num = len(cues) + 1
-        if tc_index > 0:
-            try:
-                cue_num = int(re.sub(r"\D", "", lines[0]) or str(len(cues) + 1))
-            except ValueError:
-                pass
+        if tc_idx > 0:
+            prev_line = lines[tc_idx - 1]
+            digits = re.sub(r"\D", "", prev_line)
+            prev_tc_limit = tc_indices[k - 1][0] if k > 0 else -1
+            if digits and (tc_idx - 1 > prev_tc_limit):
+                try:
+                    cue_num = int(digits)
+                except ValueError:
+                    pass
 
-        # Cue text is all lines after timecode
-        text_lines = lines[tc_index + 1 :]
+        # Text lines: from tc_idx + 1 up to the start of the next cue
+        if k + 1 < len(tc_indices):
+            next_tc_idx = tc_indices[k + 1][0]
+            if next_tc_idx > 0 and re.match(r"^\d+\.?$", lines[next_tc_idx - 1]):
+                end_slice = next_tc_idx - 1
+            else:
+                end_slice = next_tc_idx
+        else:
+            end_slice = len(lines)
+
+        text_lines = [l for l in lines[tc_idx + 1 : end_slice] if l]
+        text_lines = [l for l in text_lines if not l.startswith("```")]
         text = " ".join(text_lines).strip()
 
         cues.append(
@@ -124,6 +134,49 @@ def parse_cues(raw_srt: str) -> list[Cue]:
         )
 
     return cues
+
+
+def align_and_fill_cues(orig_cues: list[Cue], trans_cues: list[Cue]) -> str:
+    """Align translated cues 1-to-1 against original cues and format as valid SRT.
+
+    Guarantees:
+    - Exactly len(orig_cues) cues
+    - 100% exact original timecodes and sequential indices
+    - Fallback to original text if a cue is missing
+    """
+    if not orig_cues:
+        return ""
+    if not trans_cues:
+        return format_cues_to_srt(orig_cues)
+
+    orig_indices = {c.index for c in orig_cues}
+    trans_by_index = {c.index: c for c in trans_cues}
+    has_matching_indices = any(c.index in orig_indices for c in trans_cues)
+
+    aligned_cues: list[Cue] = []
+    for i, orig in enumerate(orig_cues):
+        matched_text = ""
+        if has_matching_indices:
+            if orig.index in trans_by_index:
+                matched_text = trans_by_index[orig.index].text.strip()
+        else:
+            if i < len(trans_cues):
+                matched_text = trans_cues[i].text.strip()
+
+        final_text = matched_text if matched_text else orig.text.strip()
+
+        aligned_cues.append(
+            Cue(
+                index=orig.index,
+                start_raw=orig.start_raw,
+                end_raw=orig.end_raw,
+                start_ms=orig.start_ms,
+                end_ms=orig.end_ms,
+                text=final_text,
+            )
+        )
+
+    return format_cues_to_srt(aligned_cues, preserve_indices=True)
 
 
 def format_cues_to_srt(cues: list[Cue], preserve_indices: bool = False) -> str:

@@ -194,8 +194,8 @@ def test_pipeline_runner_voice_only_step_4_4(qapp, tmp_path, monkeypatch):
     assert runner.state == PipelineState.REVIEW_READY
 
 
-def test_pipeline_runner_chunked_chatgpt_translation(qapp, tmp_path):
-    """Test that a 140-cue original SRT is automatically chunked into batches of 35 cues."""
+def test_pipeline_runner_single_file_chatgpt_translation(qapp, tmp_path):
+    """Test that a 140-cue original SRT is sent in one single request as a .srt file."""
     from unittest.mock import MagicMock
     from vkdub.domain.transcript import srt_timestamp
     from vkdub.services.srt_validator import parse_cues
@@ -215,11 +215,12 @@ def test_pipeline_runner_chunked_chatgpt_translation(qapp, tmp_path):
     project = Project()
     agent = LocalAgent()
 
-    # Mock translate_srt_sync to simulate ChatGPT translating each chunk cleanly
-    def mock_translate(chunk_srt, prompt_instruction="", timeout_s=360.0):
-        chunk_cues = parse_cues(chunk_srt)
+    # Mock translate_srt_sync to simulate ChatGPT translating the whole file cleanly
+    def mock_translate(full_srt, prompt_instruction="", filename="original.srt", timeout_s=600.0):
+        assert filename == "original.srt"
+        full_cues = parse_cues(full_srt)
         trans_lines = []
-        for c in chunk_cues:
+        for c in full_cues:
             trans_lines.append(f"{c.index}\n{c.start_raw} --> {c.end_raw}\nCâu dịch tiếng Việt #{c.index}\n")
         return "\n".join(trans_lines)
 
@@ -237,8 +238,8 @@ def test_pipeline_runner_chunked_chatgpt_translation(qapp, tmp_path):
     assert s42.status == SubstepStatus.SUCCESS
     assert "140" in s42.message
 
-    # 140 cues divided by CHUNK_SIZE (35) must equal exactly 4 calls
-    assert agent.translate_srt_sync.call_count == 4
+    # Entire file is sent in 1 single call (no chunking)
+    assert agent.translate_srt_sync.call_count == 1
 
     # Verify final translated.srt
     trans_file = tmp_path / "translated.srt"
@@ -248,5 +249,59 @@ def test_pipeline_runner_chunked_chatgpt_translation(qapp, tmp_path):
     assert final_cues[0].text == "Câu dịch tiếng Việt #1"
     assert final_cues[139].text == "Câu dịch tiếng Việt #140"
     assert final_cues[139].index == 140
+
+
+def test_pipeline_runner_chatgpt_missing_cues_auto_repaired(qapp, tmp_path):
+    """Test that if ChatGPT drops a cue, pipeline auto-aligns without crashing."""
+    from unittest.mock import MagicMock
+    from vkdub.domain.transcript import srt_timestamp
+    from vkdub.services.srt_validator import parse_cues
+
+    # Create 5 cues
+    lines = []
+    for i in range(1, 6):
+        s_tc = srt_timestamp((i - 1) * 2.0)
+        e_tc = srt_timestamp((i - 1) * 2.0 + 1.5)
+        lines.append(f"{i}\n{s_tc} --> {e_tc}\nOriginal sentence #{i}\n")
+    orig_file = tmp_path / "original.srt"
+    orig_file.write_text("\n".join(lines), encoding="utf-8")
+
+    project = Project()
+    agent = LocalAgent()
+
+    # Simulate ChatGPT returning only 4 cues (cue 3 missing)
+    def mock_translate_dropped(full_srt, prompt_instruction="", filename="original.srt", timeout_s=600.0):
+        return (
+            "1\n00:00:00,000 --> 00:00:01,500\nCâu dịch 1\n\n"
+            "2\n00:00:02,000 --> 00:00:03,500\nCâu dịch 2\n\n"
+            "4\n00:00:06,000 --> 00:00:07,500\nCâu dịch 4\n\n"
+            "5\n00:00:08,000 --> 00:00:09,500\nCâu dịch 5\n"
+        )
+
+    agent.translate_srt_sync = MagicMock(side_effect=mock_translate_dropped)
+
+    runner = PipelineRunner(
+        project=project,
+        local_agent=agent,
+        output_dir=tmp_path,
+        auto_voice=False,
+    )
+    runner.run()
+
+    s42 = next(s for s in runner.substeps if s.id == "4.2")
+    assert s42.status == SubstepStatus.SUCCESS
+
+    trans_file = tmp_path / "translated.srt"
+    assert trans_file.is_file()
+    final_cues = parse_cues(trans_file.read_text(encoding="utf-8"))
+    assert len(final_cues) == 5
+    assert final_cues[0].text == "Câu dịch 1"
+    assert final_cues[1].text == "Câu dịch 2"
+    # Cue 3 fell back to original text safely
+    assert final_cues[2].text == "Original sentence #3"
+    assert final_cues[3].text == "Câu dịch 4"
+    assert final_cues[4].text == "Câu dịch 5"
+
+
 
 

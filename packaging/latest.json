@@ -1,15 +1,15 @@
 {
-  "version": "2.1.12",
-  "published_at": "2026-09-08T18:57:57Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.12/VKDubStudio-Setup-2.1.12.exe",
-  "sha256": "f067790f48fadc9743c4f58b9833d7ad7c96f8acce4b5395cf574b33a7631081",
-  "file_size_bytes": 301849839,
+  "version": "2.1.13",
+  "published_at": "2026-09-08T19:34:51Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.13/VKDubStudio-Setup-2.1.13.exe",
+  "sha256": "162834b2f25c54f1841378a43e14406b8705f878b9877e9af6ab067914fba0ee",
+  "file_size_bytes": 301870509,
   "changelog": [
-    "VK Dub Studio v2.1.12 — Tách biệt Vùng lấy Sub (viền đỏ) và Vùng làm mờ, khắc phục lỗi % Vbee",
-    "Tách biệt hoàn toàn vùng xóa chữ/làm mờ (viền xanh) và vùng lấy phụ đề (viền đỏ, giữ nét video 100%)",
-    "Cho phép tạo nhiều vùng lấy sub (sub ở dưới, sub ở trên) với tùy chỉnh linh hoạt như blur (kéo thả, đổi cỡ, đổi tên, ghim vị trí)",
-    "Khắc phục lỗi Vbee: Cập nhật đúng % tiến độ thực tế từ máy chủ Vbee, chống đóng băng tab ngầm trên Chromium/Edge",
-    "Tải trực tiếp âm thanh Vbee qua API mà không phụ thuộc vào trạng thái active của tab",
-    "Thêm nút '🔴 Vùng Sub' trực tiếp trên thanh công cụ xem trước video"
+    "VK Dub Studio v2.1.13 — Dịch ChatGPT 1 lần duy nhất bằng file .srt đính kèm & Tự động tiếp tục tạo",
+    "Loại bỏ hoàn toàn cơ chế chia nhỏ 6 phần: Gửi toàn bộ file phụ đề 1 lần duy nhất để giữ trọn ngữ cảnh câu chuyện",
+    "Tự động nạp file .srt đính kèm vào ChatGPT qua DataTransfer, tránh lỗi lag ô chat và tránh AI phản hồi tự do",
+    "Tự động bấm 'Tiếp tục tạo' (Continue generating) nếu phụ đề dài bị ngắt quãng giữa chừng",
+    "Nâng cấp bộ phân tích SRT và đối soát tự động bù đắp câu, chuẩn hóa 100% timecode theo file gốc",
+    "Ghép nối thông minh các khối mã code block SRT khi AI sinh phản hồi qua nhiều lượt"
   ]
 }
