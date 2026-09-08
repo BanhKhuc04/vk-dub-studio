@@ -22,6 +22,13 @@ from PySide6.QtCore import QObject, Signal
 
 from vkdub.bridge.protocol import Actions, BridgeStatus
 from vkdub.bridge.registry import ensure_host_registered
+from vkdub.bridge.ws_framing import (
+    create_websocket_handshake_response,
+    decode_ws_frame,
+    encode_ws_frame,
+    extract_websocket_key,
+    is_websocket_request,
+)
 
 logger = logging.getLogger("vkdub.local_agent")
 
@@ -157,6 +164,7 @@ class LocalAgent(QObject):
         self.server_sock: socket.socket | None = None
         self.client_sock: socket.socket | None = None
         self.running = False
+        self.is_client_ws = False
         self.status = BridgeStatus(browser_connected=False)
         self._lock = threading.Lock()
         self._pending_requests: dict[str, tuple[threading.Event, dict[str, Any]]] = {}
@@ -190,12 +198,12 @@ class LocalAgent(QObject):
             return False
 
     def _accept_loop(self) -> None:
-        """Accept incoming connection from vkdub_host.py."""
+        """Accept incoming connection from browser extension or native host."""
         assert self.server_sock is not None
         while self.running:
             try:
                 sock, addr = self.server_sock.accept()
-                logger.info("Native host connected from %s", addr)
+                logger.info("Client connected from %s", addr)
                 with self._lock:
                     if self.client_sock:
                         try:
@@ -208,9 +216,6 @@ class LocalAgent(QObject):
                 self.browser_connection_changed.emit(True)
                 self.status_updated.emit(self.status)
 
-                # Request full status report from extension
-                self.request_status()
-
                 # Handle communication with this client
                 self._handle_client(sock)
             except TimeoutError:
@@ -220,24 +225,70 @@ class LocalAgent(QObject):
                     logger.warning("Error in Local Agent accept loop: %s", exc)
 
     def _handle_client(self, sock: socket.socket) -> None:
-        """Read newline-delimited JSON messages from native host."""
-        buf = ""
+        """Read messages from client, supporting both direct WebSocket and raw TCP native host."""
+        raw_buf = bytearray()
+        text_buf = ""
+        is_ws = False
+        handshake_done = False
+
         try:
             while self.running:
                 chunk = sock.recv(4096)
                 if not chunk:
-                    logger.info("Native host disconnected.")
+                    logger.info("Client disconnected.")
                     break
-                buf += chunk.decode("utf-8", errors="replace")
-                while "\n" in buf:
-                    line, buf = buf.split("\n", 1)
-                    line = line.strip()
-                    if line:
-                        self._process_message(line)
+
+                if not handshake_done:
+                    if is_websocket_request(chunk):
+                        is_ws = True
+                        with self._lock:
+                            self.is_client_ws = True
+                        key = extract_websocket_key(chunk)
+                        if key:
+                            sock.sendall(create_websocket_handshake_response(key))
+                            handshake_done = True
+                            logger.info("Local Agent WebSocket client handshake completed.")
+                            self.request_status()
+                            continue
+                        else:
+                            logger.warning("WebSocket upgrade missing Sec-WebSocket-Key header.")
+                            break
+                    else:
+                        is_ws = False
+                        with self._lock:
+                            self.is_client_ws = False
+                        handshake_done = True
+                        self.request_status()
+
+                if is_ws:
+                    raw_buf.extend(chunk)
+                    while True:
+                        frame = decode_ws_frame(raw_buf)
+                        if frame is None:
+                            break
+                        opcode, payload, consumed = frame
+                        del raw_buf[:consumed]
+                        if opcode == 1:  # Text frame
+                            line = payload.decode("utf-8", errors="replace").strip()
+                            if line:
+                                self._process_message(line)
+                        elif opcode == 8:  # Close frame
+                            logger.info("WebSocket close frame received.")
+                            return
+                        elif opcode == 9:  # Ping frame
+                            sock.sendall(encode_ws_frame(payload, opcode=10))  # Pong
+                else:
+                    text_buf += chunk.decode("utf-8", errors="replace")
+                    while "\n" in text_buf:
+                        line, text_buf = text_buf.split("\n", 1)
+                        line = line.strip()
+                        if line:
+                            self._process_message(line)
         except Exception as exc:
             logger.debug("Socket read ended: %s", exc)
         finally:
             with self._lock:
+                self.is_client_ws = False
                 if self.client_sock is sock:
                     self.client_sock = None
                 try:
@@ -499,12 +550,13 @@ class LocalAgent(QObject):
             self._pending_requests.pop(req_id, None)
 
     def send_command(self, action: str, payload: dict[str, Any] | None = None) -> bool:
-        """Send command to Browser Extension via native host."""
+        """Send command to Browser Extension via WebSocket or native host."""
         with self._lock:
             if not self.client_sock:
-                logger.warning("Cannot send command %s: no native host connected", action)
+                logger.warning("Cannot send command %s: no client connected", action)
                 return False
             sock = self.client_sock
+            is_ws = self.is_client_ws
 
         msg = {
             "action": action,
@@ -512,8 +564,12 @@ class LocalAgent(QObject):
             "timestamp": time.time(),
         }
         try:
-            data = (json.dumps(msg) + "\n").encode("utf-8")
-            sock.sendall(data)
+            raw_text = json.dumps(msg)
+            if is_ws:
+                sock.sendall(encode_ws_frame(raw_text.encode("utf-8")))
+            else:
+                data = (raw_text + "\n").encode("utf-8")
+                sock.sendall(data)
             return True
         except Exception as exc:
             logger.error("Failed to send command %s: %s", action, exc)

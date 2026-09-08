@@ -15,6 +15,11 @@ def _run() -> int:
 
         sys.argv = ["vkdub.services.transcription_runner", args[1], args[2]]
         return run_transcription_worker()
+    if args and args[0] == "--native-host":
+        from vkdub.bridge.native_host import main as run_native_host
+
+        run_native_host()
+        return 0
 
     from vkdub.app import main
 

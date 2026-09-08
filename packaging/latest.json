@@ -1,15 +1,15 @@
 {
-  "version": "2.1.6",
-  "published_at": "2026-09-08T04:39:20Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.6/VKDubStudio-Setup-2.1.6.exe",
-  "sha256": "5a30b1e90769afe9889acaaa17790757a39e92e410e5cce721a5260b180063dd",
-  "file_size_bytes": 301812496,
+  "version": "2.1.7",
+  "published_at": "2026-09-08T14:50:27Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.7/VKDubStudio-Setup-2.1.7.exe",
+  "sha256": "dec38eb2c0e140a8275c2a4d96ef5ef33a5b160cd668bd044fd1a0ab8813fc33",
+  "file_size_bytes": 301829096,
   "changelog": [
-    "VK Dub Studio v2.1.6 — Giao diện Cyber Obsidian Pro Studio & Vbee Extension",
-    "Đại tu giao diện toàn diện theo phong cách Studio chuyên nghiệp, gọn gàng, hiện đại",
-    "Tối ưu Bước 1: Loại bỏ lấy video từ link, tập trung hoàn toàn kéo thả & chọn file MP4",
-    "Bổ sung nhận diện thương hiệu vanhkhuc.dev & Dành tặng em bé Trang Vũ <3 trên thanh tiêu đề",
-    "Tích hợp Chromium Browser Extension điều khiển Vbee Studio trực tiếp",
+    "VK Dub Studio v2.1.7 — Dual-Channel WebSocket Bridge & Fix kết nối Extension",
+    "Nâng cấp cầu nối Extension: Hỗ trợ WebSocket trực tiếp kết nối ngay lập tức trên mọi máy tính không cần Python",
+    "Sửa triệt để lỗi không nhận diện tiện ích Extension khi cài đặt trên máy mới",
+    "Tự động tạo Native Messaging Manifest chuẩn xác theo thư mục cài đặt thực tế",
+    "Đồng bộ Extension v2.1.7 với giao diện và logo Cyber Obsidian Pro Studio",
     "Cập nhật an toàn qua HTTPS với xác thực SHA-256"
   ]
 }

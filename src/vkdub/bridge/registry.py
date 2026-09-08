@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import sys
 from pathlib import Path
 
 logger = logging.getLogger("vkdub.bridge.registry")
 
 HOST_NAME = "com.vkdub.bridge"
+EXTENSION_ID = "bnpmffibedppchkljkcaidgijekgfmgl"
 
 REGISTRY_TARGETS = [
     (r"Software\Microsoft\Edge\NativeMessagingHosts", "Microsoft Edge"),
@@ -16,22 +19,64 @@ REGISTRY_TARGETS = [
 ]
 
 
+def find_host_executable() -> Path | None:
+    """Locate vkdub_host.bat in either installed bundle or development tree."""
+    candidates = []
+
+    # 1. If running in PyInstaller frozen environment
+    if getattr(sys, "frozen", False):
+        app_dir = Path(sys.executable).parent
+        candidates.extend([
+            app_dir / "_internal" / "tools" / "native_host" / "vkdub_host.bat",
+            app_dir / "tools" / "native_host" / "vkdub_host.bat",
+        ])
+
+    # 2. Check source tree relative to this file
+    source_root = Path(__file__).resolve().parent.parent.parent.parent
+    candidates.extend([
+        source_root / "tools" / "native_host" / "vkdub_host.bat",
+        Path.cwd() / "tools" / "native_host" / "vkdub_host.bat",
+    ])
+
+    for cand in candidates:
+        if cand.is_file():
+            return cand.resolve()
+    return None
+
+
 def default_manifest_path() -> Path:
-    """Locate the native messaging host manifest in the project or application install tree."""
-    # Check project tools dir
-    cand = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "tools"
+    """Ensure dynamic manifest file with correct host path exists in LOCALAPPDATA."""
+    manifest_dir = (
+        Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
+        / "VKDubStudio"
         / "native_host"
-        / f"{HOST_NAME}.json"
     )
-    if cand.is_file():
-        return cand
-    # Fallback to current working directory tools
-    cand2 = Path.cwd() / "tools" / "native_host" / f"{HOST_NAME}.json"
-    if cand2.is_file():
-        return cand2
-    return cand
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_file = manifest_dir / f"{HOST_NAME}.json"
+
+    host_bat = find_host_executable()
+    host_path_str = str(host_bat) if host_bat else ""
+
+    manifest_data = {
+        "name": HOST_NAME,
+        "description": "VK Dub Studio Native Messaging Bridge Host",
+        "path": host_path_str,
+        "type": "stdio",
+        "allowed_origins": [
+            f"chrome-extension://{EXTENSION_ID}/"
+        ],
+    }
+
+    # Write or update manifest with verified path
+    try:
+        manifest_file.write_text(
+            json.dumps(manifest_data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        logger.warning("Could not write dynamic manifest: %s", exc)
+
+    return manifest_file
 
 
 def ensure_host_registered(manifest_path: Path | None = None) -> bool:
@@ -75,7 +120,10 @@ def ensure_host_registered(manifest_path: Path | None = None) -> bool:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, manifest_str)
             success = True
             logger.info(
-                "Registered Native Messaging Host for %s at HKCU\\%s", browser_name, key_path
+                "Registered Native Messaging Host for %s at HKCU\\%s -> %s",
+                browser_name,
+                key_path,
+                manifest_str,
             )
         except Exception as exc:
             logger.warning("Failed to register native host for %s: %s", browser_name, exc)
