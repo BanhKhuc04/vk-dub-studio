@@ -1,15 +1,14 @@
 {
-  "version": "2.1.5",
-  "published_at": "2026-09-07T05:11:28Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.5/VKDubStudio-Setup-2.1.5.exe",
+  "version": "2.1.6",
+  "published_at": "2026-09-08T04:25:00Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.6/VKDubStudio-Setup-2.1.6.exe",
   "sha256": "395c0dbef56cab1b06c9f29a0a35726342c08439c0e3c398240f5a0790cd4b1f",
   "file_size_bytes": 309999241,
   "changelog": [
-    "VK Dub Studio v2.1.5 — Bản cập nhật vá lỗi và cải tiến trải nghiệm",
-    "Bổ sung quy trình Vbee thủ công: Tải file SRT tiếng Việt về máy và Nhập file audio Vbee để tự động cắt ghép, đồng bộ",
-    "Vá triệt để lỗi kết nối CapCut Voice: Tích hợp sẵn bộ SDK và chuyển sang thực thi trực tiếp in-process (không cần subprocess)",
-    "Vá triệt để lỗi kết nối VieNeu: Tự động dò tìm Python hệ thống, không còn lỗi khi gọi từ bản đóng gói .exe",
-    "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS, xác thực SHA-256 trước khi chạy",
-    "Bảo toàn toàn bộ dự án, cấu hình và phiên đăng nhập qua các lần cập nhật"
+    "VK Dub Studio v2.1.6 — Nâng cấp giao diện Cyber Obsidian Pro Studio & Vbee Extension",
+    "Đại tu giao diện toàn diện: Stepper Sidebar chuyên nghiệp, Media Inspector hiển thị chi tiết video, Floating Player Dock",
+    "Tối ưu Bước 1: Loại bỏ tải link web, tập trung hoàn toàn vào kéo thả & chọn file MP4 trực tiếp",
+    "Tích hợp Chromium Browser Extension: Dubbing tự động trên Vbee qua extension mượt mà, không mở cửa sổ riêng",
+    "Cập nhật an toàn qua HTTPS với xác thực SHA-256"
   ]
 }
