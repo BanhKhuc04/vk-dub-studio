@@ -1,15 +1,15 @@
 {
-  "version": "2.1.11",
-  "published_at": "2026-09-08T17:54:45Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.11/VKDubStudio-Setup-2.1.11.exe",
-  "sha256": "d99fb913d2b537c8811485cfa5c6bd32192fca8a0422bb57274d97eb599f3422",
-  "file_size_bytes": 301734803,
+  "version": "2.1.12",
+  "published_at": "2026-09-08T18:57:57Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.12/VKDubStudio-Setup-2.1.12.exe",
+  "sha256": "f067790f48fadc9743c4f58b9833d7ad7c96f8acce4b5395cf574b33a7631081",
+  "file_size_bytes": 301849839,
   "changelog": [
-    "VK Dub Studio v2.1.11 — Khắc phục triệt để lỗi 'Cần cập nhật CapCut' khi mở dự án",
-    "Tự động nhận diện phiên bản CapCut thực tế trên máy tính để tạo dự án tương thích 100%, không bao giờ bị hỏi cập nhật",
-    "Tự động đồng bộ và sửa toàn bộ các dự án VKDub cũ trong CapCut để mở được ngay lập tức",
-    "Hạ phiên bản template cơ sở xuống CapCut 3.0+ đảm bảo tương thích mọi bản CapCut cũ và mới",
-    "Vá lỗi Vbee & tự động dò tìm FFmpeg/ffprobe trong thư mục ứng dụng",
-    "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS với xác thực mã băm SHA-256"
+    "VK Dub Studio v2.1.12 — Tách biệt Vùng lấy Sub (viền đỏ) và Vùng làm mờ, khắc phục lỗi % Vbee",
+    "Tách biệt hoàn toàn vùng xóa chữ/làm mờ (viền xanh) và vùng lấy phụ đề (viền đỏ, giữ nét video 100%)",
+    "Cho phép tạo nhiều vùng lấy sub (sub ở dưới, sub ở trên) với tùy chỉnh linh hoạt như blur (kéo thả, đổi cỡ, đổi tên, ghim vị trí)",
+    "Khắc phục lỗi Vbee: Cập nhật đúng % tiến độ thực tế từ máy chủ Vbee, chống đóng băng tab ngầm trên Chromium/Edge",
+    "Tải trực tiếp âm thanh Vbee qua API mà không phụ thuộc vào trạng thái active của tab",
+    "Thêm nút '🔴 Vùng Sub' trực tiếp trên thanh công cụ xem trước video"
   ]
 }

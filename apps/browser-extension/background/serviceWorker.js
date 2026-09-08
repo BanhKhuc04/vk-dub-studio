@@ -397,6 +397,7 @@ async function handleChatGPTTranslate(payload) {
 // request_id -> thời điểm bắt đầu, dùng để lọc đúng download khi kết quả
 // VBEE_GENERATE_DONE tới muộn (không còn nằm trong closure của handleVbeeGenerate).
 const vbeeStartedAt = new Map();
+const vbeeWakeIntervals = new Map();
 
 async function handleVbeeGenerate(payload) {
   try {
@@ -452,11 +453,31 @@ async function handleVbeeGenerate(payload) {
     if (!ack || ack.status !== "STARTED") {
       throw new Error("Vbee adapter không xác nhận đã bắt đầu xử lý.");
     }
+
+    // Keep tab awake and unthrottled during generation
+    if (payload?.request_id && tab?.id) {
+      const intervalId = setInterval(() => {
+        chrome.tabs.get(tab.id).then((t) => {
+          if (t && !t.active) {
+            chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+          }
+        }).catch(() => {
+          clearInterval(intervalId);
+        });
+      }, 4000);
+      vbeeWakeIntervals.set(payload.request_id, intervalId);
+    }
     // Kết quả thật sự tới sau (có thể tới 10 phút) qua message "VBEE_GENERATE_DONE"
     // được xử lý trong listener chrome.runtime.onMessage ở cuối file.
   } catch (err) {
     console.error("[SW] Error in handleVbeeGenerate:", err);
-    if (payload?.request_id) vbeeStartedAt.delete(payload.request_id);
+    if (payload?.request_id) {
+      vbeeStartedAt.delete(payload.request_id);
+      if (vbeeWakeIntervals.has(payload.request_id)) {
+        clearInterval(vbeeWakeIntervals.get(payload.request_id));
+        vbeeWakeIntervals.delete(payload.request_id);
+      }
+    }
     bridge.send({
       action: Actions.VBEE_VOICE_RESULT,
       payload: {
@@ -471,7 +492,13 @@ async function handleVbeeGenerate(payload) {
 async function finalizeVbeeResult(resp) {
   const requestId = resp?.request_id;
   const startedAtMs = (requestId && vbeeStartedAt.get(requestId)) || Date.now() - 5000;
-  if (requestId) vbeeStartedAt.delete(requestId);
+  if (requestId) {
+    vbeeStartedAt.delete(requestId);
+    if (vbeeWakeIntervals.has(requestId)) {
+      clearInterval(vbeeWakeIntervals.get(requestId));
+      vbeeWakeIntervals.delete(requestId);
+    }
+  }
 
   if (resp?.download_triggered) {
     const download = await waitForVbeeDownload(resp.job_name, startedAtMs);
@@ -551,6 +578,31 @@ chrome.runtime.onMessage.addListener((message) => {
         payload: { success: false, error: `Vbee: ${err.message}`, request_id: resp?.request_id },
       });
     });
+    return;
+  }
+
+  if (message?.action === "VBEE_PROGRESS" && bridge && bridge.isConnected) {
+    bridge.send({
+      action: Actions.VBEE_PROGRESS,
+      payload: {
+        progress: message.progress,
+        message: message.message,
+        request_id: message.request_id,
+      },
+    });
+    return;
+  }
+
+  if (message?.action === "WAKE_VBEE_TAB") {
+    chrome.tabs.query({}).then((allTabs) => {
+      const vbeeTab = allTabs.find(isVbeeTab);
+      if (vbeeTab && vbeeTab.id) {
+        chrome.tabs.update(vbeeTab.id, { active: true }).catch(() => {});
+        if (vbeeTab.windowId && vbeeTab.windowId !== chrome.windows.WINDOW_ID_NONE) {
+          chrome.windows.update(vbeeTab.windowId, { focused: true }).catch(() => {});
+        }
+      }
+    }).catch(() => {});
     return;
   }
 

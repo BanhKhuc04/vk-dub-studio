@@ -200,9 +200,12 @@ class MainWindow(QMainWindow):
         # Step 3 connections
         self.step3_panel.add_region_requested.connect(self.add_blur_zone)
         self.step3_panel.add_mask_requested.connect(self.add_blur_mask)
+        self.step3_panel.add_sub_region_requested.connect(self.add_sub_region)
         self.step3_panel.delete_region_requested.connect(self._delete_blur_mask)
         self.step3_panel.region_selected.connect(self._on_inspector_region_selected)
         self.step3_panel.region_changed.connect(self._on_inspector_region_changed)
+        self.step3_panel.region_type_changed.connect(self._on_inspector_region_type_changed)
+        self.step3_panel.region_name_changed.connect(self._on_inspector_region_name_changed)
         self.step3_panel.back_requested.connect(lambda: self.switch_to_step(1))
         self.step3_panel.continue_requested.connect(lambda: self.switch_to_step(3))
 
@@ -229,9 +232,11 @@ class MainWindow(QMainWindow):
         self.preview.player.positionChanged.connect(self._script_playback_position)
         self.preview.mask_requested.connect(self.add_blur_mask)
         self.preview.blur_requested.connect(lambda: (self.switch_to_step(2), self.add_blur_zone()))
+        self.preview.sub_region_requested.connect(lambda: (self.switch_to_step(2), self.add_sub_region("bottom")))
         self.preview.subtitle_requested.connect(self.open_subtitle_settings)
         self.preview.subtitle_box_toggled.connect(self._toggle_subtitle_box)
         self.preview.preview_voice_requested.connect(self._preview_voice_clicked)
+        self.preview.video.mask_selected.connect(self._on_canvas_mask_selected)
         self.preview.video.mask_rect_changed.connect(self._on_canvas_mask_rect_changed)
         self.preview.video.mask_delete_requested.connect(self._delete_blur_mask)
         self.preview.video.subtitle_margin_changed.connect(self._on_canvas_subtitle_margin_changed)
@@ -541,27 +546,89 @@ class MainWindow(QMainWindow):
             self.dirty = True
             self.setWindowTitle(self.windowTitle().rstrip(" *") + " *")
 
+    def _on_canvas_mask_selected(self, mask_id: str) -> None:
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.select_mask(mask_id)
+
+    def _on_inspector_region_type_changed(self, mask_id: str, new_type: str) -> None:
+        if self.busy:
+            return
+        mask = next((m for m in self.project.masks if m.id == mask_id), None)
+        if mask:
+            mask.mask_type = new_type
+            self.preview.video.set_masks(
+                self.project.masks, mask_id, self.preview.player.position()
+            )
+            self.preview.video.update()
+            self.dirty = True
+            self.setWindowTitle(self.windowTitle().rstrip(" *") + " *")
+
+    def _on_inspector_region_name_changed(self, mask_id: str, new_name: str) -> None:
+        if self.busy:
+            return
+        mask = next((m for m in self.project.masks if m.id == mask_id), None)
+        if mask:
+            mask.name = new_name
+            self.preview.video.set_masks(
+                self.project.masks, mask_id, self.preview.player.position()
+            )
+            self.preview.video.update()
+            self.dirty = True
+            self.setWindowTitle(self.windowTitle().rstrip(" *") + " *")
+
+    def add_sub_region(self, position: str = "bottom") -> None:
+        """Thêm vùng lấy phụ đề (viền đỏ, không làm mờ video, hỗ trợ nhiều vùng)."""
+        if self.busy or not self.project.video_path:
+            return
+        sub_count = sum(1 for m in self.project.masks if m.mask_type == "sub_region")
+        pos_label = "Dưới" if position == "bottom" else "Trên"
+        name = f"Vùng lấy sub ({pos_label})"
+        if sub_count > 0:
+            name += f" #{sub_count + 1}"
+        y_pos = 0.76 if position == "bottom" else 0.06
+        mask = MaskItem(
+            name=name,
+            mask_type="sub_region",
+            x=0.08,
+            y=y_pos,
+            width=0.84,
+            height=0.15,
+            blur_strength=1,
+        )
+        self.project.masks.append(mask)
+        self.preview.video.set_masks(self.project.masks, mask.id, self.preview.player.position())
+        self.preview.video.interactive_mask_mode = True
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.set_masks(self.project.masks, mask.id)
+        self.dirty = True
+        self._refresh()
+        self.statusBar().showMessage(
+            f"Đã thêm {name} (Viền màu đỏ): Kéo để di chuyển · Kéo góc để đổi kích cỡ",
+            10000,
+        )
+
     def add_blur_mask(self) -> None:
         if self.busy or not self.project.video_path:
             return
-        # Giữ duy nhất 1 khung chọn khu vực phụ đề có thể điều chỉnh phạm vi
-        if self.project.masks:
-            mask = self.project.masks[0]
+        erase_mask = next((m for m in self.project.masks if m.mask_type == "erase"), None)
+        if erase_mask:
             self.preview.video.set_masks(
-                self.project.masks, mask.id, self.preview.player.position()
+                self.project.masks, erase_mask.id, self.preview.player.position()
             )
             self.preview.video.interactive_mask_mode = True
             self.preview.video.update()
             if hasattr(self, "step3_panel"):
-                self.step3_panel.set_masks(self.project.masks, mask.id)
+                self.step3_panel.set_masks(self.project.masks, erase_mask.id)
             self.statusBar().showMessage(
                 "Khung che phụ đề: Kéo để di chuyển · Kéo góc để đổi kích thước bao trọn phụ đề cũ",
                 8000,
             )
             return
 
+        erase_count = sum(1 for m in self.project.masks if m.mask_type == "erase")
+        name = "Khung che phụ đề" if erase_count == 0 else f"Khung che phụ đề #{erase_count + 1}"
         mask = MaskItem(
-            name="Khung che phụ đề",
+            name=name,
             mask_type="erase",
             x=0.08,
             y=0.76,

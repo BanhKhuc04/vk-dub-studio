@@ -345,6 +345,19 @@ class LocalAgent(QObject):
                 event, container = self._pending_requests[req_id]
                 container.update(payload)
                 event.set()
+        elif action == Actions.VBEE_PROGRESS:
+            payload = msg.get("payload", {})
+            req_id = payload.get("request_id")
+            pct = payload.get("progress")
+            msg_text = payload.get("message")
+            if req_id and req_id in self._pending_requests:
+                _, container = self._pending_requests[req_id]
+                if pct is not None:
+                    container["vbee_progress"] = pct
+                if msg_text:
+                    container["vbee_progress_msg"] = msg_text
+            if msg_text:
+                self.log_emitted.emit(f"🌐 [Vbee] {msg_text}")
         elif action == Actions.LOG_EVENT:
             payload = msg.get("payload", {})
             log_msg = payload.get("message") if isinstance(payload, dict) else None
@@ -479,13 +492,22 @@ class LocalAgent(QObject):
                 elapsed = int(time.monotonic() - t_start)
                 if elapsed >= timeout_s:
                     break
-                self.log_emitted.emit(f"⏳ Vbee đang tổng hợp và tải audio ({elapsed}s)...")
+                real_pct = container.get("vbee_progress")
+                real_msg = container.get("vbee_progress_msg")
                 if progress_callback:
-                    pct = min(85, 40 + int((elapsed / 60.0) * 45))
-                    progress_callback(pct, f"Vbee đang xử lý phụ đề thành voice ({elapsed}s)…")
+                    if real_pct is not None and real_pct >= 0:
+                        mapped_pct = int(min(100, max(0, real_pct)))
+                        msg_text = real_msg or f"Vbee: Đang tổng hợp giọng nói ({mapped_pct}%)…"
+                        progress_callback(mapped_pct, msg_text)
+                    else:
+                        pct = min(85, 15 + int((elapsed / 60.0) * 45))
+                        progress_callback(pct, f"Vbee đang xử lý phụ đề ({elapsed}s)…")
 
             if not completed:
                 raise TimeoutError(f"Quá thời gian chờ tạo voice từ Vbee ({timeout_s}s).")
+
+            if progress_callback:
+                progress_callback(100, "Vbee: Đã tạo xong giọng đọc 100%!")
 
             logger.info(
                 "Vbee response: request_id=%s job=%s success=%s base64=%s url=%s "

@@ -104,6 +104,7 @@ class MaskEditorDialog(QDialog):
         self.type_combo.addItem("Xóa chữ — hòa nền (Khuyên dùng)", "erase")
         self.type_combo.addItem("Làm mờ mạnh", "blur")
         self.type_combo.addItem("Màu đặc", "solid")
+        self.type_combo.addItem("🔴 Vùng lấy Sub (Viền đỏ, không mờ)", "sub_region")
         self.type_combo.currentIndexChanged.connect(self._on_input_changed)
         basic_form.addRow("Kiểu che:", self.type_combo)
 
@@ -279,7 +280,7 @@ class MaskEditorDialog(QDialog):
         self.table.setRowCount(len(self.masks))
         for row, mask in enumerate(self.masks):
             item_name = QTableWidgetItem(mask.name)
-            type_labels = {"erase": "Xóa chữ", "blur": "Làm mờ", "solid": "Màu đặc"}
+            type_labels = {"erase": "Xóa chữ", "blur": "Làm mờ", "solid": "Màu đặc", "sub_region": "🔴 Lấy Sub"}
             item_type = QTableWidgetItem(type_labels.get(mask.mask_type, "Làm mờ"))
             if mask.start_ms == 0 and mask.end_ms == 0:
                 time_str = "Toàn bộ video"

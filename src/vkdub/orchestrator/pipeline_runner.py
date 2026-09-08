@@ -95,6 +95,10 @@ class PipelineRunner(QThread):
     def cancel(self) -> None:
         self.cancel_event.set()
 
+    def _check_cancel(self) -> None:
+        if self.cancel_event.is_set():
+            raise InterruptedError("Tiến trình đã bị người dùng hủy.")
+
     def _update_substep(
         self,
         step_id: str,
@@ -612,6 +616,10 @@ class PipelineRunner(QThread):
                         voice_name=self.voice_name,
                         speed=self.speed,
                         timeout_s=600.0,
+                        check_cancel=self._check_cancel,
+                        progress_callback=lambda pct, msg: self._update_substep(
+                            "4.4", SubstepStatus.RUNNING, pct, msg
+                        ),
                     )
                     self.artifacts.vbee_master_audio = saved_vbee_audio
                     audio_size_kb = saved_vbee_audio.stat().st_size // 1024 if saved_vbee_audio.exists() else 0

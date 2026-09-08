@@ -623,7 +623,8 @@ def export_capcut_project(
 
         video_source = project.video_path
         final_video_source = project.video_path
-        if project.masks:
+        has_visual_masks = any(m.mask_type in ("erase", "blur", "solid") for m in project.masks)
+        if has_visual_masks:
             if not ffmpeg:
                 raise ValueError("Cần FFmpeg để áp dụng vùng xóa chữ trước khi xuất CapCut.")
             video_source = assets / "video-da-xoa-chu.mp4"

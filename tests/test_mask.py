@@ -186,3 +186,67 @@ def test_mask_editor_dialog_actions(qtbot):
     dialog._delete_mask()
     assert dialog.table.rowCount() == 2
     assert len(dialog.masks) == 2
+
+
+def test_sub_region_skips_ffmpeg_filter():
+    sub_mask = MaskItem(
+        id="sub-1",
+        name="Vùng lấy sub",
+        mask_type="sub_region",
+        x=0.08,
+        y=0.76,
+        width=0.84,
+        height=0.15,
+    )
+    # sub_region masks must not generate blur or delogo filters
+    filter_chain = build_ffmpeg_mask_filter([sub_mask], 1920, 1080)
+    assert filter_chain == ""
+
+
+def test_step3_panel_sub_region_operations(qtbot):
+    from vkdub.ui.panels.step3_blur_panel import Step3BlurPanel
+
+    panel = Step3BlurPanel()
+    qtbot.addWidget(panel)
+
+    m1 = MaskItem(
+        id="sub-bottom",
+        name="Sub dưới",
+        mask_type="sub_region",
+        x=0.08,
+        y=0.76,
+        width=0.84,
+        height=0.15,
+    )
+    m2 = MaskItem(
+        id="blur-1",
+        name="Logo mờ",
+        mask_type="blur",
+        x=0.1,
+        y=0.05,
+        width=0.2,
+        height=0.1,
+    )
+    panel.set_masks([m1, m2], active_id="sub-bottom")
+    panel.show()
+    assert panel.region_list.count() == 2
+    assert "🔴 [LẤY SUB]" in panel.region_list.item(0).text()
+    assert "🌫 [LÀM MỜ]" in panel.region_list.item(1).text()
+
+    # Sub banner is visible, blur box is hidden for sub_region
+    assert panel.sub_banner.isVisible() is True
+    assert panel.blur_box_widget.isVisible() is False
+
+    # Snap presets
+    panel._snap_top()
+    assert panel.spin_y.value() == 6.0
+    assert panel.spin_h.value() == 15.0
+
+    panel._snap_bottom()
+    assert panel.spin_y.value() == 76.0
+
+    # Summary
+    summary = panel.regions_summary()
+    assert "1 vùng sub (viền đỏ)" in summary
+    assert "1 vùng làm mờ" in summary
+

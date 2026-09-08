@@ -32,6 +32,7 @@ class VideoPreview(QFrame):
     playback_error = Signal(str)
     mask_requested = Signal()
     blur_requested = Signal()
+    sub_region_requested = Signal()
     subtitle_requested = Signal()
     subtitle_box_toggled = Signal(bool)
     preview_voice_requested = Signal()
@@ -168,6 +169,27 @@ class VideoPreview(QFrame):
         self.btn_blur.clicked.connect(self._blur_clicked)
         controls.addWidget(self.btn_blur)
 
+        self.btn_sub_region = QPushButton("🔴 Vùng Sub")
+        self.btn_sub_region.setToolTip("Thêm hoặc chỉnh vùng lấy phụ đề (viền đỏ, không mờ video)")
+        self.btn_sub_region.setStyleSheet("""
+            QPushButton {
+                background-color: #1a0d14;
+                color: #fca5a5;
+                border: 1px solid #7f1d1d;
+                border-radius: 6px;
+                padding: 5px 12px;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background-color: #2b111a;
+                border-color: #ef4444;
+                color: #ffffff;
+            }
+        """)
+        self.btn_sub_region.clicked.connect(self._sub_region_clicked)
+        controls.addWidget(self.btn_sub_region)
+
         self.btn_preview_voice = QPushButton("🎵 Nghe Voice")
         self.btn_preview_voice.setToolTip("Nghe thử voice lồng tiếng đã tạo")
         self.btn_preview_voice.setStyleSheet(btn_tool_style)
@@ -255,6 +277,9 @@ class VideoPreview(QFrame):
 
     def _blur_clicked(self) -> None:
         self.blur_requested.emit()
+
+    def _sub_region_clicked(self) -> None:
+        self.sub_region_requested.emit()
 
     def _subtitle_clicked(self) -> None:
         self.subtitle_requested.emit()

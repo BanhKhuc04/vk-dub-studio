@@ -24,6 +24,8 @@ def build_ffmpeg_mask_filter(
     """
     filters: list[str] = []
     for index, mask in enumerate(masks):
+        if mask.mask_type == "sub_region":
+            continue
         px_x, px_y, px_w, px_h = mask.to_pixel_rect(video_width, video_height)
 
         # Build enable expression

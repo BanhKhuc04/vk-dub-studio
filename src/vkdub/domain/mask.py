@@ -9,7 +9,7 @@ class MaskItem:
 
     id: str = ""
     name: str = "Vùng che mới"
-    mask_type: str = "erase"  # 'erase', 'blur', or 'solid'
+    mask_type: str = "erase"  # 'erase', 'blur', 'solid', or 'sub_region' (vùng lấy sub viền đỏ)
     x: float = 0.1  # Normalized 0.0 to 1.0 relative to video width
     y: float = 0.8  # Normalized 0.0 to 1.0 relative to video height
     width: float = 0.8  # Normalized 0.0 to 1.0

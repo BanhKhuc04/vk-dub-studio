@@ -103,30 +103,64 @@
     return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   }
 
-  async function getCompletedAudioFromApi(jobName) {
-    try {
-      const apiUrl =
-        "https://vbee.vn/api/v2/requests?type=dubbing&limit=5&sort=-createdAt&fields=id,title,characters,credits,seconds,createdAt,progress,status,voice,audioType,audioLink";
-      const res = await fetch(apiUrl, { credentials: "include" });
-      if (res.ok) {
-        const json = await res.json();
-        const reqs = json?.result?.requests || json?.data?.requests || json?.data || [];
-        for (const req of reqs) {
-          const title = String(req.title || req.name || "");
-          const matchesJob =
-            jobName && normalizedJobKey(title).includes(normalizedJobKey(jobName));
-          if (matchesJob && (req.status === 1 || req.status === "SUCCESS" || req.progress === 100) && req.audioLink) {
-            return {
-              id: req.id,
-              title: req.title,
-              audioUrl: req.audioLink,
-              createdAt: req.createdAt,
-            };
+  async function queryVbeeRequest(jobName, requireJobMatch = false) {
+    const endpoints = [
+      "https://vbee.vn/api/v2/requests?type=dubbing&limit=5&sort=-createdAt&fields=id,title,characters,credits,seconds,createdAt,progress,status,voice,audioType,audioLink",
+      `${window.location.origin}/api/v2/requests?type=dubbing&limit=5&sort=-createdAt&fields=id,title,characters,credits,seconds,createdAt,progress,status,voice,audioType,audioLink`,
+    ];
+    for (const apiUrl of endpoints) {
+      try {
+        const res = await fetch(apiUrl, { credentials: "include" });
+        if (res.ok) {
+          const json = await res.json();
+          const reqs = json?.result?.requests || json?.data?.requests || json?.data || [];
+          for (const req of reqs) {
+            const title = String(req.title || req.name || "");
+            const matchesJob =
+              !jobName || normalizedJobKey(title).includes(normalizedJobKey(jobName));
+            if (matchesJob) {
+              const rawProg = req.progress;
+              const isSuccess = req.status === 1 || req.status === "SUCCESS";
+              const progNum = typeof rawProg === "number" ? rawProg : (isSuccess ? 100 : 0);
+              return {
+                id: req.id,
+                title: req.title,
+                progress: Math.max(0, Math.min(100, Math.round(progNum))),
+                status: req.status,
+                audioUrl: req.audioLink || null,
+                createdAt: req.createdAt,
+              };
+            }
+          }
+          if (!requireJobMatch && reqs.length > 0) {
+            const newest = reqs[0];
+            const createdTime = new Date(newest.createdAt || Date.now()).getTime();
+            if (Date.now() - createdTime < 900000) {
+              const rawProg = newest.progress;
+              const isSuccess = newest.status === 1 || newest.status === "SUCCESS";
+              const progNum = typeof rawProg === "number" ? rawProg : (isSuccess ? 100 : 0);
+              return {
+                id: newest.id,
+                title: newest.title,
+                progress: Math.max(0, Math.min(100, Math.round(progNum))),
+                status: newest.status,
+                audioUrl: newest.audioLink || null,
+                createdAt: newest.createdAt,
+              };
+            }
           }
         }
+      } catch (err) {
+        console.warn("[VbeeAdapter] Error querying requests API:", apiUrl, err);
       }
-    } catch (err) {
-      console.warn("[VbeeAdapter] Error querying requests API:", err);
+    }
+    return null;
+  }
+
+  async function getCompletedAudioFromApi(jobName) {
+    const req = await queryVbeeRequest(jobName, true);
+    if (req && (req.status === 1 || req.status === "SUCCESS" || req.progress === 100) && req.audioUrl) {
+      return req;
     }
     return null;
   }
@@ -345,41 +379,57 @@
         throw new Error("Tài khoản Vbee đã hết số dư ký tự hoặc vượt quá hạn mức.");
       }
 
-      const now = Date.now();
-      if (now - lastLogTime > 4000) {
-        lastLogTime = now;
-        try {
-          const firstRow = findJobRow(job_name);
-          const rowText = firstRow ? (firstRow.innerText || "") : "";
-          const pctMatch = rowText.match(/(\d{1,3})%/);
-          if (pctMatch) {
-            chrome.runtime.sendMessage({
-              action: "LOG_EVENT",
-              message: `Vbee: Đang tổng hợp giọng nói (${pctMatch[1]}%)...`,
-            });
-          } else {
-            chrome.runtime.sendMessage({
-              action: "LOG_EVENT",
-              message: "Vbee: Đang tổng hợp giọng nói kịch bản...",
-            });
-          }
-        } catch (e) {}
-      }
-
-      // Check API first for completed audio link
-      const apiJob = await getCompletedAudioFromApi(job_name);
-      if (apiJob && apiJob.audioUrl) {
-        console.log("[VbeeAdapter] Completion detected via API! audioUrl:", apiJob.audioUrl);
+      // Query real server status via Vbee API
+      const apiReq = await queryVbeeRequest(job_name, false);
+      if (apiReq) {
+        const pct = Math.max(0, Math.min(100, Math.round(apiReq.progress || 0)));
         try {
           chrome.runtime.sendMessage({
-            action: "LOG_EVENT",
-            message: "Vbee: Đã hoàn tất tạo giọng đọc! Đang tải audio về máy...",
+            action: "VBEE_PROGRESS",
+            progress: pct,
+            message: `Vbee: Đang tổng hợp giọng nói (${pct}%)...`,
+            request_id: request_id,
           });
         } catch (e) {}
-        return await completedResult(apiJob, request_id, job_name);
+
+        const now = Date.now();
+        if (now - lastLogTime > 2500) {
+          lastLogTime = now;
+          try {
+            chrome.runtime.sendMessage({
+              action: "LOG_EVENT",
+              message: `Vbee: Đang tổng hợp giọng nói (${pct}%)...`,
+            });
+          } catch (e) {}
+        }
+
+        // If completed and audioLink is ready, return directly without needing DOM click
+        if ((apiReq.status === 1 || apiReq.status === "SUCCESS" || pct === 100) && apiReq.audioUrl) {
+          console.log("[VbeeAdapter] Completion detected via API with direct audioUrl:", apiReq.audioUrl);
+          try {
+            chrome.runtime.sendMessage({
+              action: "VBEE_PROGRESS",
+              progress: 100,
+              message: "Vbee: Đã hoàn tất tạo giọng đọc 100%!",
+              request_id: request_id,
+            });
+            chrome.runtime.sendMessage({
+              action: "LOG_EVENT",
+              message: "Vbee: Đã hoàn tất tạo giọng đọc 100%! Đang chuyển file âm thanh về máy...",
+            });
+          } catch (e) {}
+          return await completedResult(apiReq, request_id, job_name);
+        }
+
+        // If 100% or done in API but audioUrl not in API, wake tab so DOM unfreezes
+        if (apiReq.status === 1 || apiReq.status === "SUCCESS" || pct === 100) {
+          try {
+            chrome.runtime.sendMessage({ action: "WAKE_VBEE_TAB" });
+          } catch (e) {}
+        }
       }
 
-      // Check only the row for this script identity; never use another recent Vbee job.
+      // Check DOM row fallback
       const firstRow = findJobRow(job_name);
       if (firstRow) {
         const rowText = firstRow.innerText || "";
@@ -391,8 +441,14 @@
             console.log("[VbeeAdapter] Completion detected in DOM row! Clicking download...");
             try {
               chrome.runtime.sendMessage({
+                action: "VBEE_PROGRESS",
+                progress: 100,
+                message: "Vbee: Đã hoàn tất tạo giọng đọc 100%!",
+                request_id: request_id,
+              });
+              chrome.runtime.sendMessage({
                 action: "LOG_EVENT",
-                message: "Vbee: Đã hoàn tất tạo giọng đọc trong hàng dự án! Đang bấm tải xuống...",
+                message: "Vbee: Đã hoàn tất tạo giọng đọc! Đang bấm tải xuống...",
               });
             } catch (e) {}
             safeClick(rowDlBtn);
@@ -406,7 +462,14 @@
         }
       }
 
-      await new Promise((r) => setTimeout(r, 2000));
+      // Periodically wake tab every 5s so Edge does not freeze background timers
+      if (Math.floor((Date.now() - startTime) / 1000) % 5 === 0) {
+        try {
+          chrome.runtime.sendMessage({ action: "WAKE_VBEE_TAB" });
+        } catch (e) {}
+      }
+
+      await new Promise((r) => setTimeout(r, 1200));
     }
 
     throw new Error("Quá thời gian xử lý giọng đọc trên Vbee (hơn 10 phút).");

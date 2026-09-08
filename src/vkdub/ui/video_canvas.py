@@ -184,6 +184,45 @@ class VideoCanvas(QWidget):
             rect = self._mask_rect(mask)
             local = rect.translated(-frame_rect.topLeft())
             prefix += (local.x(), local.y(), local.width(), local.height())
+
+            if mask.mask_type == "sub_region":
+                # Subtitle extraction region: Distinct red border and badge, no pixel blur
+                painter.fillRect(rect, QColor(239, 68, 68, 28))
+                is_active = self.interactive_mask_mode and mask.id == self.active_mask_id
+                border_color = QColor("#ef4444")
+                pen_style = Qt.PenStyle.SolidLine if is_active else Qt.PenStyle.DashLine
+                pen_width = 2 if is_active else 1
+                painter.setPen(QPen(border_color, pen_width, pen_style))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(rect)
+
+                # Badge label at top-left
+                badge_text = f"🔴 {mask.name or 'Vùng lấy sub'}"
+                font = painter.font()
+                font.setPixelSize(10)
+                font.setBold(True)
+                painter.setFont(font)
+                fm = QFontMetrics(font)
+                text_w = fm.horizontalAdvance(badge_text) + 12
+                text_h = 18
+                badge_y = rect.top() - text_h - 2 if rect.top() >= text_h + 2 else rect.top() + 2
+                badge_rect = QRect(rect.left(), badge_y, text_w, text_h)
+                painter.fillRect(badge_rect, QColor(185, 28, 28, 220))
+                painter.setPen(QColor("#ffffff"))
+                painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, badge_text)
+
+                if is_active:
+                    painter.setBrush(QColor("#ef4444"))
+                    painter.setPen(QPen(QColor("#ffffff"), 1))
+                    for corner in (
+                        rect.topLeft(),
+                        rect.topRight(),
+                        rect.bottomLeft(),
+                        rect.bottomRight(),
+                    ):
+                        painter.drawRect(QRect(corner.x() - 4, corner.y() - 4, 8, 8))
+                continue
+
             if mask.mask_type == "solid":
                 # Keep existing solid masks in saved projects compatible.
                 color = QColor(mask.color)
