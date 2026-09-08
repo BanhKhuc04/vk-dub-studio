@@ -24,7 +24,11 @@ from vkdub.integrations.vbee.errors import (
     VoiceStorageFailedError,
 )
 from vkdub.integrations.vbee.importer import slice_and_import_vbee_audio
-from vkdub.integrations.vbee.provider import VbeeBrowserProvider, VoiceProvider
+from vkdub.integrations.vbee.provider import (
+    VbeeBrowserProvider,
+    VbeeExtensionProvider,
+    VoiceProvider,
+)
 from vkdub.integrations.vbee.state import CHECKLIST_STEPS, WorkflowState
 from vkdub.integrations.vbee.workflow import (
     VbeeVoiceWorkflow,
@@ -38,6 +42,7 @@ __all__ = [
     "VbeeBrowserLaunchFailedError",
     "VbeeBrowserNotFoundError",
     "VbeeBrowserProvider",
+    "VbeeExtensionProvider",
     "VbeeConversionFailedError",
     "VbeeDownloadError",
     "VbeeError",

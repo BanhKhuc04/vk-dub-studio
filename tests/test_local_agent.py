@@ -7,7 +7,7 @@ import time
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from vkdub.bridge.local_agent import LocalAgent
+from vkdub.bridge.local_agent import LocalAgent, _looks_like_audio, _wait_for_correlated_audio
 from vkdub.bridge.protocol import Actions, BridgeStatus
 
 TEST_PORT = 59814
@@ -128,7 +128,7 @@ def test_local_agent_translate_and_vbee_sync(qapp, tmp_path):
                         }
                         client.sendall((json.dumps(reply) + "\n").encode("utf-8"))
                     elif action == Actions.VBEE_GENERATE_VOICE:
-                        fake_audio = b"ID3\x03\x00\x00\x00FAKE_AUDIO_DATA"
+                        fake_audio = b"ID3\x03\x00\x00\x00" + (b"FAKE_AUDIO_DATA" * 100)
                         reply = {
                             "action": Actions.VBEE_VOICE_RESULT,
                             "payload": {
@@ -156,3 +156,91 @@ def test_local_agent_translate_and_vbee_sync(qapp, tmp_path):
 
     client.close()
     agent.stop()
+
+
+def test_audio_payload_validation_rejects_empty_or_html():
+    assert not _looks_like_audio(b"")
+    assert not _looks_like_audio(b"<html>not audio</html>" * 100)
+    assert _looks_like_audio(b"ID3\x04\x00\x00" + (b"\0" * 2048))
+
+
+def test_wait_for_correlated_audio_accepts_only_matching_stable_download(
+    monkeypatch, tmp_path
+):
+    import vkdub.bridge.local_agent as local_agent_module
+
+    unrelated = tmp_path / "other_job.mp3"
+    unrelated.write_bytes(b"ID3" + (b"x" * 2048))
+    # Vbee sanitizes the uploaded job title and removes underscores.
+    expected = tmp_path / "vkdubabc123_result.mp3.crdownload"
+    expected.write_bytes(b"ID3" + (b"y" * 2048))
+    monkeypatch.setattr(local_agent_module, "_edge_download_directories", lambda: [tmp_path])
+
+    found = _wait_for_correlated_audio("vkdub_abc123", timeout_s=2.0)
+
+    assert found == expected
+
+
+def test_generate_vbee_sync_recovers_correlated_edge_partial_download(
+    qapp, monkeypatch, tmp_path
+):
+    import vkdub.bridge.local_agent as local_agent_module
+
+    agent = LocalAgent()
+    agent.status.browser_connected = True
+    monkeypatch.setattr(local_agent_module, "_edge_download_directories", lambda: [tmp_path])
+
+    def fake_send(action, payload=None):
+        assert action == Actions.VBEE_GENERATE_VOICE
+        assert payload is not None
+        job_name = payload["job_name"]
+        downloaded = tmp_path / f"{job_name}_result.mp3.crdownload"
+        downloaded.write_bytes(b"ID3" + (b"voice" * 500))
+        agent._process_message(
+            json.dumps(
+                {
+                    "action": Actions.VBEE_VOICE_RESULT,
+                    "payload": {
+                        "success": True,
+                        "download_triggered": True,
+                        "download_path": str(downloaded)[: -len(".crdownload")],
+                        "job_name": job_name,
+                        "request_id": payload["request_id"],
+                    },
+                }
+            )
+        )
+        return True
+
+    monkeypatch.setattr(agent, "send_command", fake_send)
+    target = tmp_path / "master.mp3"
+
+    saved = agent.generate_vbee_sync("1\n00:00:00,000 --> 00:00:01,000\nXin chào", target)
+
+    assert saved == target
+    assert saved.read_bytes().startswith(b"ID3")
+
+
+def test_generate_vbee_sync_rejects_success_without_audio(qapp, monkeypatch, tmp_path):
+    agent = LocalAgent()
+    agent.status.browser_connected = True
+
+    def fake_send(action, payload=None):
+        assert payload is not None
+        agent._process_message(
+            json.dumps(
+                {
+                    "action": Actions.VBEE_VOICE_RESULT,
+                    "payload": {
+                        "success": True,
+                        "request_id": payload["request_id"],
+                    },
+                }
+            )
+        )
+        return True
+
+    monkeypatch.setattr(agent, "send_command", fake_send)
+
+    with pytest.raises(RuntimeError, match="không trả audio"):
+        agent.generate_vbee_sync("valid srt", tmp_path / "must-not-exist.mp3")

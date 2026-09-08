@@ -46,13 +46,13 @@ class VbeeWorkflowDialog(QDialog):
         # Title & Subtitle
         header = QVBoxLayout()
         header.setSpacing(4)
-        title_lbl = QLabel("TẠO VOICE TỰ ĐỘNG BẰNG VBEE")
+        title_lbl = QLabel("TẠO VOICE TỰ ĐỘNG BẰNG VBEE (EDGE EXTENSION)")
         title_lbl.setStyleSheet("font-size: 15px; font-weight: bold; color: #38bdf8;")
         header.addWidget(title_lbl)
 
         desc_lbl = QLabel(
-            "Tự động xuất phụ đề SRT tiếng Việt, mở Vbee Dubbing, tải SRT, theo dõi "
-            "xử lý, tải âm thanh và đồng bộ trực tiếp vào project."
+            "Tự động xuất phụ đề SRT tiếng Việt, gửi qua tiện ích VK Dub Studio Bridge trong Edge, "
+            "tổng hợp âm thanh Vbee và đồng bộ trực tiếp vào project."
         )
         desc_lbl.setWordWrap(True)
         desc_lbl.setStyleSheet("color: #94a3b8; font-size: 12px;")

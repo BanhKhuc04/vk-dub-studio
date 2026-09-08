@@ -2,9 +2,9 @@
  * VK Dub Studio — ChatGPT Content Script Adapter (H6.1 Automation)
  *
  * Implements end-to-end automated SRT translation:
- * 1. Opens or focuses conversation.
- * 2. Injects prompt instructions and original SRT content.
- * 3. Submits prompt and waits for generation to complete.
+ * 1. Verifies input field in conversation.
+ * 2. Injects prompt instructions and original SRT content with modern React/Lexical support.
+ * 3. Submits prompt and waits for streaming to complete.
  * 4. Extracts translated SRT code block from the response.
  * 5. Returns raw SRT text to background service worker.
  */
@@ -14,11 +14,7 @@
   const CHATGPT_TRANSLATE_ACTION = "CHATGPT_TRANSLATE";
 
   function checkLoginState() {
-    const hasPromptInput = !!(
-      document.querySelector("#prompt-textarea") ||
-      document.querySelector("textarea[placeholder*='Message']") ||
-      document.querySelector("div[contenteditable='true'][id*='prompt']")
-    );
+    const hasPromptInput = !!findPromptInput();
 
     const hasUserMenu = !!(
       document.querySelector("[data-testid='user-menu-button']") ||
@@ -40,6 +36,7 @@
     return {
       available: true,
       logged_in: isLoggedIn,
+      version: "2.2.0",
       has_input: hasPromptInput,
       has_user_menu: hasUserMenu,
       url: window.location.href,
@@ -50,9 +47,11 @@
   function findPromptInput() {
     return (
       document.querySelector("#prompt-textarea") ||
+      document.querySelector("div[placeholder*='Ask ChatGPT'], div[placeholder*='Hỏi ChatGPT'], [data-placeholder*='Ask ChatGPT'], [data-placeholder*='Hỏi ChatGPT']") ||
       document.querySelector("div[contenteditable='true'][id*='prompt']") ||
+      document.querySelector("div[contenteditable='true']") ||
       document.querySelector("textarea[placeholder*='Message']") ||
-      document.querySelector("div[contenteditable='true']")
+      document.querySelector("textarea")
     );
   }
 
@@ -62,6 +61,8 @@
       document.querySelector("button[data-testid='fruitjuice-send-button']") ||
       document.querySelector("button[aria-label='Send prompt']") ||
       document.querySelector("button[aria-label='Gửi tin nhắn']") ||
+      document.querySelector("button[aria-label*='Send']") ||
+      document.querySelector("button[aria-label*='Gửi']") ||
       document.querySelector("form button:has(svg)")
     );
   }
@@ -75,10 +76,62 @@
     );
   }
 
+  function insertPromptText(inputEl, promptText) {
+    inputEl.focus();
+
+    // Strategy 1: document.execCommand (optimal for ProseMirror/Lexical contenteditable)
+    let execSuccess = false;
+    try {
+      if (inputEl.isContentEditable) {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(inputEl);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        execSuccess = document.execCommand("insertText", false, promptText);
+      }
+    } catch (e) {
+      console.warn("[ChatGPTAdapter] execCommand error:", e);
+    }
+
+    if (!execSuccess) {
+      if (inputEl.tagName && inputEl.tagName.toLowerCase() === "textarea") {
+        try {
+          const setter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype,
+            "value"
+          )?.set;
+          if (setter) {
+            setter.call(inputEl, promptText);
+          } else {
+            inputEl.value = promptText;
+          }
+        } catch (e) {
+          inputEl.value = promptText;
+        }
+        inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+        inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+      } else {
+        // Fallback for contenteditable div
+        inputEl.innerText = promptText;
+        inputEl.dispatchEvent(
+          new InputEvent("input", {
+            bubbles: true,
+            cancelable: true,
+            inputType: "insertText",
+            data: promptText,
+          })
+        );
+      }
+    }
+  }
+
   function extractSRTFromResponses() {
     // Look at all assistant message containers
     const assistantMessages = Array.from(
-      document.querySelectorAll("div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']")
+      document.querySelectorAll(
+        "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
+      )
     );
 
     if (!assistantMessages.length) return null;
@@ -93,7 +146,7 @@
       }
     }
 
-    // Priority 2: Full message text if code block not used
+    // Priority 2: Full message text if code block was not formatted by AI
     const fullText = lastMessage.innerText || lastMessage.textContent || "";
     if (fullText.includes("-->") && /\d{1,2}:\d{2}:\d{2}/.test(fullText)) {
       return cleanSRTText(fullText);
@@ -119,6 +172,13 @@
   async function executeTranslation({ srt_content, prompt_instruction, request_id }) {
     console.log("[ChatGPTAdapter] Executing translation for request:", request_id);
 
+    try {
+      chrome.runtime.sendMessage({
+        action: "LOG_EVENT",
+        message: "ChatGPT: Đang chuẩn bị gửi kịch bản vào ô nhập liệu...",
+      });
+    } catch (e) {}
+
     // 1. Wait for input to be ready
     let inputEl = null;
     for (let i = 0; i < 30; i++) {
@@ -143,47 +203,100 @@
       srt_content +
       "\n--- HẾT ---";
 
-    const promptText = prompt_instruction ? `${prompt_instruction}\n\n${srt_content}` : defaultInstruction;
+    const promptText = prompt_instruction
+      ? `${prompt_instruction}\n\n${srt_content}`
+      : defaultInstruction;
 
     // 3. Inject text into input element
-    inputEl.focus();
-    if (inputEl.tagName.toLowerCase() === "textarea") {
-      inputEl.value = promptText;
-      inputEl.dispatchEvent(new Event("input", { bubbles: true }));
-      inputEl.dispatchEvent(new Event("change", { bubbles: true }));
-    } else {
-      // Contenteditable div
-      inputEl.innerText = promptText;
-      inputEl.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
-    }
-
-    await new Promise((r) => setTimeout(r, 600));
+    insertPromptText(inputEl, promptText);
+    await new Promise((r) => setTimeout(r, 800));
 
     // 4. Click send button
     let sendBtn = null;
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 20; i++) {
       sendBtn = findSendButton();
       if (sendBtn && !sendBtn.disabled) break;
-      await new Promise((r) => setTimeout(r, 400));
+      inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
     }
 
-    if (!sendBtn) {
-      // Fallback: trigger Enter key
-      inputEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true }));
-    } else {
+    if (sendBtn && !sendBtn.disabled) {
       sendBtn.click();
+    } else {
+      // Fallback: trigger Enter key
+      inputEl.focus();
+      inputEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          code: "Enter",
+          keyCode: 13,
+          bubbles: true,
+        })
+      );
+      inputEl.dispatchEvent(
+        new KeyboardEvent("keyup", {
+          key: "Enter",
+          code: "Enter",
+          keyCode: 13,
+          bubbles: true,
+        })
+      );
+      if (sendBtn) {
+        try {
+          sendBtn.click();
+        } catch (e) {}
+      }
     }
 
     console.log("[ChatGPTAdapter] Prompt submitted. Waiting for generation to complete...");
+    try {
+      chrome.runtime.sendMessage({
+        action: "LOG_EVENT",
+        message: "ChatGPT: Đã gửi kịch bản sang AI. Đang chờ AI phản hồi...",
+      });
+    } catch (e) {}
 
     // 5. Wait for streaming to start then complete
     await new Promise((r) => setTimeout(r, 2500));
 
     const startTime = Date.now();
     const maxWaitMs = 360000; // 6 minutes max
+    let lastLogTime = 0;
 
     while (Date.now() - startTime < maxWaitMs) {
+      const bodyText = document.body.innerText || "";
+      if (
+        /reached the limit|đã đạt giới hạn|try again later|limit of messages|you've hit the message limit/i.test(
+          bodyText
+        )
+      ) {
+        throw new Error(
+          "Tài khoản ChatGPT đã đạt giới hạn số tin nhắn. Vui lòng thử lại sau hoặc đổi tài khoản."
+        );
+      }
+
       const generating = isGenerating();
+      const now = Date.now();
+
+      if (now - lastLogTime > 3000) {
+        lastLogTime = now;
+        try {
+          const srtCurrent = extractSRTFromResponses();
+          const cueCount = srtCurrent ? (srtCurrent.match(/-->/g) || []).length : 0;
+          if (cueCount > 0) {
+            chrome.runtime.sendMessage({
+              action: "LOG_EVENT",
+              message: `ChatGPT: Đang sinh bản dịch (đã dịch ${cueCount} câu)...`,
+            });
+          } else {
+            chrome.runtime.sendMessage({
+              action: "LOG_EVENT",
+              message: "ChatGPT: Đang xử lý nội dung dịch ngữ cảnh...",
+            });
+          }
+        } catch (e) {}
+      }
+
       if (!generating) {
         // Wait an extra 1.5s to ensure DOM finalized
         await new Promise((r) => setTimeout(r, 1500));
@@ -191,6 +304,13 @@
           const srtResult = extractSRTFromResponses();
           if (srtResult && srtResult.includes("-->")) {
             console.log("[ChatGPTAdapter] Translation extracted successfully!");
+            const totalCues = (srtResult.match(/-->/g) || []).length;
+            try {
+              chrome.runtime.sendMessage({
+                action: "LOG_EVENT",
+                message: `ChatGPT: Đã hoàn tất tạo bản dịch (${totalCues} câu)! Đang gửi dữ liệu về VK Dub Studio...`,
+              });
+            } catch (e) {}
             return {
               success: true,
               translated_srt: srtResult,
@@ -205,20 +325,44 @@
     throw new Error("Quá thời gian chờ phản hồi từ ChatGPT (hơn 6 phút).");
   }
 
+  // Clear previous message listener to avoid duplicates
+  if (window.__chatgptListener) {
+    try {
+      chrome.runtime.onMessage.removeListener(window.__chatgptListener);
+    } catch (e) {}
+  }
+
   // Handle messages from service worker
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  window.__chatgptListener = (request, sender, sendResponse) => {
     if (request && request.action === CHATGPT_CHECK_ACTION) {
       sendResponse(checkLoginState());
       return true;
     }
 
     if (request && request.action === CHATGPT_TRANSLATE_ACTION) {
+      // Trả lời NGAY để đóng kênh message trong <1s. Dịch có thể chạy tới vài
+      // phút, và Chrome/Edge tự đóng kênh message bất đồng bộ sau ~5 phút —
+      // nếu giữ kênh mở tới lúc dịch xong sẽ mất kết quả giữa chừng.
+      sendResponse({ status: "STARTED", request_id: request.payload?.request_id });
+
       executeTranslation(request.payload || {})
-        .then((result) => sendResponse(result))
-        .catch((err) => sendResponse({ success: false, error: err.message, request_id: request.payload?.request_id }));
-      return true; // Keep message channel open for async response
+        .then((result) => {
+          chrome.runtime.sendMessage({ action: "CHATGPT_TRANSLATE_DONE", payload: result });
+        })
+        .catch((err) => {
+          chrome.runtime.sendMessage({
+            action: "CHATGPT_TRANSLATE_DONE",
+            payload: {
+              success: false,
+              error: err.message,
+              request_id: request.payload?.request_id,
+            },
+          });
+        });
+      return true;
     }
-  });
+  };
+  chrome.runtime.onMessage.addListener(window.__chatgptListener);
 
   // Notify service worker when tab loads
   try {

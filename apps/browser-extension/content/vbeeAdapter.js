@@ -46,7 +46,7 @@
     return {
       available: true,
       logged_in: isLoggedIn,
-      version: "2.1.6",
+      version: "2.1.8",
       is_studio: isStudio,
       is_dubbing_page: isDubbingPage,
       has_avatar: hasAvatar,
@@ -87,17 +87,103 @@
     });
   }
 
-  async function executeVoiceGeneration({ srt_content, voice_name = "Ngọc Huyền", speed = "1.1x", request_id }) {
-    console.log("[VbeeAdapter] Starting voice generation for request:", request_id);
+  async function waitForElement(finder, timeoutMs = 1500, stepMs = 100) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const el = finder();
+      if (el) return el;
+      await new Promise((r) => setTimeout(r, stepMs));
+    }
+    return null;
+  }
 
-    // 1. Ensure on dubbing page
+  function normalizedJobKey(value) {
+    // Vbee removes separators such as '_' from uploaded SRT names. Match the
+    // stable alphanumeric identity so retry still finds exactly the same job.
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
+  async function getCompletedAudioFromApi(jobName) {
+    try {
+      const apiUrl =
+        "https://vbee.vn/api/v2/requests?type=dubbing&limit=5&sort=-createdAt&fields=id,title,characters,credits,seconds,createdAt,progress,status,voice,audioType,audioLink";
+      const res = await fetch(apiUrl, { credentials: "include" });
+      if (res.ok) {
+        const json = await res.json();
+        const reqs = json?.result?.requests || json?.data?.requests || json?.data || [];
+        for (const req of reqs) {
+          const title = String(req.title || req.name || "");
+          const matchesJob =
+            jobName && normalizedJobKey(title).includes(normalizedJobKey(jobName));
+          if (matchesJob && (req.status === 1 || req.status === "SUCCESS" || req.progress === 100) && req.audioLink) {
+            return {
+              id: req.id,
+              title: req.title,
+              audioUrl: req.audioLink,
+              createdAt: req.createdAt,
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[VbeeAdapter] Error querying requests API:", err);
+    }
+    return null;
+  }
+
+  function findJobRow(jobName) {
+    return Array.from(document.querySelectorAll("tr, .ant-table-row, div[class*='row']")).find(
+      (row) => normalizedJobKey(row.innerText).includes(normalizedJobKey(jobName))
+    );
+  }
+
+  function findDownloadButton(row) {
+    return row?.querySelector(
+      "button:has(svg[data-testid*='Download']), svg[data-testid*='Download'], " +
+      "svg[data-testid='DownloadRoundedIcon'], button[title*='Tải'], a[download]"
+    );
+  }
+
+  async function completedResult(job, requestId, jobName) {
+    // Không tự tải + encode base64 trong tab (chậm, tốn RAM, có thể vượt giới
+    // hạn kích thước Native Messaging). Phía Python (local_agent.py) đã tự
+    // tải trực tiếp từ audio_url bằng httpx khi audio_base64 vắng mặt.
+    return {
+      success: true,
+      audio_url: job.audioUrl,
+      request_id: requestId,
+      job_name: jobName,
+    };
+  }
+
+  async function executeVoiceGeneration({ srt_content, voice_name = "Ngọc Huyền", speed = "1.1x", request_id, job_name }) {
+    console.log("[VbeeAdapter] Starting voice generation for request:", request_id);
+    if (!request_id || !job_name || !srt_content) {
+      throw new Error("Yêu cầu Vbee thiếu request_id, job_name hoặc nội dung SRT.");
+    }
+
+    // Retry safety: reuse only a completed job with the same deterministic script identity.
+    const existingJob = await getCompletedAudioFromApi(job_name);
+    if (existingJob && existingJob.audioUrl) {
+      console.log("[VbeeAdapter] Found already completed audio on Vbee:", existingJob.audioUrl);
+      return await completedResult(existingJob, request_id, job_name);
+    }
+
+    const existingRow = findJobRow(job_name);
+    const existingDownload = findDownloadButton(existingRow);
+    if (existingDownload) {
+      safeClick(existingDownload);
+      return { success: true, download_triggered: true, request_id, job_name };
+    }
+
+    // 2. Ensure on dubbing page
     if (!window.location.pathname.includes("/dubbing")) {
       console.log("[VbeeAdapter] Navigating to /studio/dubbing...");
       window.location.href = "https://studio.vbee.vn/studio/dubbing";
       return { status: "NAVIGATING", message: "Đang mở trang Chuyển phụ đề Vbee...", request_id };
     }
 
-    // 2. Handle initial policy / terms agreement modal if present
+    // 3. Handle initial policy / terms agreement modal if present
     const termsCheckbox = document.querySelector("input[type='checkbox'], .ant-checkbox-input, span.ant-checkbox");
     if (termsCheckbox) {
       if (!termsCheckbox.checked && !termsCheckbox.classList.contains("ant-checkbox-checked")) {
@@ -110,31 +196,29 @@
         findElementByText("button", "Tiếp tục");
       if (agreeBtn) {
         safeClick(agreeBtn);
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
 
-    // 3. Check if subtitles are already populated in table
-    const existingRows = document.querySelectorAll("tr, .ant-table-row, div[class*='subtitle-item']");
-    if (existingRows.length > 3) {
-      console.log("[VbeeAdapter] Subtitles already loaded in table. Reusing existing upload.");
-    } else {
-      // Locate SRT file input
+    // 4. Check if subtitles are already loaded in the editor table
+    const pageText = document.body.innerText || "";
+    const isSubLoaded = pageText.includes(`${job_name}.srt`);
+
+    if (!isSubLoaded && srt_content) {
+      console.log("[VbeeAdapter] Uploading SRT subtitle file...");
       let fileInput = null;
       for (let i = 0; i < 20; i++) {
         fileInput = document.querySelector("input[type='file'][accept*='.srt'], input[type='file']");
         if (fileInput) break;
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 400));
       }
 
       if (!fileInput) {
         throw new Error("Không tìm thấy ô tải file SRT trên giao diện Vbee Dubbing.");
       }
 
-      // Upload SRT content via HTML5 File and DataTransfer
-      console.log("[VbeeAdapter] Uploading translated SRT content...");
       const srtBlob = new Blob([srt_content], { type: "text/plain;charset=utf-8" });
-      const srtFile = new File([srtBlob], "translated.srt", { type: "text/plain" });
+      const srtFile = new File([srtBlob], `${job_name}.srt`, { type: "text/plain" });
       const dt = new DataTransfer();
       dt.items.add(srtFile);
       fileInput.files = dt.files;
@@ -143,11 +227,10 @@
       await new Promise((r) => setTimeout(r, 2000));
     }
 
-    // 4. Select Voice: Ngọc Huyền
+    // 5. Select Voice: Ngọc Huyền (if not already selected)
     try {
-      console.log(`[VbeeAdapter] Checking voice selection for: ${voice_name}...`);
-      const pageText = document.body.innerText || "";
-      if (!pageText.includes("Ngọc Huyền")) {
+      const curText = document.body.innerText || "";
+      if (!curText.includes(voice_name) && !curText.includes("Ngọc Huyền")) {
         const voiceTrigger =
           document.querySelector("div[class*='voice-select']") ||
           document.querySelector("div[class*='select-voice']") ||
@@ -156,13 +239,14 @@
 
         if (voiceTrigger) {
           safeClick(voiceTrigger);
-          await new Promise((r) => setTimeout(r, 800));
-          const voiceOpt =
-            findElementByText("div[role='option'], div.ant-select-item-option, span, li", voice_name) ||
-            findElementByText("div, span, li", "HN - Ngọc Huyền");
+          const voiceOpt = await waitForElement(
+            () =>
+              findElementByText("div[role='option'], div.ant-select-item-option, span, li", voice_name) ||
+              findElementByText("div, span, li", "HN - Ngọc Huyền")
+          );
           if (voiceOpt) {
             safeClick(voiceOpt);
-            console.log("[VbeeAdapter] Voice selected: Ngọc Huyền");
+            console.log("[VbeeAdapter] Voice selected:", voice_name);
           }
         }
       }
@@ -172,37 +256,46 @@
 
     await new Promise((r) => setTimeout(r, 600));
 
-    // 5. Select Speed: 1.1x
+    // 6. Select Speed: 1.1x (if not already 1.1x)
     try {
-      console.log(`[VbeeAdapter] Configuring speed: ${speed}...`);
-      const speedTrigger =
-        document.querySelector(".speed button") ||
-        document.querySelector("button:has([data-testid*='ArrowDrop'])") ||
-        document.querySelector(".speed") ||
-        document.querySelector("div[class*='speed']") ||
-        findElementByText("button, span, div", "1x", true) ||
-        findElementByText("button, span, div", "1.0x", true) ||
-        document.querySelector("[data-testid='ArrowDropDownIcon']");
+      const curText = document.body.innerText || "";
+      if (!curText.includes("1.1x")) {
+        const speedTrigger =
+          document.querySelector(".speed button") ||
+          document.querySelector("button:has([data-testid*='ArrowDrop'])") ||
+          document.querySelector(".speed") ||
+          document.querySelector("div[class*='speed']") ||
+          findElementByText("button, span, div", "1x", true) ||
+          document.querySelector("[data-testid='ArrowDropDownIcon']");
 
-      if (speedTrigger) {
-        safeClick(speedTrigger);
-        await new Promise((r) => setTimeout(r, 800));
-        const speedOpt =
-          findElementByText("li.MuiMenuItem-root, div[role='option'], span, li", speed) ||
-          findElementByText("li, div, span", "1.1x");
-        if (speedOpt) {
-          safeClick(speedOpt);
-          console.log("[VbeeAdapter] Speed configured to: 1.1x");
+        if (speedTrigger) {
+          safeClick(speedTrigger);
+          const speedOpt = await waitForElement(
+            () =>
+              findElementByText("li.MuiMenuItem-root, div[role='option'], span, li", speed) ||
+              findElementByText("li, div, span", "1.1x")
+          );
+          if (speedOpt) {
+            safeClick(speedOpt);
+            console.log("[VbeeAdapter] Speed configured to: 1.1x");
+          }
         }
       }
     } catch (speedErr) {
-      console.warn("[VbeeAdapter] Speed configuration notice (continuing):", speedErr);
+      console.warn("[VbeeAdapter] Speed configuration notice:", speedErr);
     }
 
     await new Promise((r) => setTimeout(r, 600));
 
-    // 6. Submit conversion
+    // 7. Submit conversion
     console.log("[VbeeAdapter] Submitting dubbing conversion...");
+    try {
+      chrome.runtime.sendMessage({
+        action: "LOG_EVENT",
+        message: `Vbee: Đang chọn giọng '${voice_name}' (${speed}) và nạp kịch bản vào studio...`,
+      });
+    } catch (e) {}
+
     const submitBtn =
       findElementByText("button", "Chuyển phụ đề") ||
       findElementByText("button", "Bắt đầu chuyển") ||
@@ -232,10 +325,18 @@
       await new Promise((r) => setTimeout(r, 400));
     }
 
-    // 7. Poll for completion
-    console.log("[VbeeAdapter] Polling for voice generation completion...");
+    // 8. Poll for completion (API + DOM)
+    console.log("[VbeeAdapter] Polling for completion...");
+    try {
+      chrome.runtime.sendMessage({
+        action: "LOG_EVENT",
+        message: "Vbee: Đã gửi yêu cầu tạo voice, đang chờ máy chủ xử lý...",
+      });
+    } catch (e) {}
+
     const startTime = Date.now();
-    const maxWaitMs = 600000; // 10 minutes max for long video subtitles
+    const maxWaitMs = 600000; // 10 minutes max
+    let lastLogTime = 0;
 
     while (Date.now() - startTime < maxWaitMs) {
       // Check quota or fatal errors
@@ -244,52 +345,65 @@
         throw new Error("Tài khoản Vbee đã hết số dư ký tự hoặc vượt quá hạn mức.");
       }
 
-      // Check download / completion indicators
-      const downloadBtn =
-        document.querySelector("button:has(svg[data-testid*='Download'])") ||
-        document.querySelector("svg[data-testid*='Download']") ||
-        findElementByText("button, a", "Tải xuống") ||
-        findElementByText("button, a", "Tải về") ||
-        findElementByText("button, a", "Tải audio") ||
-        document.querySelector("a[download]");
-
-      if (downloadBtn) {
-        console.log("[VbeeAdapter] Completion detected! Fetching audio...");
-        let audioUrl = null;
-        if (downloadBtn.tagName && downloadBtn.tagName.toLowerCase() === "a" && downloadBtn.href) {
-          audioUrl = downloadBtn.href;
-        } else {
-          const audioElem = document.querySelector("audio[src], source[src]");
-          if (audioElem && audioElem.src) {
-            audioUrl = audioElem.src;
-          }
-        }
-
-        // If audio URL found, download blob and convert to base64
-        let base64Audio = null;
-        if (audioUrl && audioUrl.startsWith("http")) {
-          try {
-            const resp = await fetch(audioUrl);
-            const blob = await resp.blob();
-            base64Audio = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result.split(",")[1]);
-              reader.readAsDataURL(blob);
+      const now = Date.now();
+      if (now - lastLogTime > 4000) {
+        lastLogTime = now;
+        try {
+          const firstRow = findJobRow(job_name);
+          const rowText = firstRow ? (firstRow.innerText || "") : "";
+          const pctMatch = rowText.match(/(\d{1,3})%/);
+          if (pctMatch) {
+            chrome.runtime.sendMessage({
+              action: "LOG_EVENT",
+              message: `Vbee: Đang tổng hợp giọng nói (${pctMatch[1]}%)...`,
             });
-          } catch (e) {
-            console.warn("[VbeeAdapter] Could not directly fetch audio blob:", e);
+          } else {
+            chrome.runtime.sendMessage({
+              action: "LOG_EVENT",
+              message: "Vbee: Đang tổng hợp giọng nói kịch bản...",
+            });
+          }
+        } catch (e) {}
+      }
+
+      // Check API first for completed audio link
+      const apiJob = await getCompletedAudioFromApi(job_name);
+      if (apiJob && apiJob.audioUrl) {
+        console.log("[VbeeAdapter] Completion detected via API! audioUrl:", apiJob.audioUrl);
+        try {
+          chrome.runtime.sendMessage({
+            action: "LOG_EVENT",
+            message: "Vbee: Đã hoàn tất tạo giọng đọc! Đang tải audio về máy...",
+          });
+        } catch (e) {}
+        return await completedResult(apiJob, request_id, job_name);
+      }
+
+      // Check only the row for this script identity; never use another recent Vbee job.
+      const firstRow = findJobRow(job_name);
+      if (firstRow) {
+        const rowText = firstRow.innerText || "";
+        const isProcessing = /\b\d{1,2}%\b/.test(rowText) || /đang xử lý/i.test(rowText) || !!firstRow.querySelector("[role='progressbar'], .ant-spin");
+
+        if (!isProcessing) {
+          const rowDlBtn = findDownloadButton(firstRow);
+          if (rowDlBtn) {
+            console.log("[VbeeAdapter] Completion detected in DOM row! Clicking download...");
+            try {
+              chrome.runtime.sendMessage({
+                action: "LOG_EVENT",
+                message: "Vbee: Đã hoàn tất tạo giọng đọc trong hàng dự án! Đang bấm tải xuống...",
+              });
+            } catch (e) {}
+            safeClick(rowDlBtn);
+            return {
+              success: true,
+              download_triggered: true,
+              request_id,
+              job_name,
+            };
           }
         }
-
-        // Trigger safe click on download button as well to ensure file downloads to disk if needed
-        safeClick(downloadBtn);
-
-        return {
-          success: true,
-          audio_url: audioUrl,
-          audio_base64: base64Audio,
-          request_id: request_id,
-        };
       }
 
       await new Promise((r) => setTimeout(r, 2000));
@@ -311,9 +425,21 @@
     }
 
     if (request && request.action === VBEE_GENERATE_ACTION) {
+      // Trả lời NGAY để đóng kênh message trong <1s. Tạo voice có thể chạy
+      // tới 10 phút, vượt xa giới hạn ~5 phút mà Chrome/Edge giữ một kênh
+      // message bất đồng bộ mở — nếu giữ kênh mở sẽ mất kết quả giữa chừng.
+      sendResponse({ status: "STARTED", request_id: request.payload?.request_id });
+
       executeVoiceGeneration(request.payload || {})
-        .then((res) => sendResponse(res))
-        .catch((err) => sendResponse({ success: false, error: err.message, request_id: request.payload?.request_id }));
+        .then((res) => {
+          chrome.runtime.sendMessage({ action: "VBEE_GENERATE_DONE", payload: res });
+        })
+        .catch((err) => {
+          chrome.runtime.sendMessage({
+            action: "VBEE_GENERATE_DONE",
+            payload: { success: false, error: err.message, request_id: request.payload?.request_id },
+          });
+        });
       return true;
     }
   };

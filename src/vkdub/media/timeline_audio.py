@@ -16,6 +16,15 @@ from vkdub.services.srt_validator import parse_cues
 logger = logging.getLogger("vkdub.timeline_audio")
 
 
+def _ffprobe_executable(ffmpeg_exe: str) -> str:
+    """Resolve ffprobe beside ffmpeg without rewriting parent directory names."""
+    executable = Path(ffmpeg_exe)
+    suffix = executable.suffix
+    if executable.name.lower().startswith("ffmpeg"):
+        return str(executable.with_name(f"ffprobe{suffix}"))
+    return "ffprobe"
+
+
 def get_audio_duration_ms(path: Path, ffprobe_exe: str = "ffprobe") -> int:
     """Get audio file duration in milliseconds using ffprobe."""
     cmd = [
@@ -58,7 +67,9 @@ def build_master_timeline_audio(
     cues = parse_cues(srt_text)
 
     # Probe Vbee audio duration
-    vbee_dur_ms = get_audio_duration_ms(vbee_audio_path, ffmpeg_exe.replace("ffmpeg", "ffprobe"))
+    vbee_dur_ms = get_audio_duration_ms(
+        vbee_audio_path, _ffprobe_executable(ffmpeg_exe)
+    )
 
     first_cue_start_ms = cues[0].start_ms if cues else 0
     last_cue_end_ms = cues[-1].end_ms if cues else vbee_dur_ms
@@ -76,11 +87,31 @@ def build_master_timeline_audio(
     # we prepend silence of first_cue_start_ms and pad end silence.
     pad_total_seconds = expected_min_ms / 1000.0
 
-    # Use FFmpeg filter complex: adelay prepends silence, apad / atrim pads/trims to total duration
-    # Filter: adelay=<delay_ms>|<delay_ms>,apad=whole_dur=<pad_total_s>
-    filter_complex = (
-        f"adelay={first_cue_start_ms}|{first_cue_start_ms},apad=whole_dur={pad_total_seconds:.3f}"
+    filters: list[str] = []
+
+    # Check if lead silence is missing:
+    # Vbee Dubbing from SRT exports audio with timestamps aligned to the project timeline (starting at 00:00:00).
+    # If the first cue starts after 500ms AND the raw audio is noticeably shorter than last_cue_end_ms,
+    # then the audio source did not include the initial silence and needs adelay.
+    # Otherwise, if vbee_dur_ms spans the full timeline, Vbee already included the lead silence!
+    if first_cue_start_ms > 500 and vbee_dur_ms < (last_cue_end_ms - 250):
+        logger.info(
+            "Audio source lacks initial silence; prepending %d ms delay",
+            first_cue_start_ms,
+        )
+        filters.append(f"adelay={first_cue_start_ms}|{first_cue_start_ms}")
+
+    # Trim any trailing overrun or Vbee promotional watermark ("Giải pháp chuyển văn bản...")
+    # and pad silence at the end if the video timeline is longer than the voice audio.
+    # DO NOT apply blanket atempo across the entire continuous file, as doing so
+    # compresses natural sentence pauses and causes subtitles and speech to drift out of sync.
+    filters.extend(
+        [
+            f"atrim=start=0:end={pad_total_seconds:.3f}",
+            f"apad=whole_dur={pad_total_seconds:.3f}",
+        ]
     )
+    filter_complex = ",".join(filters)
 
     cmd = [
         ffmpeg_exe,

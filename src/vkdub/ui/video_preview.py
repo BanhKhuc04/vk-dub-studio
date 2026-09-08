@@ -74,86 +74,161 @@ class VideoPreview(QFrame):
         self.seek.setAccessibleName("Vị trí phát video")
         layout.addWidget(self.seek)
 
-        # Controls row
-        controls = QHBoxLayout()
+        # Controls row (Play, time, volume, timeline, secondary tools)
+        controls_frame = QFrame()
+        controls_frame.setStyleSheet("""
+            QFrame {
+                background-color: #080d17;
+                border: 1px solid #152033;
+                border-radius: 8px;
+                padding: 4px;
+            }
+        """)
+        controls = QHBoxLayout(controls_frame)
+        controls.setContentsMargins(8, 6, 8, 6)
         controls.setSpacing(10)
 
         self.play_button = QPushButton("▶ Phát")
         self.play_button.setEnabled(False)
-        self.play_button.setStyleSheet("font-weight: bold; min-width: 80px;")
+        self.play_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
+                color: #ffffff;
+                border: 1px solid #38bdf8;
+                border-radius: 6px;
+                font-weight: 800;
+                font-size: 12px;
+                min-width: 80px;
+                padding: 6px 14px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:1 #0891b2);
+                border-color: #7dd3fc;
+            }
+            QPushButton:disabled {
+                background: #0d1524;
+                color: #475569;
+                border: 1px solid #162032;
+            }
+        """)
         controls.addWidget(self.play_button)
 
         self.time_label = QLabel("00:00 / 00:00")
-        self.time_label.setStyleSheet("font-family: Consolas; font-weight: 600; color: #e5eaf4;")
+        self.time_label.setStyleSheet("""
+            background-color: #050810;
+            border: 1px solid #162236;
+            border-radius: 5px;
+            padding: 4px 8px;
+            font-family: 'Consolas', 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: #38bdf8;
+            font-size: 11px;
+        """)
         controls.addWidget(self.time_label)
 
         # Volume control
         vol_label = QLabel("🔊")
+        vol_label.setStyleSheet("color: #64748b; font-size: 12px;")
         controls.addWidget(vol_label)
         self.volume = QSlider(Qt.Orientation.Horizontal)
         self.volume.setRange(0, 100)
         self.volume.setValue(70)
-        self.volume.setMaximumWidth(80)
+        self.volume.setMaximumWidth(70)
         self.volume.setAccessibleName("Âm lượng xem trước")
         controls.addWidget(self.volume)
 
-        controls.addStretch()
+        controls.addStretch(1)
 
-        # Key action buttons
-        self.btn_mask = QPushButton("▣ Khung dịch / Xóa chữ")
-        self.btn_mask.setToolTip(
-            "Khung chọn khu vực phụ đề cần che/dịch · Kéo để di chuyển · Kéo góc để đổi kích thước"
-        )
-        self.btn_mask.clicked.connect(self._mask_clicked)
-
-        self.btn_blur = QPushButton("🌫 Làm mờ chữ")
-        self.btn_blur.setToolTip(
-            "Thêm vùng làm mờ (blur) — che logo/watermark/chữ không cần dịch "
-            "· Kéo để di chuyển · Kéo góc để đổi kích thước"
-        )
-        self.btn_blur.clicked.connect(self._blur_clicked)
-
-        self.btn_subtitle = QPushButton("✥ Vị trí & kiểu Sub")
-        self.btn_subtitle.setToolTip("Mở chỉnh phụ đề; kéo khung trên video để đổi vị trí")
+        # Secondary tools (Subtitle, Blur, Voice Preview, More ...)
+        btn_tool_style = """
+            QPushButton {
+                background-color: #0c1220;
+                color: #cbd5e1;
+                border: 1px solid #1a273e;
+                border-radius: 6px;
+                padding: 5px 12px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #131c30;
+                border-color: #38bdf8;
+                color: #38bdf8;
+            }
+        """
+        self.btn_subtitle = QPushButton("✥ Phụ đề")
+        self.btn_subtitle.setToolTip("Mở bảng cài đặt font, màu sắc, vị trí phụ đề")
+        self.btn_subtitle.setStyleSheet(btn_tool_style)
         self.btn_subtitle.clicked.connect(self._subtitle_clicked)
+        controls.addWidget(self.btn_subtitle)
+
+        self.btn_blur = QPushButton("🌫 Làm mờ")
+        self.btn_blur.setToolTip("Thêm hoặc chỉnh vùng làm mờ (che logo / watermark)")
+        self.btn_blur.setStyleSheet(btn_tool_style)
+        self.btn_blur.clicked.connect(self._blur_clicked)
+        controls.addWidget(self.btn_blur)
+
+        self.btn_preview_voice = QPushButton("🎵 Nghe Voice")
+        self.btn_preview_voice.setToolTip("Nghe thử voice lồng tiếng đã tạo")
+        self.btn_preview_voice.setStyleSheet(btn_tool_style)
+        self.btn_preview_voice.clicked.connect(self._voice_preview_clicked)
+        controls.addWidget(self.btn_preview_voice)
+
+        # Retain hidden buttons for backwards compatibility & menu triggers
+        self.btn_mask = QPushButton("▣ Khung dịch / Xóa chữ")
+        self.btn_mask.clicked.connect(self._mask_clicked)
+        self.btn_mask.hide()
 
         self.btn_sub_box = QPushButton("▣ Khung Sub")
         self.btn_sub_box.setCheckable(True)
-        self.btn_sub_box.setToolTip("Bật/tắt hộp nền phía sau phụ đề")
         self.btn_sub_box.toggled.connect(self.subtitle_box_toggled.emit)
-
-        self.btn_preview_voice = QPushButton("Preview Voice")
-        self.btn_preview_voice.setToolTip("Nghe thử voice lồng tiếng (Giai đoạn 5)")
-        self.btn_preview_voice.clicked.connect(self._voice_preview_clicked)
+        self.btn_sub_box.hide()
 
         # More actions menu (...)
         self.btn_more = QToolButton()
         self.btn_more.setText("⋯")
-        self.btn_more.setStyleSheet("font-size: 16px; font-weight: bold; padding: 4px 8px;")
+        self.btn_more.setStyleSheet("""
+            QToolButton {
+                background-color: #0c1220;
+                color: #cbd5e1;
+                border: 1px solid #1a273e;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 3px 10px;
+            }
+            QToolButton:hover {
+                background-color: #131c30;
+                border-color: #38bdf8;
+                color: #38bdf8;
+            }
+        """)
         self.btn_more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         more_menu = QMenu(self)
+
+        act_mask = QAction("▣ Khung che chữ cũ / phụ đề", self)
+        act_mask.triggered.connect(self._mask_clicked)
+        more_menu.addAction(act_mask)
+
+        act_sub_box = QAction("▣ Bật/tắt nền khung viền phụ đề", self)
+        act_sub_box.setCheckable(True)
+        act_sub_box.toggled.connect(self.subtitle_box_toggled.emit)
+        more_menu.addAction(act_sub_box)
+
+        more_menu.addSeparator()
+
         act_info = QAction("ℹ Thông tin chi tiết video", self)
         act_info.triggered.connect(self._show_info_dialog)
+        more_menu.addAction(act_info)
+
         act_snap = QAction("📸 Chụp ảnh khung hình hiện tại", self)
         act_snap.triggered.connect(self._capture_frame)
-        more_menu.addAction(act_info)
         more_menu.addAction(act_snap)
+
         self.btn_more.setMenu(more_menu)
+        controls.addWidget(self.btn_more)
 
-        actions = QHBoxLayout()
-        for btn in (
-            self.btn_mask,
-            self.btn_blur,
-            self.btn_subtitle,
-            self.btn_sub_box,
-            self.btn_preview_voice,
-            self.btn_more,
-        ):
-            btn.setStyleSheet("padding: 6px 10px; font-weight: 600;")
-            actions.addWidget(btn)
-
-        layout.addLayout(controls)
-        layout.addLayout(actions)
+        layout.addWidget(controls_frame)
 
         # Concise Metadata label
         self.metadata_label = label("Chưa có metadata.")
@@ -161,6 +236,7 @@ class VideoPreview(QFrame):
         layout.addWidget(self.metadata_label)
 
         self._last_metadata: VideoMetadata | None = None
+        self._metadata_duration_ms = 0
 
         # Connect events
         self.play_button.clicked.connect(self.toggle_playback)
@@ -232,6 +308,7 @@ class VideoPreview(QFrame):
         self.play_button.setEnabled(False)
         self.seek.setEnabled(False)
         self.seek.setRange(0, 0)
+        self._metadata_duration_ms = 0
         self.metadata_label.setText("Đang đọc metadata…" if path else "Chưa có metadata.")
         self._position_changed(0)
         if path:
@@ -239,6 +316,8 @@ class VideoPreview(QFrame):
 
     def show_metadata(self, metadata: VideoMetadata) -> None:
         self._last_metadata = metadata
+        self._metadata_duration_ms = max(0, round(metadata.duration * 1000))
+        self.seek.setMaximum(max(self.player.duration(), self._metadata_duration_ms))
         fps = f"{metadata.fps:.2f} fps" if metadata.fps else ""
         audio = metadata.audio_codec or "không có audio"
         dur_str = clock_text(round(metadata.duration * 1000))
@@ -247,6 +326,11 @@ class VideoPreview(QFrame):
             f"✓ {metadata.width} × {metadata.height}  •  {dur_str}  •  "
             f"{size_mb}  •  {metadata.video_codec}/{audio}  {fps}"
         )
+        self._position_changed(self.player.position())
+
+    def _effective_duration(self) -> int:
+        """Prefer ffprobe when Windows Media Foundation misreports HEVC duration."""
+        return max(self.player.duration(), self._metadata_duration_ms)
 
     def toggle_playback(self) -> None:
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
@@ -257,7 +341,7 @@ class VideoPreview(QFrame):
             self.player.play()
 
     def _duration_changed(self, duration: int) -> None:
-        self.seek.setMaximum(duration)
+        self.seek.setMaximum(max(duration, self._metadata_duration_ms))
         self._position_changed(self.player.position())
 
     def _position_changed(self, position: int) -> None:
@@ -265,12 +349,14 @@ class VideoPreview(QFrame):
             self.seek.blockSignals(True)
             self.seek.setValue(position)
             self.seek.blockSignals(False)
-        self.time_label.setText(f"{clock_text(position)} / {clock_text(self.player.duration())}")
+        self.time_label.setText(
+            f"{clock_text(position)} / {clock_text(self._effective_duration())}"
+        )
 
     def _seek_changed(self, value: int) -> None:
         if not self.seek.isSliderDown():
             self.player.setPosition(value)
-        self.time_label.setText(f"{clock_text(value)} / {clock_text(self.player.duration())}")
+        self.time_label.setText(f"{clock_text(value)} / {clock_text(self._effective_duration())}")
 
     def _state_changed(self, state: QMediaPlayer.PlaybackState) -> None:
         self.play_button.setText(

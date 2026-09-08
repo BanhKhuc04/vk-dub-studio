@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QMessageBox
 
 from vkdub.domain.project import Project
 from vkdub.domain.transcript import SubtitleSegment, Transcript, TranscriptionSettings
+from vkdub.domain.voice import VoiceSettings
 from vkdub.services.project_service import save_project
 from vkdub.ui.main_window import MainWindow
 from vkdub.ui.video_canvas import VideoCanvas
@@ -52,6 +53,26 @@ def test_output_and_project_roundtrip_in_window(window, tmp_path):
     assert window.project.project_id == identifier
     assert window.project.output_directory == tmp_path
     assert not window.review.export_button.isEnabled()
+
+
+def test_open_project_restores_vbee_voice_controls(window, tmp_path):
+    project = Project(
+        voice=VoiceSettings(
+            provider="vbee",
+            voice_id="vbee-ngoc-huyen",
+            display_name="Ngọc Huyền (Nữ miền Bắc)",
+            speed=1.1,
+        )
+    )
+    target = tmp_path / "voice-settings.vkdub"
+    save_project(project, target)
+
+    window.left.speed_combo.setCurrentIndex(window.left.speed_combo.findData(1.0))
+    assert window.open_project(target)
+
+    assert window.left.voice_combo.currentData() == "vbee-ngoc-huyen"
+    assert window.left.speed_combo.currentData() == 1.1
+    assert window.project.voice.speed == 1.1
 
 
 def test_missing_video_preserves_reference(window, tmp_path):

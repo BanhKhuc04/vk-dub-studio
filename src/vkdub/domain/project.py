@@ -46,24 +46,51 @@ class Project:
             and asset.matches(line.text, self.voice)
             and asset.output_path.is_file()
         }
+        if not res and not self.master_voice_path:
+            self._probe_master_voice()
         if not res and self.master_voice_path and self.master_voice_path.is_file():
-            # Provide synthesized master asset for compatibility
+            from datetime import datetime
+            now_iso = datetime.now().astimezone().isoformat()
+            fake_hash = "0" * 64
             for line in self.script.lines:
+                dur = max(1, line.end_ms - line.start_ms)
                 res[line.id] = VoiceAsset(
-                    audio_key=f"master_{line.id}",
+                    cache_key=fake_hash,
+                    text_hash=fake_hash,
+                    provider=self.voice.provider,
+                    voice_id=self.voice.voice_id,
+                    speed=self.voice.speed,
+                    duration_ms=dur,
                     output_path=self.master_voice_path,
-                    duration_ms=line.end_ms - line.start_ms,
-                    sample_rate_hz=24000,
-                    voice=self.voice,
-                    text_hash=line.text,
+                    audio_sha256=fake_hash,
+                    generated_at=now_iso,
                 )
         return res
+
+    def _probe_master_voice(self) -> Path | None:
+        if self.master_voice_path and self.master_voice_path.is_file():
+            return self.master_voice_path
+        candidates: list[Path] = []
+        if self.output_directory:
+            candidates.append(self.output_directory / "master_narration_timeline.mp3")
+        if self.video_path:
+            from vkdub.utils.paths import workspace_root
+            candidates.append(
+                workspace_root() / "export" / self.video_path.stem / "master_narration_timeline.mp3"
+            )
+        for c in candidates:
+            if c.is_file():
+                self.master_voice_path = c
+                return c
+        return None
 
     @property
     def voice_ready(self) -> bool:
         if not (self.is_approved and self.script and self.script.lines):
             return False
         if self.master_voice_path and self.master_voice_path.is_file():
+            return True
+        if self._probe_master_voice():
             return True
         return len(self.current_voices()) == len(self.script.lines)
 

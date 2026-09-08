@@ -153,3 +153,22 @@ def test_export_without_masks_keeps_source_video_and_voice_paths_valid(tmp_path)
     video = next(row for row in content["materials"]["videos"] if row["id"] == video_id)
     assert Path(video["path"]) == project.video_path
     assert result.applied_mask_count == 0
+
+
+def test_export_accepts_single_master_audio_track(tmp_path):
+    root = tmp_path / "drafts"
+    root.mkdir()
+    project = ready_project(tmp_path)
+    master = next(iter(project.voice_assets.values())).output_path
+    project.master_voice_path = master
+    project.voice_assets.clear()
+
+    result = export_capcut_project(
+        project, root, shutil.which("ffprobe"), shutil.which("ffmpeg")
+    )
+
+    content = json.loads((result.path / "draft_content.json").read_text(encoding="utf-8"))
+    tracks = {row["type"]: row for row in content["tracks"]}
+    assert len(tracks["audio"]["segments"]) == 1
+    assert len(tracks["text"]["segments"]) == 1
+    assert (result.path / "Assets" / f"master-voice{master.suffix}").is_file()

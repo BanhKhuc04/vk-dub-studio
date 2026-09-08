@@ -431,10 +431,13 @@ class SettingsDialog(QDialog):
 
         self.vbee_mode_combo = QComboBox()
         self.vbee_mode_combo.addItem(
-            "🌐 Trình duyệt tự động (Vbee Dubbing Studio — Edge/Chrome)", "browser"
+            "🌐 Tiện ích Edge Extension (VK Dub Studio Bridge — Đã đăng nhập sẵn)", "browser"
         )
         self.vbee_mode_combo.addItem(
             "⚡ API chính thức (Vbee Realtime API — Dùng App ID & Token)", "api"
+        )
+        self.vbee_mode_combo.addItem(
+            "🖥️ Trình duyệt Playwright độc lập (Mở cửa sổ phụ riêng)", "standalone_browser"
         )
         current_vbee_mode = getattr(self.app_settings, "vbee_mode", "browser")
         vbee_mode_idx = self.vbee_mode_combo.findData(current_vbee_mode)

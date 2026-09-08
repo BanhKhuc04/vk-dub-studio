@@ -137,6 +137,11 @@ def build_speech_track_wav(
     ffmpeg: str | None = None,
 ) -> Path:
     """Combine per-segment voice assets into a single synchronized 24kHz mono WAV track."""
+    if project.master_voice_path and project.master_voice_path.is_file():
+        ffmpeg_bin = ffmpeg or "ffmpeg"
+        _normalize_wav(project.master_voice_path, output_path, ffmpeg_bin)
+        return output_path
+
     if project.script is None:
         raise ValueError("Chưa có kịch bản.")
     current_voices = project.current_voices()

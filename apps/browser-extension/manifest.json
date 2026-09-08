@@ -9,13 +9,19 @@
     "tabs",
     "storage",
     "cookies",
-    "scripting"
+    "downloads",
+    "scripting",
+    "webNavigation"
   ],
   "host_permissions": [
     "*://chatgpt.com/*",
     "*://*.chatgpt.com/*",
+    "*://chat.openai.com/*",
+    "*://*.openai.com/*",
     "*://vbee.vn/*",
-    "*://*.vbee.vn/*"
+    "*://*.vbee.vn/*",
+    "*://studio.vbee.vn/*",
+    "*://*.studio.vbee.vn/*"
   ],
   "background": {
     "service_worker": "background/serviceWorker.js",
@@ -23,20 +29,39 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://chatgpt.com/*", "*://*.chatgpt.com/*"],
+      "matches": [
+        "*://chatgpt.com/*",
+        "*://*.chatgpt.com/*",
+        "*://chat.openai.com/*",
+        "*://*.openai.com/*"
+      ],
       "js": ["content/chatgptAdapter.js"],
       "run_at": "document_end"
     },
     {
-      "matches": ["*://vbee.vn/*", "*://*.vbee.vn/*"],
+      "matches": [
+        "*://vbee.vn/*",
+        "*://*.vbee.vn/*",
+        "*://studio.vbee.vn/*",
+        "*://*.studio.vbee.vn/*"
+      ],
       "js": ["content/vbeeAdapter.js"],
       "run_at": "document_end"
     }
   ],
   "action": {
-    "default_title": "VK Dub Studio Bridge"
+    "default_title": "VK Dub Studio Bridge",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "icons": {
-    "48": "icons/icon48.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }

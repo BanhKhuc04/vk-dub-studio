@@ -15,7 +15,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.domain.project import Project
-from vkdub.media.timeline_audio import build_master_timeline_audio
+from vkdub.media.timeline_audio import build_master_timeline_audio, get_audio_duration_ms
 from vkdub.orchestrator.checkpoint import load_checkpoint, save_checkpoint
 from vkdub.orchestrator.pipeline_state import (
     ArtifactRegistry,
@@ -23,11 +23,23 @@ from vkdub.orchestrator.pipeline_state import (
     SubstepInfo,
     SubstepStatus,
 )
+from vkdub.domain.transcript import srt_timestamp
 from vkdub.services.srt_service import parse_srt, write_srt
 from vkdub.services.srt_validator import validate_and_repair_srt
 from vkdub.utils.paths import workspace_root
 
 logger = logging.getLogger("vkdub.pipeline_runner")
+
+
+def _timeline_audio_is_usable(path: Path, target_duration_ms: int | None) -> bool:
+    if not path.is_file():
+        return False
+    if not target_duration_ms:
+        return True
+    actual_duration_ms = get_audio_duration_ms(path)
+    # Keep the artifact when probing is unavailable, but rebuild any measured
+    # output that drifts enough to be visible/audible in the final video.
+    return actual_duration_ms <= 0 or abs(actual_duration_ms - target_duration_ms) <= 250
 
 
 class PipelineRunner(QThread):
@@ -48,6 +60,8 @@ class PipelineRunner(QThread):
         output_dir: Path | None = None,
         voice_name: str = "Ngọc Huyền",
         speed: str = "1.1x",
+        auto_voice: bool = True,
+        target_step: str | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -56,6 +70,8 @@ class PipelineRunner(QThread):
         self.output_dir = output_dir or (workspace_root() / "export")
         self.voice_name = voice_name
         self.speed = speed
+        self.auto_voice = auto_voice
+        self.target_step = target_step
         self.cancel_event = threading.Event()
 
         self.state = PipelineState.PROJECT_CREATED
@@ -97,6 +113,7 @@ class PipelineRunner(QThread):
                 break
 
         self.substep_updated.emit(step_id, status, progress, message)
+        self.log_emitted.emit(f"[{step_id}] {message}")
         self._save_current_checkpoint()
 
     def _save_current_checkpoint(self) -> None:
@@ -118,221 +135,386 @@ class PipelineRunner(QThread):
             )
 
         try:
-            # =======================================================
-            # 4.1 TRANSCRIPTION (Whisper / Existing Script)
-            # =======================================================
-            orig_srt_path = self.artifacts.original_srt or (self.output_dir / "original.srt")
-            if not (orig_srt_path and orig_srt_path.is_file()):
-                self.state = PipelineState.TRANSCRIBING
-                self.state_changed.emit(self.state, "Đang bóc băng phụ đề gốc...")
-                self._update_substep("4.1", SubstepStatus.RUNNING, 10, "Đang khởi chạy Whisper...")
-                t0 = time.monotonic()
+            if self.target_step != "4.4":
+                # =======================================================
+                # 4.1 TRANSCRIPTION (Whisper / Existing Script)
+                # =======================================================
+                orig_srt_path = self.artifacts.original_srt or (self.output_dir / "original.srt")
+                if not (orig_srt_path and orig_srt_path.is_file()):
+                    self.state = PipelineState.TRANSCRIBING
+                    self.state_changed.emit(self.state, "Đang bóc băng phụ đề gốc...")
+                    self._update_substep("4.1", SubstepStatus.RUNNING, 10, "Đang khởi chạy Whisper...")
+                    t0 = time.monotonic()
 
-                if self.project.script and self.project.script.lines:
-                    # Use script already present in project
-                    orig_srt_path = self.output_dir / "original.srt"
-                    write_srt(orig_srt_path, self.project.script, self.project.duration_ms)
-                elif self.project.video_path and self.project.video_path.is_file():
-                    # Run local faster-whisper transcription
+                    if self.project.script and self.project.script.lines:
+                        # Use script already present in project
+                        orig_srt_path = self.output_dir / "original.srt"
+                        write_srt(orig_srt_path, self.project.script, self.project.duration_ms)
+                    elif self.project.video_path and self.project.video_path.is_file():
+                        # Run local faster-whisper transcription
+                        self._update_substep(
+                            "4.1", SubstepStatus.RUNNING, 40, "Đang trích xuất audio..."
+                        )
+                        from vkdub.media.audio_extract import extract_audio
+
+                        wav_path = self.output_dir / "audio_source.wav"
+                        self.log_emitted.emit(
+                            f"🎵 Đang trích xuất âm thanh từ video: {self.project.video_path.name}..."
+                        )
+                        extract_audio(self.project.video_path, wav_path)
+                        wav_size_kb = wav_path.stat().st_size / 1024 if wav_path.exists() else 0
+                        self.log_emitted.emit(
+                            f"✓ Đã trích xuất audio nguồn ({wav_size_kb:.1f} KB)."
+                        )
+
+                        self._update_substep(
+                            "4.1",
+                            SubstepStatus.RUNNING,
+                            65,
+                            "Đang nhận diện giọng nói (Whisper)...",
+                        )
+                        from faster_whisper import WhisperModel
+
+                        model_size = "base"
+                        if (
+                            hasattr(self.project, "transcription_settings")
+                            and self.project.transcription_settings
+                        ):
+                            model_size = (
+                                getattr(self.project.transcription_settings, "model", "base") or "base"
+                            )
+
+                        whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
+                        segments_gen, info = whisper.transcribe(str(wav_path), beam_size=5)
+                        total_dur = (
+                            info.duration
+                            if (info and getattr(info, "duration", 0) > 0)
+                            else (
+                                self.project.video_duration_ms / 1000
+                                if getattr(self.project, "video_duration_ms", None)
+                                else 60.0
+                            )
+                        )
+                        self.log_emitted.emit(
+                            f"🎙 Bắt đầu bóc băng Whisper ({model_size}) cho video độ dài {total_dur:.1f}s..."
+                        )
+
+                        cues = []
+                        for idx, seg in enumerate(segments_gen, 1):
+                            start_tc = srt_timestamp(seg.start)
+                            end_tc = srt_timestamp(seg.end)
+                            text = seg.text.strip()
+                            if text:
+                                cues.append(f"{idx}\n{start_tc} --> {end_tc}\n{text}\n")
+                                pct = min(98, 65 + int((seg.end / total_dur) * 33))
+                                self._update_substep(
+                                    "4.1",
+                                    SubstepStatus.RUNNING,
+                                    pct,
+                                    f"Đang bóc băng: [{start_tc[:8]} ➔ {end_tc[:8]}] ({idx} câu)",
+                                )
+                                self.log_emitted.emit(
+                                    f"  🎙 [Bóc băng #{idx}] Đang xử lý đoạn {start_tc[:8]} ➔ {end_tc[:8]}: \"{text}\""
+                                )
+
+                        orig_srt_content = "\n".join(cues)
+                        orig_srt_path = self.output_dir / "original.srt"
+                        orig_srt_path.write_text(orig_srt_content, encoding="utf-8")
+                        self.log_emitted.emit(
+                            f"✓ Bóc băng hoàn tất: Đã nhận diện toàn bộ {len(cues)} câu thoại."
+                        )
+                    else:
+                        raise ValueError("Dự án chưa chọn video MP4 và chưa có phụ đề gốc để xử lý.")
+
+                    duration = time.monotonic() - t0
+                    self.artifacts.original_srt = orig_srt_path
+                    self.artifact_ready.emit("original_srt", orig_srt_path)
                     self._update_substep(
-                        "4.1", SubstepStatus.RUNNING, 40, "Đang trích xuất audio..."
+                        "4.1",
+                        SubstepStatus.SUCCESS,
+                        100,
+                        "Bóc băng thành công",
+                        artifact=orig_srt_path,
+                        duration=duration,
                     )
-                    from vkdub.media.audio_extract import extract_audio
-
-                    wav_path = self.output_dir / "audio_source.wav"
-                    extract_audio(self.project.video_path, wav_path)
+                    self.state = PipelineState.TRANSCRIBED
+                    self.state_changed.emit(self.state, "Bóc băng hoàn tất.")
+                else:
+                    self.artifacts.original_srt = orig_srt_path
+                    logger.info("Reusing existing original.srt: %s", orig_srt_path)
+                    try:
+                        raw_c = orig_srt_path.read_text(encoding="utf-8", errors="replace")
+                        d_orig = parse_srt(raw_c)
+                        c_cnt = len(d_orig.lines)
+                        if c_cnt > 0:
+                            f_tc = srt_timestamp(d_orig.lines[0].start_ms / 1000)
+                            l_tc = srt_timestamp(d_orig.lines[-1].end_ms / 1000)
+                            self.log_emitted.emit(
+                                f"ℹ Tái sử dụng phụ đề gốc có sẵn: {c_cnt} câu thoại (từ đoạn {f_tc[:8]} ➔ {l_tc[:8]}). Bỏ qua bóc băng."
+                            )
+                            self.log_emitted.emit(f"  → Đoạn đầu [{f_tc[:8]}]: \"{d_orig.lines[0].text}\"")
+                            self.log_emitted.emit(f"  → Đoạn cuối [{l_tc[:8]}]: \"{d_orig.lines[-1].text}\"")
+                        else:
+                            self.log_emitted.emit("ℹ Tái sử dụng phụ đề gốc có sẵn (0 câu thoại).")
+                    except Exception:
+                        self.log_emitted.emit(f"ℹ Tái sử dụng phụ đề gốc có sẵn ({orig_srt_path.name}).")
 
                     self._update_substep(
                         "4.1",
-                        SubstepStatus.RUNNING,
-                        65,
-                        "Đang nhận diện giọng nói (Whisper)...",
+                        SubstepStatus.SUCCESS,
+                        100,
+                        "Đã có sẵn phụ đề gốc",
+                        artifact=orig_srt_path,
                     )
-                    from faster_whisper import WhisperModel
 
-                    from vkdub.domain.transcript import srt_timestamp
+                if self.cancel_event.is_set():
+                    self.pipeline_cancelled.emit()
+                    return
 
-                    model_size = "base"
-                    if (
-                        hasattr(self.project, "transcription_settings")
-                        and self.project.transcription_settings
-                    ):
-                        model_size = (
-                            getattr(self.project.transcription_settings, "model", "base") or "base"
-                        )
+                # =======================================================
+                # 4.2 CHATGPT TRANSLATION (via Edge Extension)
+                # =======================================================
+                trans_srt_path = self.artifacts.translated_srt or (self.output_dir / "translated.srt")
+                if not (trans_srt_path and trans_srt_path.is_file()):
+                    self.state = PipelineState.TRANSLATING
+                    self.state_changed.emit(self.state, "Đang gửi phụ đề sang ChatGPT qua Edge...")
+                    self._update_substep(
+                        "4.2",
+                        SubstepStatus.RUNNING,
+                        15,
+                        "Đang kết nối ChatGPT trong Edge...",
+                    )
+                    t0 = time.monotonic()
 
-                    whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
-                    segments_gen, _ = whisper.transcribe(str(wav_path), beam_size=5)
+                    assert orig_srt_path is not None
+                    raw_original_srt = orig_srt_path.read_text(encoding="utf-8", errors="replace")
 
-                    cues = []
-                    for idx, seg in enumerate(segments_gen, 1):
-                        start_tc = srt_timestamp(seg.start)
-                        end_tc = srt_timestamp(seg.end)
-                        text = seg.text.strip()
-                        if text:
-                            cues.append(f"{idx}\n{start_tc} --> {end_tc}\n{text}\n")
+                    num_lines = raw_original_srt.count("-->")
+                    try:
+                        d_orig = parse_srt(raw_original_srt)
+                        f_tc = srt_timestamp(d_orig.lines[0].start_ms / 1000) if d_orig.lines else "00:00:00"
+                        l_tc = srt_timestamp(d_orig.lines[-1].end_ms / 1000) if d_orig.lines else "00:00:00"
+                        range_str = f"từ đoạn {f_tc[:8]} ➔ {l_tc[:8]}"
+                    except Exception:
+                        range_str = ""
 
-                    orig_srt_content = "\n".join(cues)
-                    orig_srt_path = self.output_dir / "original.srt"
-                    orig_srt_path.write_text(orig_srt_content, encoding="utf-8")
+                    self.log_emitted.emit(
+                        f"📝 Gửi {num_lines} câu phụ đề ({range_str}) sang ChatGPT qua Edge để dịch ngữ cảnh..."
+                    )
+                    self._update_substep(
+                        "4.2",
+                        SubstepStatus.WAITING,
+                        45,
+                        f"ChatGPT đang dịch ({num_lines} câu)...",
+                    )
+                    raw_translated_srt = self.local_agent.translate_srt_sync(
+                        raw_original_srt, timeout_s=360.0
+                    )
+                    self.log_emitted.emit(
+                        f"✓ Đã nhận bản dịch từ ChatGPT ({len(raw_translated_srt)} ký tự). Đang đối soát và chuẩn hóa timecode..."
+                    )
+
+                    self._update_substep(
+                        "4.2", SubstepStatus.VALIDATING, 85, "Đang kiểm tra và sửa lỗi timecode..."
+                    )
+                    val_res = validate_and_repair_srt(
+                        raw_original_srt, raw_translated_srt, auto_repair_timecodes=True
+                    )
+                    if not val_res.is_valid:
+                        err_detail = " | ".join(val_res.errors)
+                        raise ValueError(f"Kiểm tra phụ đề dịch thất bại: {err_detail}")
+
+                    final_srt_content = val_res.repaired_srt or raw_translated_srt
+                    trans_srt_path = self.output_dir / "translated.srt"
+                    trans_srt_path.write_text(final_srt_content, encoding="utf-8")
+                    self.log_emitted.emit(
+                        f"✓ Phụ đề dịch hợp lệ 100%: Khớp toàn bộ {val_res.cue_count} câu thoại ({range_str})."
+                    )
+
+                    duration = time.monotonic() - t0
+                    self.artifacts.translated_srt = trans_srt_path
+                    self.artifact_ready.emit("translated_srt", trans_srt_path)
+                    self._update_substep(
+                        "4.2",
+                        SubstepStatus.SUCCESS,
+                        100,
+                        f"Dịch thành công ({val_res.cue_count} câu)",
+                        artifact=trans_srt_path,
+                        duration=duration,
+                    )
+                    self.state = PipelineState.TRANSLATED
+                    self.state_changed.emit(self.state, "Dịch ChatGPT hoàn tất.")
                 else:
-                    raise ValueError("Dự án chưa chọn video MP4 và chưa có phụ đề gốc để xử lý.")
+                    self.artifacts.translated_srt = trans_srt_path
+                    logger.info("Reusing existing translated.srt: %s", trans_srt_path)
+                    try:
+                        raw_c = trans_srt_path.read_text(encoding="utf-8", errors="replace")
+                        d_trans = parse_srt(raw_c)
+                        c_cnt = len(d_trans.lines)
+                        if c_cnt > 0:
+                            f_tc = srt_timestamp(d_trans.lines[0].start_ms / 1000)
+                            l_tc = srt_timestamp(d_trans.lines[-1].end_ms / 1000)
+                            self.log_emitted.emit(
+                                f"ℹ Tái sử dụng phụ đề dịch có sẵn: {c_cnt} câu thoại (từ đoạn {f_tc[:8]} ➔ {l_tc[:8]})."
+                            )
+                            self.log_emitted.emit(f"  → Đoạn đầu dịch [{f_tc[:8]}]: \"{d_trans.lines[0].text}\"")
+                            self.log_emitted.emit(f"  → Đoạn cuối dịch [{l_tc[:8]}]: \"{d_trans.lines[-1].text}\"")
+                        else:
+                            self.log_emitted.emit("ℹ Tái sử dụng phụ đề dịch có sẵn (0 câu thoại).")
+                    except Exception:
+                        self.log_emitted.emit(f"ℹ Tái sử dụng phụ đề dịch có sẵn ({trans_srt_path.name}).")
 
-                duration = time.monotonic() - t0
-                self.artifacts.original_srt = orig_srt_path
-                self.artifact_ready.emit("original_srt", orig_srt_path)
-                self._update_substep(
-                    "4.1",
-                    SubstepStatus.SUCCESS,
-                    100,
-                    "Bóc băng thành công",
-                    artifact=orig_srt_path,
-                    duration=duration,
-                )
-                self.state = PipelineState.TRANSCRIBED
-                self.state_changed.emit(self.state, "Bóc băng hoàn tất.")
-            else:
-                self.artifacts.original_srt = orig_srt_path
-                logger.info("Reusing existing original.srt: %s", orig_srt_path)
-                self._update_substep(
-                    "4.1",
-                    SubstepStatus.SUCCESS,
-                    100,
-                    "Đã có sẵn phụ đề gốc",
-                    artifact=orig_srt_path,
-                )
+                    self._update_substep(
+                        "4.2",
+                        SubstepStatus.SUCCESS,
+                        100,
+                        "Đã có sẵn phụ đề dịch",
+                        artifact=trans_srt_path,
+                    )
 
-            if self.cancel_event.is_set():
-                self.pipeline_cancelled.emit()
-                return
+                if self.cancel_event.is_set():
+                    self.pipeline_cancelled.emit()
+                    return
 
-            # =======================================================
-            # 4.2 CHATGPT TRANSLATION (via Edge Extension)
-            # =======================================================
-            trans_srt_path = self.artifacts.translated_srt or (self.output_dir / "translated.srt")
-            if not (trans_srt_path and trans_srt_path.is_file()):
-                self.state = PipelineState.TRANSLATING
-                self.state_changed.emit(self.state, "Đang gửi phụ đề sang ChatGPT qua Edge...")
-                self._update_substep(
-                    "4.2",
-                    SubstepStatus.RUNNING,
-                    15,
-                    "Đang kết nối ChatGPT trong Edge...",
-                )
+                # =======================================================
+                # 4.3 SCRIPT PREPARATION & ATTACHMENT
+                # =======================================================
+                self.state = PipelineState.SCRIPT_READY
+                self.state_changed.emit(self.state, "Đang nạp kịch bản vào dự án...")
+                self._update_substep("4.3", SubstepStatus.RUNNING, 30, "Đang phân tích câu phụ đề...")
                 t0 = time.monotonic()
 
-                assert orig_srt_path is not None
-                raw_original_srt = orig_srt_path.read_text(encoding="utf-8", errors="replace")
+                assert trans_srt_path is not None
+                script_content = trans_srt_path.read_text(encoding="utf-8", errors="replace")
+                script_doc = parse_srt(script_content)
+                if self.project.duration_ms:
+                    from dataclasses import replace as dc_replace
+                    clamped_lines = []
+                    clamped_any = False
+                    for line in script_doc.lines:
+                        if line.end_ms > self.project.duration_ms and line.start_ms < self.project.duration_ms:
+                            clamped_lines.append(dc_replace(line, end_ms=self.project.duration_ms))
+                            clamped_any = True
+                        else:
+                            clamped_lines.append(line)
+                    if clamped_any:
+                        from vkdub.domain.script import ScriptDocument
+                        from vkdub.services.srt_service import script_to_srt
+                        script_doc = ScriptDocument(tuple(clamped_lines))
+                        trans_srt_path.write_text(script_to_srt(script_doc), encoding="utf-8")
+                        self.log_emitted.emit(
+                            f"ℹ Tự động khớp thời lượng câu cuối ({script_doc.lines[-1].end_ms}ms) với thời lượng video ({self.project.duration_ms}ms)."
+                        )
+                self.project.script = script_doc
+                self.project.target_language = "vi"
+                self.log_emitted.emit(
+                    f"📋 Đã nạp {len(script_doc.lines)} câu thoại vào kịch bản dự án."
+                )
+                if self.auto_voice:
+                    try:
+                        self.project.approved_revision_hash = self.project.revision_hash
+                    except Exception as e:
+                        logger.warning("Could not calculate approved_revision_hash: %s", e)
+                        self.project.approved_revision_hash = None
+                else:
+                    self.project.approved_revision_hash = None
 
-                self._update_substep(
-                    "4.2",
-                    SubstepStatus.WAITING,
-                    45,
-                    "ChatGPT đang dịch (giữ nguyên timecode)...",
+                # Save plain text voice script
+                voice_txt_path = self.output_dir / "voice_script.txt"
+                voice_txt_path.write_text(
+                    "\n".join(line.text for line in script_doc.lines),
+                    encoding="utf-8",
                 )
-                raw_translated_srt = self.local_agent.translate_srt_sync(
-                    raw_original_srt, timeout_s=360.0
+                self.artifacts.voice_script = voice_txt_path
+                self.log_emitted.emit(
+                    f"💾 Đã lưu file voice_script.txt ({voice_txt_path.stat().st_size} bytes)."
                 )
-
-                self._update_substep(
-                    "4.2", SubstepStatus.VALIDATING, 85, "Đang kiểm tra và sửa lỗi timecode..."
-                )
-                val_res = validate_and_repair_srt(
-                    raw_original_srt, raw_translated_srt, auto_repair_timecodes=True
-                )
-                if not val_res.is_valid:
-                    err_detail = " | ".join(val_res.errors)
-                    raise ValueError(f"Kiểm tra phụ đề dịch thất bại: {err_detail}")
-
-                final_srt_content = val_res.repaired_srt or raw_translated_srt
-                trans_srt_path = self.output_dir / "translated.srt"
-                trans_srt_path.write_text(final_srt_content, encoding="utf-8")
 
                 duration = time.monotonic() - t0
-                self.artifacts.translated_srt = trans_srt_path
-                self.artifact_ready.emit("translated_srt", trans_srt_path)
                 self._update_substep(
-                    "4.2",
+                    "4.3",
                     SubstepStatus.SUCCESS,
                     100,
-                    f"Dịch thành công ({val_res.cue_count} câu)",
-                    artifact=trans_srt_path,
+                    f"Kịch bản sẵn sàng ({len(script_doc.lines)} câu)",
+                    artifact=voice_txt_path,
                     duration=duration,
                 )
-                self.state = PipelineState.TRANSLATED
-                self.state_changed.emit(self.state, "Dịch ChatGPT hoàn tất.")
-            else:
-                self.artifacts.translated_srt = trans_srt_path
-                logger.info("Reusing existing translated.srt: %s", trans_srt_path)
-                self._update_substep(
-                    "4.2",
-                    SubstepStatus.SUCCESS,
-                    100,
-                    "Đã có sẵn phụ đề dịch",
-                    artifact=trans_srt_path,
-                )
 
-            if self.cancel_event.is_set():
-                self.pipeline_cancelled.emit()
-                return
+                if self.cancel_event.is_set():
+                    self.pipeline_cancelled.emit()
+                    return
 
-            # =======================================================
-            # 4.3 SCRIPT PREPARATION & ATTACHMENT
-            # =======================================================
-            self.state = PipelineState.SCRIPT_READY
-            self.state_changed.emit(self.state, "Đang nạp kịch bản vào dự án...")
-            self._update_substep("4.3", SubstepStatus.RUNNING, 30, "Đang phân tích câu phụ đề...")
-            t0 = time.monotonic()
-
-            assert trans_srt_path is not None
-            script_content = trans_srt_path.read_text(encoding="utf-8", errors="replace")
-            script_doc = parse_srt(script_content)
-            self.project.script = script_doc
-            self.project.target_language = "vi"
-            try:
-                self.project.approved_revision_hash = self.project.revision_hash
-            except Exception as e:
-                logger.warning("Could not calculate approved_revision_hash: %s", e)
-                self.project.approved_revision_hash = None
-
-            # Save plain text voice script
-            voice_txt_path = self.output_dir / "voice_script.txt"
-            voice_txt_path.write_text(
-                "\n".join(line.text for line in script_doc.lines),
-                encoding="utf-8",
-            )
-            self.artifacts.voice_script = voice_txt_path
-
-            duration = time.monotonic() - t0
-            self._update_substep(
-                "4.3",
-                SubstepStatus.SUCCESS,
-                100,
-                f"Kịch bản sẵn sàng ({len(script_doc.lines)} câu)",
-                artifact=voice_txt_path,
-                duration=duration,
-            )
-
-            if self.cancel_event.is_set():
-                self.pipeline_cancelled.emit()
-                return
+                if not self.auto_voice:
+                    self._update_substep(
+                        "4.4",
+                        SubstepStatus.WAITING,
+                        0,
+                        "Chờ duyệt kịch bản tại Bước 05",
+                    )
+                    self.state = PipelineState.SCRIPT_READY
+                    self.state_changed.emit(
+                        self.state, "Dịch hoàn tất! Vui lòng duyệt kịch bản tại Bước 05 trước khi tạo giọng đọc."
+                    )
+                    self.log_emitted.emit(
+                        "⏸ [Tạm dừng duyệt kịch bản] Hệ thống dừng lại ở Bước 05 để bạn kiểm tra và chốt kịch bản trước khi tạo giọng đọc Vbee."
+                    )
+                    self._save_current_checkpoint()
+                    self.pipeline_completed.emit(self.artifacts)
+                    return
 
             # =======================================================
             # 4.4 VBEE VOICE GENERATION (via Edge Extension)
             # =======================================================
-            master_audio_path = self.artifacts.vbee_master_audio or (self.output_dir / "vbee_master_raw.mp3")
-            timeline_audio_path = self.artifacts.timeline_master_audio or (self.output_dir / "master_narration_timeline.mp3")
+            if self.project.script and self.project.script.lines:
+                trans_srt_path = self.output_dir / "translated.srt"
+                write_srt(trans_srt_path, self.project.script, self.project.duration_ms)
+                script_content = trans_srt_path.read_text(encoding="utf-8", errors="replace")
+                voice_txt_path = self.output_dir / "voice_script.txt"
+                voice_txt_path.write_text(
+                    "\n".join(line.text for line in self.project.script.lines),
+                    encoding="utf-8",
+                )
+                self.artifacts.translated_srt = trans_srt_path
+                self.artifacts.voice_script = voice_txt_path
+            else:
+                trans_srt_path = self.artifacts.translated_srt or (self.output_dir / "translated.srt")
+                if trans_srt_path and trans_srt_path.is_file():
+                    script_content = trans_srt_path.read_text(encoding="utf-8", errors="replace")
+                else:
+                    raise ValueError("Không tìm thấy kịch bản để tạo giọng đọc Vbee.")
+            master_audio_path = self.artifacts.vbee_master_audio or (
+                self.output_dir / "vbee_master_raw.mp3"
+            )
+            timeline_audio_path = self.artifacts.timeline_master_audio or (
+                self.output_dir / "master_narration_timeline.mp3"
+            )
 
-            if not (timeline_audio_path and timeline_audio_path.is_file()):
+            timeline_ready = bool(
+                timeline_audio_path
+                and _timeline_audio_is_usable(
+                    timeline_audio_path, self.project.duration_ms
+                )
+            )
+            if not timeline_ready:
                 self.state = PipelineState.VOICE_GENERATING
                 self.state_changed.emit(
-                    self.state, "Đang gửi kịch bản sang Vbee (Ngọc Huyền 1.1x)..."
+                    self.state, f"Đang gửi kịch bản sang Vbee ({self.voice_name} {self.speed})..."
                 )
                 self._update_substep(
                     "4.4",
                     SubstepStatus.RUNNING,
                     15,
                     f"Vbee đang tạo giọng {self.voice_name} {self.speed}...",
+                )
+                num_v = len(self.project.script.lines) if (self.project.script and self.project.script.lines) else 0
+                range_str = ""
+                if num_v > 0:
+                    f_tc = srt_timestamp(self.project.script.lines[0].start_ms / 1000)
+                    l_tc = srt_timestamp(self.project.script.lines[-1].end_ms / 1000)
+                    range_str = f" ({num_v} câu thoại, từ đoạn {f_tc[:8]} ➔ {l_tc[:8]})"
+
+                self.log_emitted.emit(
+                    f"🎙 Gửi kịch bản sang Vbee qua Edge: Giọng '{self.voice_name}', Tốc độ '{self.speed}'{range_str}..."
                 )
                 t0 = time.monotonic()
 
@@ -346,6 +528,10 @@ class PipelineRunner(QThread):
                         timeout_s=600.0,
                     )
                     self.artifacts.vbee_master_audio = saved_vbee_audio
+                    audio_size_kb = saved_vbee_audio.stat().st_size // 1024 if saved_vbee_audio.exists() else 0
+                    self.log_emitted.emit(
+                        f"✓ Đã nhận file audio từ Vbee ({audio_size_kb} KB). Đang dùng FFmpeg căn chỉnh timeline master..."
+                    )
                 else:
                     saved_vbee_audio = master_audio_path
 
@@ -366,6 +552,10 @@ class PipelineRunner(QThread):
                 duration = time.monotonic() - t0
                 self.artifacts.timeline_master_audio = timeline_audio_path
                 self.artifact_ready.emit("master_audio", timeline_audio_path)
+                dur_total_s = (self.project.duration_ms or 0) / 1000
+                self.log_emitted.emit(
+                    f"🎉 Master timeline audio hoàn thành: {timeline_audio_path.name} ({dur_total_s:.1f}s, bắt đầu tại 00:00:00.000)."
+                )
                 self._update_substep(
                     "4.4",
                     SubstepStatus.SUCCESS,
@@ -380,6 +570,9 @@ class PipelineRunner(QThread):
                 logger.info(
                     "Reusing existing master audio from checkpoint: %s",
                     timeline_audio_path,
+                )
+                self.log_emitted.emit(
+                    f"ℹ Tái sử dụng master narration timeline có sẵn: {timeline_audio_path.name}"
                 )
                 self._update_substep(
                     "4.4",

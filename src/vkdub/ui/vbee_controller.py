@@ -15,7 +15,11 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 from vkdub.domain.project import Project
 from vkdub.integrations.vbee.errors import VbeeError, VbeeValidationError
-from vkdub.integrations.vbee.provider import VbeeBrowserProvider, VoiceProvider
+from vkdub.integrations.vbee.provider import (
+    VbeeBrowserProvider,
+    VbeeExtensionProvider,
+    VoiceProvider,
+)
 from vkdub.integrations.vbee.state import WorkflowState
 from vkdub.integrations.vbee.workflow import VbeeVoiceWorkflow, validate_project_for_vbee
 from vkdub.services.credential_service import redact
@@ -237,10 +241,17 @@ class VbeeController(QObject):
                 ffmpeg=str(ffmpeg),
                 ffprobe=str(ffprobe),
             )
-        else:
+        elif vbee_mode == "standalone_browser":
             provider = VbeeBrowserProvider(
                 downloads_dir=staging_dir / "downloads",
                 headless=False,
+            )
+        else:
+            # Mặc định sử dụng tiện ích mở rộng Edge Bridge (theo yêu cầu người dùng)
+            local_agent = getattr(self.window, "local_agent", None)
+            provider = VbeeExtensionProvider(
+                local_agent=local_agent,
+                downloads_dir=staging_dir / "downloads",
             )
 
         # 6. Create thread-safe worker job

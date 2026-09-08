@@ -38,6 +38,79 @@ class VoiceProvider(Protocol):
         ...
 
 
+class VbeeExtensionProvider:
+    """Vbee Voice Provider implementation backed by VK Dub Studio Browser Extension (Microsoft Edge)."""
+
+    name = "vbee_extension"
+
+    def __init__(
+        self,
+        local_agent: Any = None,
+        downloads_dir: Path | None = None,
+    ) -> None:
+        self.local_agent = local_agent
+        self.downloads_dir = downloads_dir
+
+    async def execute_dubbing(
+        self,
+        project: Project,
+        srt_path: Path,
+        progress_callback: Callable[[int, str], None],
+        check_cancel: Callable[[], None],
+        speed: float | None = None,
+    ) -> Path:
+        import asyncio
+
+        progress_callback(20, "Đang kết nối tới tiện ích Vbee trên Microsoft Edge…")
+        check_cancel()
+
+        if not self.local_agent or not getattr(self.local_agent.status, "browser_connected", False):
+            raise RuntimeError(
+                "Tiện ích 'VK Dub Studio Bridge' trong Microsoft Edge chưa kết nối.\n"
+                "Vui lòng kiểm tra Microsoft Edge đã mở và tiện ích đang hoạt động."
+            )
+
+        srt_content = srt_path.read_text(encoding="utf-8")
+        target_dir = self.downloads_dir or srt_path.parent
+        target_dir.mkdir(parents=True, exist_ok=True)
+        raw_vbee_path = target_dir / "vbee_master_raw.mp3"
+
+        voice_name = "Ngọc Huyền"
+        if project.voice:
+            vn = project.voice.display_name or project.voice.voice_id
+            for known in ("Mai Phương", "Tường Vy", "Ngọc Huyền", "Lan Trinh", "Thảo Trinh"):
+                if known in vn:
+                    voice_name = known
+                    break
+            else:
+                if vn and vn != "unconfigured":
+                    voice_name = vn
+
+        spd_str = f"{speed or 1.1:.1f}x" if isinstance(speed, (int, float)) else str(speed or "1.1x")
+
+        progress_callback(35, f"Đang gửi kịch bản sang Vbee qua Edge (giọng {voice_name}, tốc độ {spd_str})…")
+        check_cancel()
+
+        loop = asyncio.get_running_loop()
+        saved_audio = await loop.run_in_executor(
+            None,
+            lambda: self.local_agent.generate_vbee_sync(
+                srt_content=srt_content,
+                target_audio_path=raw_vbee_path,
+                voice_name=voice_name,
+                speed=spd_str,
+                timeout_s=600.0,
+                check_cancel=check_cancel,
+                progress_callback=progress_callback,
+            ),
+        )
+        progress_callback(90, "Đã nhận âm thanh từ Vbee!")
+        return Path(saved_audio)
+
+    async def close(self) -> None:
+        pass
+
+
 class VbeeBrowserProvider:
     """Vbee Voice Provider implementation backed by Playwright browser automation."""
 

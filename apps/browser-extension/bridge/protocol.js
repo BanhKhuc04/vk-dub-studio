@@ -15,6 +15,7 @@ export const Actions = {
   // Status & Telemetry
   GET_STATUS: "GET_STATUS",
   STATUS_REPORT: "STATUS_REPORT",
+  RELOAD_EXTENSION: "RELOAD_EXTENSION",
 
   // Logging & Events
   LOG_EVENT: "LOG_EVENT",

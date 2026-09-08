@@ -285,6 +285,13 @@ class Step4PipelineWidget(QFrame):
             )
             self.btn_cancel.hide()
 
+    def reset_state(self) -> None:
+        self.set_running_state(False)
+        self.overall_badge.setText("○ Sẵn sàng")
+        self.overall_badge.setStyleSheet("color: #8b949e; font-size: 11px;")
+        for row in self.rows.values():
+            row.update_info(SubstepStatus.PENDING, 0, "Chờ thực hiện...")
+
     def update_substep(
         self,
         step_id: str,

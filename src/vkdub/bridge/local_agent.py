@@ -6,6 +6,7 @@ with the Native Messaging Host and Browser Extension.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -26,6 +27,112 @@ logger = logging.getLogger("vkdub.local_agent")
 
 DEFAULT_PORT = 49814
 DEFAULT_HOST = "127.0.0.1"
+MIN_AUDIO_BYTES = 1024
+
+
+def _looks_like_audio(data: bytes) -> bool:
+    """Reject empty/HTML responses before they become a voice checkpoint."""
+    if len(data) < MIN_AUDIO_BYTES:
+        return False
+    return bool(
+        data.startswith((b"ID3", b"RIFF", b"OggS", b"fLaC"))
+        or (len(data) >= 2 and data[0] == 0xFF and data[1] & 0xE0 == 0xE0)
+        or (len(data) >= 12 and data[4:8] == b"ftyp")
+    )
+
+
+def _write_verified_audio(target: Path, data: bytes, source: str) -> Path:
+    if not _looks_like_audio(data):
+        raise RuntimeError(
+            f"Dữ liệu audio Vbee không hợp lệ từ {source} ({len(data)} bytes)."
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(target.suffix + ".part")
+    try:
+        temporary.write_bytes(data)
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return target
+
+
+def _edge_download_directories() -> list[Path]:
+    """Read configured Edge download folders without assuming a profile name."""
+    candidates = [
+        Path.home() / "Downloads",
+        Path.home() / "AppData" / "Local" / "VKDubStudio" / "vbee_staging" / "downloads",
+    ]
+    edge_root = Path.home() / "AppData" / "Local" / "Microsoft" / "Edge" / "User Data"
+    preferences_files = edge_root.glob("*/Preferences") if edge_root.is_dir() else ()
+    for preferences in preferences_files:
+        try:
+            payload = json.loads(preferences.read_text(encoding="utf-8", errors="ignore"))
+            configured = payload.get("download", {}).get("default_directory")
+            if configured:
+                candidates.insert(0, Path(configured))
+        except (OSError, ValueError, TypeError):
+            logger.debug("Không đọc được Edge Preferences: %s", preferences)
+
+    unique: list[Path] = []
+    for candidate in candidates:
+        if candidate not in unique:
+            unique.append(candidate)
+    return unique
+
+
+def _matching_audio_candidates(job_name: str, explicit_path: str | None = None) -> list[Path]:
+    paths: list[Path] = []
+    if explicit_path:
+        reported = Path(explicit_path)
+        paths.extend([reported, Path(str(reported) + ".crdownload")])
+
+    patterns = {job_name, job_name.replace("_", ""), job_name.replace("-", "")}
+    parts = job_name.split("_")
+    if len(parts) > 1 and parts[-1]:
+        patterns.add(parts[-1])
+
+    for directory in _edge_download_directories():
+        if not directory.is_dir():
+            continue
+        for pat in patterns:
+            paths.extend(directory.glob(f"*{pat}*.mp3"))
+            paths.extend(directory.glob(f"*{pat}*.mp3.crdownload"))
+
+    deduplicated: list[Path] = []
+    for path in paths:
+        if path not in deduplicated and "unconfirmed" not in path.name.lower():
+            deduplicated.append(path)
+    return deduplicated
+
+
+def _wait_for_correlated_audio(
+    job_name: str,
+    explicit_path: str | None = None,
+    timeout_s: float = 60.0,
+) -> Path | None:
+    """Wait for the exact Vbee job download, including a stable Edge .crdownload."""
+    deadline = time.monotonic() + timeout_s
+    observations: dict[Path, tuple[int, int]] = {}
+    while True:
+        for candidate in _matching_audio_candidates(job_name, explicit_path):
+            try:
+                size = candidate.stat().st_size
+                previous_size, stable_count = observations.get(candidate, (-1, 0))
+                stable_count = stable_count + 1 if size == previous_size else 0
+                observations[candidate] = (size, stable_count)
+                if size < MIN_AUDIO_BYTES:
+                    continue
+                if candidate.suffix == ".crdownload" and stable_count < 2:
+                    continue
+                with candidate.open("rb") as stream:
+                    prefix = stream.read(16)
+                if _looks_like_audio(prefix + b"\0" * MIN_AUDIO_BYTES):
+                    return candidate
+            except OSError:
+                continue
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.5)
 
 
 class LocalAgent(QObject):
@@ -158,13 +265,19 @@ class LocalAgent(QObject):
             payload = msg.get("payload", {})
             new_status = BridgeStatus.from_payload(payload)
             new_status.browser_connected = True
+            status_changed = (
+                new_status.chatgpt_logged_in != self.status.chatgpt_logged_in
+                or new_status.vbee_logged_in != self.status.vbee_logged_in
+                or new_status.browser_connected != self.status.browser_connected
+            )
             self.status = new_status
             self.status_updated.emit(self.status)
-            self.log_emitted.emit(
-                f"Cập nhật trạng thái trình duyệt: ChatGPT="
-                f"{'Đã đăng nhập' if new_status.chatgpt_logged_in else 'Chưa đăng nhập'}, "
-                f"Vbee={'Đã đăng nhập' if new_status.vbee_logged_in else 'Chưa đăng nhập'}"
-            )
+            if status_changed:
+                self.log_emitted.emit(
+                    f"Trạng thái kết nối: Edge={'Kết nối' if new_status.browser_connected else 'Mất kết nối'}, "
+                    f"ChatGPT={'Đã đăng nhập' if new_status.chatgpt_logged_in else 'Chưa đăng nhập'}, "
+                    f"Vbee={'Đã đăng nhập' if new_status.vbee_logged_in else 'Chưa đăng nhập'}"
+                )
         elif action == Actions.CHATGPT_TRANSLATE_RESULT:
             payload = msg.get("payload", {})
             req_id = payload.get("request_id")
@@ -181,6 +294,13 @@ class LocalAgent(QObject):
                 event, container = self._pending_requests[req_id]
                 container.update(payload)
                 event.set()
+        elif action == Actions.LOG_EVENT:
+            payload = msg.get("payload", {})
+            log_msg = payload.get("message") if isinstance(payload, dict) else None
+            if not log_msg:
+                log_msg = msg.get("message")
+            if log_msg:
+                self.log_emitted.emit(f"🌐 [Edge] {log_msg}")
         elif action == Actions.HELLO:
             self.log_emitted.emit("Trình duyệt Microsoft Edge đã kết nối thành công.")
             self.request_status()
@@ -199,7 +319,8 @@ class LocalAgent(QObject):
 
         if not self.status.browser_connected:
             raise RuntimeError(
-                "Trình duyệt Microsoft Edge chưa kết nối. Vui lòng mở Microsoft Edge trước khi dịch."
+                "Trình duyệt Microsoft Edge chưa kết nối. "
+                "Vui lòng mở Microsoft Edge trước khi dịch."
             )
 
         req_id = str(uuid.uuid4())
@@ -220,7 +341,18 @@ class LocalAgent(QObject):
                 raise RuntimeError("Không thể gửi lệnh dịch sang extension Microsoft Edge.")
 
             logger.info("Đã gửi yêu cầu dịch sang ChatGPT (request_id=%s). Đang chờ...", req_id)
-            completed = event.wait(timeout=timeout_s)
+            self.log_emitted.emit("Đã gửi phụ đề sang ChatGPT qua Edge. Đang chờ phản hồi...")
+            t_start = time.monotonic()
+            completed = False
+            while True:
+                if event.wait(timeout=3.0):
+                    completed = True
+                    break
+                elapsed = int(time.monotonic() - t_start)
+                if elapsed >= timeout_s:
+                    break
+                self.log_emitted.emit(f"⏳ Đang chờ ChatGPT dịch ngữ cảnh ({elapsed}s)...")
+
             if not completed:
                 raise TimeoutError(f"Quá thời gian chờ phản hồi dịch từ ChatGPT ({timeout_s}s).")
 
@@ -243,20 +375,28 @@ class LocalAgent(QObject):
         voice_name: str = "Ngọc Huyền",
         speed: str = "1.1x",
         timeout_s: float = 600.0,
+        check_cancel: Any | None = None,
+        progress_callback: Any | None = None,
     ) -> Path:
         """Execute Vbee dubbing synthesis through the browser extension synchronously.
 
         Downloads or writes the master audio to target_audio_path.
         """
         import base64
+        import binascii
         import uuid
 
         if not self.status.browser_connected:
             raise RuntimeError(
-                "Trình duyệt Microsoft Edge chưa kết nối. Vui lòng mở Microsoft Edge trước khi tạo voice."
+                "Trình duyệt Microsoft Edge chưa kết nối. "
+                "Vui lòng mở Microsoft Edge trước khi tạo voice."
             )
 
         req_id = str(uuid.uuid4())
+        job_digest = hashlib.sha256(
+            f"{voice_name}\0{speed}\0{srt_content}".encode()
+        ).hexdigest()[:12]
+        job_name = f"vkdub_{job_digest}"
         event = threading.Event()
         container: dict[str, Any] = {}
         self._pending_requests[req_id] = (event, container)
@@ -269,58 +409,92 @@ class LocalAgent(QObject):
                     "voice_name": voice_name,
                     "speed": speed,
                     "request_id": req_id,
+                    "job_name": job_name,
                 },
             )
             if not sent:
                 raise RuntimeError("Không thể gửi lệnh tạo voice sang extension Vbee.")
 
             logger.info("Đã gửi yêu cầu tạo voice Vbee (request_id=%s). Đang xử lý...", req_id)
-            completed = event.wait(timeout=timeout_s)
+            self.log_emitted.emit(f"Đã gửi kịch bản sang Vbee (giọng {voice_name} {speed}). Đang xử lý...")
+            t_start = time.monotonic()
+            completed = False
+            while True:
+                if check_cancel:
+                    check_cancel()
+                if event.wait(timeout=1.0):
+                    completed = True
+                    break
+                elapsed = int(time.monotonic() - t_start)
+                if elapsed >= timeout_s:
+                    break
+                self.log_emitted.emit(f"⏳ Vbee đang tổng hợp và tải audio ({elapsed}s)...")
+                if progress_callback:
+                    pct = min(85, 40 + int((elapsed / 60.0) * 45))
+                    progress_callback(pct, f"Vbee đang xử lý phụ đề thành voice ({elapsed}s)…")
+
             if not completed:
                 raise TimeoutError(f"Quá thời gian chờ tạo voice từ Vbee ({timeout_s}s).")
 
-            if not container.get("success", False):
-                err = container.get("error", "Lỗi không xác định từ extension Vbee.")
-                raise RuntimeError(f"Vbee tạo voice thất bại: {err}")
+            logger.info(
+                "Vbee response: request_id=%s job=%s success=%s base64=%s url=%s "
+                "download_triggered=%s download_path=%s",
+                req_id,
+                job_name,
+                container.get("success"),
+                bool(container.get("audio_base64")),
+                bool(container.get("audio_url")),
+                bool(container.get("download_triggered")),
+                container.get("download_path") or "-",
+            )
 
             audio_b64 = container.get("audio_base64")
             if audio_b64:
-                target_audio_path.parent.mkdir(parents=True, exist_ok=True)
-                raw_bytes = base64.b64decode(audio_b64)
-                target_audio_path.write_bytes(raw_bytes)
-                logger.info("Đã lưu master audio Vbee thành công vào: %s", target_audio_path)
-                return target_audio_path
+                try:
+                    raw_bytes = base64.b64decode(audio_b64, validate=True)
+                    saved = _write_verified_audio(target_audio_path, raw_bytes, "extension")
+                    logger.info("Đã lưu master audio Vbee thành công vào: %s", saved)
+                    return saved
+                except (binascii.Error, RuntimeError) as exc:
+                    logger.warning("Payload base64 Vbee không dùng được: %s", exc)
 
             # If audio_b64 not directly returned, check audio_url
             audio_url = container.get("audio_url")
             if audio_url and audio_url.startswith("http"):
                 import httpx
 
-                target_audio_path.parent.mkdir(parents=True, exist_ok=True)
-                with httpx.Client(timeout=30.0) as client:
-                    resp = client.get(audio_url)
-                    resp.raise_for_status()
-                    target_audio_path.write_bytes(resp.content)
-                logger.info("Đã tải master audio Vbee từ URL: %s", target_audio_path)
-                return target_audio_path
+                try:
+                    with httpx.Client(timeout=45.0, follow_redirects=True) as client:
+                        resp = client.get(audio_url)
+                        resp.raise_for_status()
+                    saved = _write_verified_audio(target_audio_path, resp.content, "audio_url")
+                    logger.info("Đã tải master audio Vbee từ URL: %s", saved)
+                    return saved
+                except (httpx.HTTPError, RuntimeError) as exc:
+                    logger.warning("Không tải được audio_url Vbee; thử file Edge: %s", exc)
 
-            # Fallback: check if browser downloaded MP3 to user's Downloads directory
-            downloads_dir = Path.home() / "Downloads"
-            if downloads_dir.is_dir():
-                import shutil
-                import time
-                mp3_files = sorted(
-                    downloads_dir.glob("*.mp3"),
-                    key=lambda f: f.stat().st_mtime,
-                    reverse=True,
+            if container.get("download_triggered") or container.get("download_path"):
+                downloaded = _wait_for_correlated_audio(
+                    job_name=str(container.get("job_name") or job_name),
+                    explicit_path=container.get("download_path"),
                 )
-                if mp3_files and (time.time() - mp3_files[0].stat().st_mtime) < 300:
-                    target_audio_path.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(mp3_files[0], target_audio_path)
-                    logger.info("Đã lấy master audio Vbee từ thư mục Downloads: %s", mp3_files[0])
-                    return target_audio_path
+                if downloaded:
+                    saved = _write_verified_audio(
+                        target_audio_path,
+                        downloaded.read_bytes(),
+                        str(downloaded),
+                    )
+                    logger.info("Đã nhận đúng audio Vbee job %s từ %s", job_name, downloaded)
+                    return saved
 
-            raise RuntimeError("Extension báo thành công nhưng không có dữ liệu audio hợp lệ.")
+            if not container.get("success", False):
+                err = container.get("error", "Lỗi không xác định từ extension Vbee.")
+                raise RuntimeError(f"Vbee tạo voice thất bại: {err}")
+
+            raise RuntimeError(
+                f"Extension Vbee báo thành công nhưng không trả audio cho job {job_name}. "
+                "Không tạo checkpoint để có thể Thử lại an toàn."
+            )
         finally:
             self._pending_requests.pop(req_id, None)
 
@@ -348,6 +522,10 @@ class LocalAgent(QObject):
     def request_status(self) -> bool:
         """Request immediate status refresh from browser extension."""
         return self.send_command(Actions.GET_STATUS)
+
+    def reload_extension(self) -> bool:
+        """Request browser extension to reload its background service worker."""
+        return self.send_command(Actions.RELOAD_EXTENSION)
 
     def open_browser(self, target_url: str = "https://chatgpt.com") -> bool:
         """Open target URL in user's default browser."""

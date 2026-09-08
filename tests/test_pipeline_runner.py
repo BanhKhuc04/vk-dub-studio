@@ -1,7 +1,7 @@
 """Unit tests for PipelineRunner, checkpoints, and substep state management."""
 
 import pytest
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtWidgets import QApplication
 
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.domain.project import Project
@@ -10,7 +10,7 @@ from vkdub.orchestrator.checkpoint import (
     load_checkpoint,
     save_checkpoint,
 )
-from vkdub.orchestrator.pipeline_runner import PipelineRunner
+from vkdub.orchestrator.pipeline_runner import PipelineRunner, _timeline_audio_is_usable
 from vkdub.orchestrator.pipeline_state import (
     ArtifactRegistry,
     PipelineState,
@@ -21,10 +21,23 @@ from vkdub.orchestrator.pipeline_state import (
 
 @pytest.fixture(scope="session")
 def qapp():
-    app = QCoreApplication.instance()
+    app = QApplication.instance()
     if not app:
-        app = QCoreApplication([])
+        app = QApplication([])
     return app
+
+
+def test_timeline_checkpoint_rebuilds_when_duration_drift_is_measurable(
+    monkeypatch, tmp_path
+):
+    audio = tmp_path / "timeline.mp3"
+    audio.write_bytes(b"ID3" + b"x" * 2048)
+    monkeypatch.setattr(
+        "vkdub.orchestrator.pipeline_runner.get_audio_duration_ms", lambda _path: 66_872
+    )
+
+    assert not _timeline_audio_is_usable(audio, 63_646)
+    assert _timeline_audio_is_usable(audio, 66_800)
 
 
 def test_checkpoint_save_and_load(tmp_path):
@@ -95,7 +108,11 @@ def test_pipeline_runner_step_4_3_execution(qapp, tmp_path, monkeypatch):
 
     # Mock build_master_timeline_audio to avoid ffmpeg call
     import vkdub.orchestrator.pipeline_runner as pr_mod
-    monkeypatch.setattr(pr_mod, "build_master_timeline_audio", lambda **kwargs: tmp_path / "master_narration_timeline.mp3")
+    monkeypatch.setattr(
+        pr_mod,
+        "build_master_timeline_audio",
+        lambda **kwargs: tmp_path / "master_narration_timeline.mp3",
+    )
 
     runner = PipelineRunner(project=project, local_agent=agent, output_dir=tmp_path)
     # Run synchronously in test
@@ -115,6 +132,63 @@ def test_pipeline_runner_step_4_3_execution(qapp, tmp_path, monkeypatch):
     assert voice_txt.read_text(encoding="utf-8").strip() == "Xin chào thế giới"
 
     # Verify Step 4.4 and overall pipeline completion
+    s44 = next(s for s in runner.substeps if s.id == "4.4")
+    assert s44.status == SubstepStatus.SUCCESS
+    assert runner.state == PipelineState.REVIEW_READY
+
+
+def test_pipeline_runner_auto_voice_false_pauses_for_review(qapp, tmp_path):
+    orig_file = tmp_path / "original.srt"
+    orig_file.write_text("1\n00:00:00,000 --> 00:00:02,000\nHello world\n", encoding="utf-8")
+    trans_file = tmp_path / "translated.srt"
+    trans_file.write_text("1\n00:00:00,000 --> 00:00:02,000\nXin chào thế giới\n", encoding="utf-8")
+
+    project = Project()
+    agent = LocalAgent()
+
+    runner = PipelineRunner(
+        project=project, local_agent=agent, output_dir=tmp_path, auto_voice=False
+    )
+    runner.run()
+
+    s43 = next(s for s in runner.substeps if s.id == "4.3")
+    assert s43.status == SubstepStatus.SUCCESS
+    assert project.script is not None
+    assert project.approved_revision_hash is None
+
+    s44 = next(s for s in runner.substeps if s.id == "4.4")
+    assert s44.status == SubstepStatus.WAITING
+    assert "Chờ duyệt kịch bản" in s44.message
+    assert runner.state == PipelineState.SCRIPT_READY
+
+
+def test_pipeline_runner_voice_only_step_4_4(qapp, tmp_path, monkeypatch):
+    import uuid
+    from unittest.mock import MagicMock
+    from vkdub.domain.script import ScriptDocument, ScriptLine
+
+    project = Project()
+    project.script = ScriptDocument(
+        lines=(ScriptLine(id=str(uuid.uuid4()), start_ms=0, end_ms=2000, text="Câu thoại đã được người dùng sửa"),)
+    )
+    agent = LocalAgent()
+
+    mock_audio = tmp_path / "mock_vbee.mp3"
+    mock_audio.write_bytes(b"FAKE_MP3_DATA")
+    agent.generate_vbee_sync = MagicMock(return_value=mock_audio)
+
+    import vkdub.orchestrator.pipeline_runner as pr_mod
+    monkeypatch.setattr(
+        pr_mod,
+        "build_master_timeline_audio",
+        lambda **kwargs: tmp_path / "master_narration_timeline.mp3",
+    )
+
+    runner = PipelineRunner(
+        project=project, local_agent=agent, output_dir=tmp_path, target_step="4.4"
+    )
+    runner.run()
+
     s44 = next(s for s in runner.substeps if s.id == "4.4")
     assert s44.status == SubstepStatus.SUCCESS
     assert runner.state == PipelineState.REVIEW_READY

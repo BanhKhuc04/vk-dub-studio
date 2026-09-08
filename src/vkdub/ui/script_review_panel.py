@@ -1,4 +1,5 @@
 from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -32,6 +33,11 @@ class ScriptReviewPanel(QFrame):
     regenerate_requested = Signal(str)
     voice_requested = Signal(str)
     listen_requested = Signal()
+    export_video_requested = Signal()
+    export_capcut_requested = Signal()
+    capcut_folder_requested = Signal()
+    open_capcut_requested = Signal()
+    open_capcut_folder_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -43,7 +49,7 @@ class ScriptReviewPanel(QFrame):
         self._editor_item: QListWidgetItem | None = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(8)
 
         # ---------------------------------------------------------
@@ -51,9 +57,12 @@ class ScriptReviewPanel(QFrame):
         # ---------------------------------------------------------
         header_row = QHBoxLayout()
         title_col = QVBoxLayout()
-        title_col.setSpacing(2)
+        title_col.setSpacing(3)
+        eyebrow = QLabel("PIPELINE · STEP 05")
+        eyebrow.setStyleSheet("font-size: 9px; font-weight: 800; color: #06b6d4; letter-spacing: 1.2px;")
+        title_col.addWidget(eyebrow)
         title_col.addWidget(label("KỊCH BẢN", "heading"))
-        self.summary = QLabel("0 câu  •  0 lỗi  •  0 cảnh báo")
+        self.summary = QLabel("0 câu")
         self.summary.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
         title_col.addWidget(self.summary)
         header_row.addLayout(title_col, 1)
@@ -62,74 +71,104 @@ class ScriptReviewPanel(QFrame):
         self.badge.setObjectName("badge")
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setStyleSheet(
-            "background: #1e293b; color: #94a3b8; border: 1px solid #475569; "
-            "font-weight: bold; padding: 6px 12px; border-radius: 5px; font-size: 11px;"
+            "background: #090f1b; color: #64748b; border: 1px solid #1a273e; "
+            "font-weight: 800; padding: 4px 10px; border-radius: 5px; font-size: 10px; letter-spacing: 0.5px;"
         )
         header_row.addWidget(self.badge)
         layout.addLayout(header_row)
 
         self.stage = QLabel("Chưa có bản chép lời.")
-        self.stage.setStyleSheet("color: #929fb5; font-size: 11px;")
+        self.stage.setStyleSheet("color: #475569; font-size: 11px;")
         layout.addWidget(self.stage)
 
         # ---------------------------------------------------------
-        # Toolbar (Actions)
+        # Toolbar: Search, + Add cue, More (...)
         # ---------------------------------------------------------
-        toolbar = QGridLayout()
-        toolbar.setSpacing(4)
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(6)
+
         self.buttons: dict[str, QPushButton] = {}
-        for index, (action, title) in enumerate(
-            (
-                ("add", "+ Thêm"),
-                ("delete", "✖ Xóa"),
-                ("split", "✂ Tách"),
-                ("merge_previous", "⇈ Gộp trước"),
-                ("merge_next", "⇊ Gộp sau"),
-                ("undo", "↶ Hoàn tác"),
-                ("redo", "↷ Làm lại"),
-                ("search", "🔍 Tìm/Thay"),
-                ("load", "📂 Nhập SRT bản dịch"),
-                ("save", "⬇ SRT đã dịch"),
-                ("import_vbee", "🎵 Nhập Audio Vbee"),
-                ("save_source", "⬇ SRT chưa dịch"),
-                ("validate", "Kiểm tra"),
-                ("prepare", "Tạo bản nháp"),
-            )
+        for action, title in (
+            ("add", "➕ Thêm câu"),
+            ("delete", "✖ Xóa câu"),
+            ("split", "✂ Tách câu"),
+            ("merge_previous", "⇈ Gộp trước"),
+            ("merge_next", "⇊ Gộp sau"),
+            ("undo", "↶ Hoàn tác"),
+            ("redo", "↷ Làm lại"),
+            ("search", "🔍 Tìm/Thay"),
+            ("load", "📂 Nhập SRT"),
+            ("save", "⬇ Xuất SRT"),
+            ("import_vbee", "🎵 Nhập Audio Vbee"),
+            ("save_source", "⬇ SRT chưa dịch"),
+            ("validate", "✔ Kiểm tra SRT"),
+            ("prepare", "🔄 Tạo lại voice"),
         ):
-            button = QPushButton(title)
-            button.setStyleSheet("padding: 5px 3px; font-size: 11px; font-weight: 600;")
-            button.clicked.connect(
-                lambda checked=False, name=action: self.action_requested.emit(name)
-            )
-            self.buttons[action] = button
-            toolbar.addWidget(button, index // 5, index % 5)
+            btn = QPushButton(title)
+            btn.clicked.connect(lambda checked=False, name=action: self.action_requested.emit(name))
+            self.buttons[action] = btn
+
+        # Search toggle button
+        self.btn_search_toggle = QPushButton("🔍 Tìm kiếm")
+        self.btn_search_toggle.setStyleSheet("padding: 5px 10px; font-size: 11px; font-weight: 600;")
+        self.btn_search_toggle.clicked.connect(self._toggle_search_box)
+        toolbar.addWidget(self.btn_search_toggle)
+
+        # + Add cue button
+        add_btn = self.buttons["add"]
+        add_btn.setStyleSheet("padding: 5px 10px; font-size: 11px; font-weight: 600; background-color: #21262d;")
+        toolbar.addWidget(add_btn)
+
+        toolbar.addStretch(1)
+
+        # More (...) menu
         self.more_button = QToolButton()
-        self.more_button.setText("Thêm ⋯")
+        self.more_button.setText("Thao tác khác ⋯")
+        self.more_button.setStyleSheet("padding: 5px 10px; font-size: 11px; font-weight: 600;")
         self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         more_menu = QMenu(self)
         self.more_button.setMenu(more_menu)
-        overflow = []
-        primary = ("load", "save", "save_source", "import_vbee", "validate")
-        for name, button in self.buttons.items():
-            toolbar.removeWidget(button)
-            if name in primary:
-                toolbar.addWidget(button, 0, primary.index(name))
-            else:
-                button.setParent(self)
-                button.hide()
-                menu_action = more_menu.addAction(button.text())
-                menu_action.triggered.connect(button.click)
-                overflow.append((menu_action, button))
 
-        def refresh_overflow() -> None:
-            for menu_action, hidden_button in overflow:
-                menu_action.setEnabled(hidden_button.isEnabled())
+        menu_items = [
+            ("load", "📂 Nhập SRT bản dịch"),
+            ("save", "⬇ Xuất SRT đã dịch"),
+            ("validate", "✔ Kiểm tra timeline & kịch bản"),
+            ("prepare", "🔄 Tạo lại giọng đọc (Voice)"),
+            (None, "---"),
+            ("split", "✂ Tách câu"),
+            ("merge_previous", "⇈ Gộp với câu trước"),
+            ("merge_next", "⇊ Gộp với câu sau"),
+            ("delete", "✖ Xóa câu đang chọn"),
+            (None, "---"),
+            ("undo", "↶ Hoàn tác (Undo)"),
+            ("redo", "↷ Làm lại (Redo)"),
+            ("save_source", "⬇ Xuất SRT gốc chưa dịch"),
+            ("import_vbee", "🎵 Nhập audio Vbee thủ công"),
+        ]
 
-        more_menu.aboutToShow.connect(refresh_overflow)
-        toolbar.addWidget(self.more_button, 0, len(primary))
+        self._overflow_actions: list[tuple[QAction, QPushButton]] = []
+        for code, m_title in menu_items:
+            if code is None:
+                more_menu.addSeparator()
+            elif code in self.buttons:
+                b = self.buttons[code]
+                b.setParent(self)
+                b.setFixedSize(0, 0)
+                b.setStyleSheet("min-width:0;max-width:0;min-height:0;max-height:0;padding:0;margin:0;border:none;")
+                b.show()
+                act = more_menu.addAction(m_title)
+                act.triggered.connect(b.click)
+                self._overflow_actions.append((act, b))
+
+        def refresh_more_actions() -> None:
+            for act, b in self._overflow_actions:
+                act.setEnabled(b.isEnabled())
+
+        more_menu.aboutToShow.connect(refresh_more_actions)
+        toolbar.addWidget(self.more_button)
         layout.addLayout(toolbar)
 
-        # Search / Replace box
+        # Search / Replace box (toggleable)
         self.search_box = QWidget()
         search_layout = QGridLayout(self.search_box)
         search_layout.setContentsMargins(0, 0, 0, 0)
@@ -163,49 +202,246 @@ class ScriptReviewPanel(QFrame):
         self.rows.setWordWrap(True)
         self.rows.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.rows.setTextElideMode(Qt.TextElideMode.ElideNone)
-        self.rows.setSpacing(8)
+        self.rows.setSpacing(6)
+        self.rows.setStyleSheet("""
+            QListWidget#scriptList {
+                background-color: #06090f;
+                border: 1px solid #162032;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QListWidget#scriptList::item {
+                background-color: #0b101b;
+                border: 1px solid #162032;
+                border-radius: 6px;
+                padding: 8px 10px;
+                margin-bottom: 4px;
+                color: #f1f5f9;
+            }
+            QListWidget#scriptList::item:hover {
+                background-color: #121a2c;
+                border-color: #24334f;
+            }
+            QListWidget#scriptList::item:selected {
+                background-color: #0f1c30;
+                border: 1px solid #0284c7;
+                border-left: 3px solid #06b6d4;
+            }
+        """)
         self.rows.setAccessibleName("Danh sách các câu kịch bản")
         self.rows.itemClicked.connect(self._seek)
         self.rows.itemActivated.connect(self._seek)
         self.rows.currentRowChanged.connect(self._select_editor)
         layout.addWidget(self.rows, 1)
 
-        # Bottom Approval Gate Section
+        # Bottom Approval Gate & Primary Export Section
         bottom_box = QFrame()
-        bottom_box.setStyleSheet(
-            "background: #0f141e; border: 1px solid #232d3f; border-radius: 6px; padding: 10px;"
-        )
+        bottom_box.setStyleSheet("""
+            QFrame {
+                background-color: #080d16;
+                border: 1px solid #151d2e;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
         bottom_layout = QVBoxLayout(bottom_box)
-        bottom_layout.setContentsMargins(8, 8, 8, 8)
-        bottom_layout.setSpacing(8)
+        bottom_layout.setContentsMargins(12, 12, 12, 12)
+        bottom_layout.setSpacing(10)
 
+        # Approval Gate
         self.review_checkbox = QCheckBox("Tôi đã kiểm tra toàn bộ kịch bản")
         self.review_checkbox.setEnabled(False)
-        self.review_checkbox.setStyleSheet("font-weight: 600; color: #e5eaf4; font-size: 13px;")
+        self.review_checkbox.setStyleSheet("font-weight: 600; color: #e5eaf4; font-size: 12px;")
         bottom_layout.addWidget(self.review_checkbox)
 
-        self.approve_button = QPushButton("✓ DUYỆT KỊCH BẢN & TẠO VOICE")
+        self.approve_button = QPushButton("✔ BƯỚC 5: CHỐT KỊCH BẢN (DUYỆT)")
         self.approve_button.setObjectName("primary")
         self.approve_button.setEnabled(False)
-        self.approve_button.setStyleSheet("font-size: 13px; font-weight: bold; padding: 10px;")
+        self.approve_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 12px;
+                padding: 10px;
+                border-radius: 6px;
+                border: 1px solid #34d399;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #047857, stop:1 #059669);
+            }
+            QPushButton:disabled {
+                background: #0f172a;
+                color: #475569;
+                border: 1px solid #1e293b;
+            }
+        """)
         self.approve_button.setToolTip(
             "Chỉ duyệt khi đã tích xác nhận và không còn lỗi blocking. Lưu revision hash an toàn."
         )
         bottom_layout.addWidget(self.approve_button)
 
-        self.voice_note = QLabel("Sẵn sàng tạo voice Vbee sau khi duyệt kịch bản.")
-        self.voice_note.setWordWrap(True)
-        self.voice_note.setStyleSheet("color: #929fb5; font-size: 11px;")
-        bottom_layout.addWidget(self.voice_note)
+        # Primary Outputs: Export Video MP4 & Export CapCut Project
+        export_row = QHBoxLayout()
+        export_row.setSpacing(8)
 
-        self.export_button = QPushButton("XUẤT VIDEO")
-        self.export_button.setEnabled(False)
-        self.export_button.setToolTip(
-            "Cần hoàn tất kịch bản đã duyệt và tạo voice trước khi render."
-        )
-        bottom_layout.addWidget(self.export_button)
+        self.export_video_button = QPushButton("🎞 XUẤT VIDEO MP4")
+        self.export_video_button.setEnabled(False)
+        self.export_video_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #6366f1);
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 12px;
+                padding: 10px;
+                border-radius: 6px;
+                border: 1px solid #818cf8;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4338ca, stop:1 #4f46e5);
+            }
+            QPushButton:disabled {
+                background: #0f172a;
+                color: #475569;
+                border: 1px solid #1e293b;
+            }
+        """)
+        self.export_video_button.setToolTip("Tạo video MP4 hoàn chỉnh kèm xóa chữ, voice và phụ đề")
+        export_row.addWidget(self.export_video_button)
+
+        self.export_capcut_button = QPushButton("🎬 XUẤT DỰ ÁN CAPCUT")
+        self.export_capcut_button.setEnabled(False)
+        self.export_capcut_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 12px;
+                padding: 10px;
+                border-radius: 6px;
+                border: 1px solid #38bdf8;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:1 #0891b2);
+                border-color: #7dd3fc;
+            }
+            QPushButton:disabled {
+                background: #0f172a;
+                color: #475569;
+                border: 1px solid #1e293b;
+            }
+        """)
+        self.export_capcut_button.setToolTip("Tạo project CapCut có video đã xóa chữ và âm thanh giọng đọc")
+        export_row.addWidget(self.export_capcut_button)
+
+        bottom_layout.addLayout(export_row)
+
+        # Compatibility alias
+        self.export_button = self.export_video_button
+        self.voice_note = QLabel("")
+        self.voice_note.hide()
+
+        # CapCut Studio Actions Container Card
+        capcut_panel = QFrame()
+        capcut_panel.setStyleSheet("""
+            QFrame {
+                background-color: #070c14;
+                border: 1px solid #151f30;
+                border-radius: 8px;
+                padding: 6px;
+            }
+        """)
+        capcut_col = QVBoxLayout(capcut_panel)
+        capcut_col.setContentsMargins(8, 6, 8, 6)
+        capcut_col.setSpacing(6)
+
+        # Row 1: Destination path & Change folder button
+        capcut_path_row = QHBoxLayout()
+        capcut_path_row.setSpacing(6)
+
+        self.capcut_dest_lbl = QLabel("📁 CapCut: com.lveditor.draft")
+        self.capcut_dest_lbl.setStyleSheet("color: #8b9bb4; font-size: 11px; font-weight: 500;")
+        capcut_path_row.addWidget(self.capcut_dest_lbl, 1)
+
+        self.btn_capcut_folder = QPushButton("Đổi…")
+        self.btn_capcut_folder.setStyleSheet("""
+            QPushButton {
+                padding: 3px 10px;
+                font-size: 11px;
+                background: #0f1624;
+                color: #8b9bb4;
+                border: 1px solid #1e2b40;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: #182337;
+                color: #38bdf8;
+                border-color: #0284c7;
+            }
+        """)
+        self.btn_capcut_folder.setToolTip("Thay đổi thư mục lưu project CapCut (com.lveditor.draft)")
+        capcut_path_row.addWidget(self.btn_capcut_folder)
+        capcut_col.addLayout(capcut_path_row)
+
+        # Row 2: Action buttons (Open Folder & Launch CapCut)
+        capcut_act_row = QHBoxLayout()
+        capcut_act_row.setSpacing(8)
+
+        self.open_capcut_folder_button = QPushButton("📂 Mở Thư Mục CapCut")
+        self.open_capcut_folder_button.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                font-size: 11px;
+                font-weight: 700;
+                background: #0c1424;
+                color: #38bdf8;
+                border: 1px solid #0284c7;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background: #102038;
+                color: #ffffff;
+                border-color: #38bdf8;
+            }
+        """)
+        self.open_capcut_folder_button.setToolTip("Mở thư mục lưu trữ project CapCut trong File Explorer")
+        capcut_act_row.addWidget(self.open_capcut_folder_button, 1)
+
+        self.open_capcut_button = QPushButton("🚀 Mở CapCut")
+        self.open_capcut_button.setStyleSheet("""
+            QPushButton {
+                padding: 6px 14px;
+                font-size: 11px;
+                font-weight: 800;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                color: #ffffff;
+                border: 1px solid #34d399;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #047857, stop:1 #059669);
+                border-color: #6ee7b7;
+            }
+        """)
+        self.open_capcut_button.setToolTip("Khởi chạy trực tiếp phần mềm CapCut trên máy tính")
+        capcut_act_row.addWidget(self.open_capcut_button, 1)
+
+        capcut_col.addLayout(capcut_act_row)
+        bottom_layout.addWidget(capcut_panel)
+
+        self.export_video_button.clicked.connect(self.export_video_requested.emit)
+        self.export_capcut_button.clicked.connect(self.export_capcut_requested.emit)
+        self.btn_capcut_folder.clicked.connect(self.capcut_folder_requested.emit)
+        self.open_capcut_button.clicked.connect(self.open_capcut_requested.emit)
+        self.open_capcut_folder_button.clicked.connect(self.open_capcut_folder_requested.emit)
 
         layout.addWidget(bottom_box)
+
+    def _toggle_search_box(self) -> None:
+        vis = not self.search_box.isVisible()
+        self.search_box.setVisible(vis)
+        if vis:
+            self.find_text.setFocus()
 
     def show_transcript(
         self, transcript: Transcript | None, translation: Translation | None = None

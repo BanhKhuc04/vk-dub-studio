@@ -55,6 +55,11 @@ class CapCutExportController(QObject):
             f"Đã tạo project CapCut: 1 video, {result.audio_segments} voice tiếng Việt, "
             f"{result.caption_segments} caption."
         )
+        if hasattr(self.window, "notify_success"):
+            self.window.notify_success(
+                "Xuất CapCut thành công!",
+                f"1 video, {result.audio_segments} voice tiếng Việt, {result.caption_segments} phụ đề.",
+            )
         if result.applied_mask_count:
             self.window.log(
                 f"Đã áp dụng {result.applied_mask_count} vùng xóa chữ vào video trong CapCut."
@@ -75,8 +80,62 @@ class CapCutExportController(QObject):
             self.job.cancel()
 
     def open_folder(self) -> None:
-        if self.last_result:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_result.path)))
+        import os
+        from pathlib import Path
+        from vkdub.services.app_settings import load_app_settings
+
+        folder: Path | None = None
+        if self.last_result and self.last_result.path and Path(self.last_result.path).is_dir():
+            folder = Path(self.last_result.path)
+        if not folder:
+            settings = load_app_settings()
+            if settings.capcut_draft_root and Path(settings.capcut_draft_root).is_dir():
+                folder = Path(settings.capcut_draft_root)
+        if not folder:
+            local_app_data = os.environ.get("LOCALAPPDATA", "")
+            def_p = Path(local_app_data) / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft"
+            if def_p.is_dir():
+                folder = def_p
+
+        if folder and folder.is_dir():
+            try:
+                os.startfile(str(folder))
+                self.window.log(f"📂 Đã mở thư mục CapCut: {folder}")
+            except Exception:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+                self.window.log(f"📂 Đã mở thư mục CapCut: {folder}")
+        else:
+            self.window.log("⚠ Chưa tìm thấy thư mục CapCut. Bấm 'Đổi…' để chọn đường dẫn.")
 
     def open_capcut(self) -> None:
+        import os
+        import subprocess
+        from pathlib import Path
+
+        local_app_data = os.environ.get("LOCALAPPDATA", "")
+        program_files = os.environ.get("PROGRAMFILES", "")
+        prog_x86 = os.environ.get("ProgramFiles(x86)", "")
+
+        candidates = [
+            Path(local_app_data) / "CapCut" / "Apps" / "CapCut.exe",
+            Path(local_app_data) / "CapCut" / "CapCut.exe",
+            Path(program_files) / "CapCut" / "CapCut.exe",
+            Path(prog_x86) / "CapCut" / "CapCut.exe",
+        ]
+        apps_dir = Path(local_app_data) / "CapCut" / "Apps"
+        if apps_dir.is_dir():
+            for sub in sorted(apps_dir.glob("*/CapCut.exe"), reverse=True):
+                candidates.insert(0, sub)
+
+        for exe in candidates:
+            if exe.is_file():
+                try:
+                    subprocess.Popen([str(exe)], close_fds=True)
+                    self.window.log(f"🚀 Đang khởi chạy CapCut ({exe.name})…")
+                    return
+                except Exception as exc:
+                    self.window.log(f"Không mở trực tiếp được {exe}: {exc}")
+
+        # Fallback to URL protocol
+        self.window.log("🚀 Đang mở CapCut qua giao thức capcut://…")
         QDesktopServices.openUrl(QUrl("capcut://"))

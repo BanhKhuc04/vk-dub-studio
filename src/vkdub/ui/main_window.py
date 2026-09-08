@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QSplitter,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -40,16 +41,23 @@ from vkdub.services.recovery_service import (
 from vkdub.services.subtitle_service import subtitle_for_time
 from vkdub.ui.background_check import BackgroundCheck
 from vkdub.ui.capcut_export_controller import CapCutExportController
+from vkdub.ui.diagnostics_drawer import DiagnosticsDrawer
 from vkdub.ui.health_banner import HealthBanner
 from vkdub.ui.left_config_panel import LeftConfigPanel
 from vkdub.ui.log_viewer_dialog import LogViewerDialog
+from vkdub.ui.panels.step1_source_panel import Step1SourcePanel
+from vkdub.ui.panels.step2_voice_panel import Step2VoicePanel
+from vkdub.ui.panels.step3_blur_panel import Step3BlurPanel
+from vkdub.ui.panels.step4_automation_panel import Step4AutomationPanel
 from vkdub.ui.render_controller import RenderController
 from vkdub.ui.review_controller import ReviewController
 from vkdub.ui.script_review_panel import ScriptReviewPanel
 from vkdub.ui.settings_dialog import SettingsDialog
 from vkdub.ui.setup_wizard import SetupWizardDialog
+from vkdub.ui.stepper_sidebar import WorkflowStepper
 from vkdub.ui.studio_voice_controller import StudioVoiceController
-from vkdub.ui.subtitle_style_dialog import SubtitleStyleDialog
+from vkdub.ui.toast import ToastManager, ToastType
+from vkdub.ui.top_bar import TopBar
 from vkdub.ui.transcription_controller import TranscriptionController
 from vkdub.ui.translation_controller import TranslationController
 from vkdub.ui.tts_controller import TTSController
@@ -85,47 +93,59 @@ class MainWindow(QMainWindow):
         self.tools_ready = False
         self._script_play_end_ms: int | None = None
         self._pending_import: Path | None = None
+        self.video_metadata: VideoMetadata | None = None
         self.started_at = time.monotonic()
         self.left = LeftConfigPanel()
+        self.top_bar = TopBar(self)
+        self.stepper = WorkflowStepper(self)
         self.preview = VideoPreview()
+
+        self.step_stack = QStackedWidget(self)
+        self.step1_panel = Step1SourcePanel(self)
+        self.step2_panel = Step2VoicePanel(self)
+        self.step3_panel = Step3BlurPanel(self)
+        self.step4_panel = Step4AutomationPanel(self)
         self.review = ScriptReviewPanel()
+
+        self.step_stack.addWidget(self.step1_panel)  # Index 0
+        self.step_stack.addWidget(self.step2_panel)  # Index 1
+        self.step_stack.addWidget(self.step3_panel)  # Index 2
+        self.step_stack.addWidget(self.step4_panel)  # Index 3
+        self.step_stack.addWidget(self.review)       # Index 4
+
         self.health_banner = HealthBanner()
         self.health_banner.action_requested.connect(self._on_banner_action)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
-        self.left.setMinimumWidth(280)
-        splitter.addWidget(self.left)
+        splitter.addWidget(self.stepper)
         splitter.addWidget(self.preview)
-        splitter.addWidget(self.review)
-        splitter.setSizes([285, 605, 490])
+        splitter.addWidget(self.step_stack)
+        splitter.setSizes([240, 610, 530])
+        splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 1)
+
+        self.diagnostics_drawer = DiagnosticsDrawer(self)
+        self.diagnostics_drawer.open_log_viewer_requested.connect(self.open_log_viewer)
 
         central_widget = QWidget()
         central_layout = QVBoxLayout(central_widget)
         central_layout.setContentsMargins(0, 0, 0, 0)
         central_layout.setSpacing(0)
+        central_layout.addWidget(self.top_bar)
         central_layout.addWidget(self.health_banner)
         central_layout.addWidget(splitter, 1)
+        central_layout.addWidget(self.diagnostics_drawer)
         self.setCentralWidget(central_widget)
 
         self.resize(1380, 860)
         self.setMinimumSize(1060, 650)
+        self.toast_manager = ToastManager(self)
+
+        # Controllers and Subsystems
         self.tools = MediaTools(self)
-        self.tools.tool_status.connect(self._tool_status)
-        self.tools.detection_finished.connect(self._detection_finished)
-        self.tools.metadata_ready.connect(self._metadata_ready)
-        self.tools.probe_failed.connect(self._probe_failed)
-        self.left.import_button.clicked.connect(self.choose_video)
-        self.left.output_button.clicked.connect(self.choose_output)
-        self.left.save_button.clicked.connect(self.save)
-        self.left.load_button.clicked.connect(self.choose_project)
-        self.left.detect_button.clicked.connect(self.detect_tools)
-        self.left.process_button.clicked.connect(self._on_primary_cta_clicked)
-        self.left.capcut_folder_requested.connect(lambda: self.open_settings(3))
-        self.preview.playback_error.connect(self.log)
-        self.review.seek_requested.connect(self.seek_script_line)
-        self.preview.player.positionChanged.connect(self._script_playback_position)
+        self.local_agent = LocalAgent(parent=self)
         self.transcription = TranscriptionController(self)
         self.translation = TranslationController(self)
         self.review_controller = ReviewController(self)
@@ -135,16 +155,100 @@ class MainWindow(QMainWindow):
         self.render_controller = RenderController(self)
         self.capcut_export = CapCutExportController(self)
         self.vbee_controller = VbeeController(self)
+        self.pipeline_runner: PipelineRunner | None = None
+        self._auto_pipeline: bool = False
+        self.settings_dialog: SettingsDialog | None = None
+        self.subtitle_dialog: SubtitleStyleDialog | None = None
+
+        # Media tools connections
+        self.tools.tool_status.connect(self._tool_status)
+        self.tools.detection_finished.connect(self._detection_finished)
+        self.tools.metadata_ready.connect(self._metadata_ready)
+        self.tools.probe_failed.connect(self._probe_failed)
+
+        # H6 Browser Bridge: Local Agent integration
+        self.local_agent.status_updated.connect(self.top_bar.update_bridge_status)
+        self.local_agent.status_updated.connect(self.left.browser_bridge.update_status)
+        if hasattr(self, "step4_panel"):
+            self.local_agent.status_updated.connect(self.step4_panel.update_health)
+        self.local_agent.log_emitted.connect(self.log)
+        self.local_agent.start()
+
+        # TopBar connections
+        self.top_bar.settings_requested.connect(self.open_settings)
+        self.top_bar.save_requested.connect(self.save)
+        self.top_bar.open_requested.connect(self.choose_project)
+        self.top_bar.open_edge_requested.connect(
+            lambda: self.local_agent.open_browser("https://chatgpt.com")
+        )
+        self.top_bar.refresh_bridge_requested.connect(self.local_agent.request_status)
+
+        # Stepper connection
+        self.stepper.step_selected.connect(self.switch_to_step)
+
+        # Step 1 connections
+        self.step1_panel.choose_video_requested.connect(self.choose_video)
+        self.step1_panel.download_url_requested.connect(self._on_download_url_requested)
+        self.step1_panel.continue_requested.connect(lambda: self.switch_to_step(1))
+
+        # Step 2 connections
+        self.step2_panel.voice_changed.connect(self._on_voice_panel_changed)
+        self.step2_panel.test_listen_requested.connect(self._test_listen_clicked)
+        self.step2_panel.back_requested.connect(lambda: self.switch_to_step(0))
+        self.step2_panel.continue_requested.connect(lambda: self.switch_to_step(2))
+
+        # Step 3 connections
+        self.step3_panel.add_region_requested.connect(self.add_blur_zone)
+        self.step3_panel.add_mask_requested.connect(self.add_blur_mask)
+        self.step3_panel.delete_region_requested.connect(self._delete_blur_mask)
+        self.step3_panel.region_selected.connect(self._on_inspector_region_selected)
+        self.step3_panel.region_changed.connect(self._on_inspector_region_changed)
+        self.step3_panel.back_requested.connect(lambda: self.switch_to_step(1))
+        self.step3_panel.continue_requested.connect(lambda: self.switch_to_step(3))
+
+        # Step 4 connections
+        self.step4_panel.start_requested.connect(self._start_pipeline_runner)
+        self.step4_panel.cancel_requested.connect(self._cancel_pipeline_runner)
+        self.step4_panel.retry_step_requested.connect(self._retry_pipeline_step)
+        self.step4_panel.continue_requested.connect(lambda: self.switch_to_step(4))
+        self.step4_panel.btn_health_check.clicked.connect(self._on_health_check_clicked)
+
+        # Step 5 (Review & Export) connections
+        self.review.export_video_requested.connect(self.render_controller.open_export_dialog)
+        self.review.export_capcut_requested.connect(self.capcut_export.start)
+        self.review.capcut_folder_requested.connect(lambda: self.open_settings(3))
+        self.review.open_capcut_requested.connect(self.capcut_export.open_capcut)
+        self.review.open_capcut_folder_requested.connect(self.capcut_export.open_folder)
+        self.review.seek_requested.connect(self.seek_script_line)
+        self.review.play_requested.connect(self.play_script_line)
+        self.review.regenerate_requested.connect(self.translation.regenerate_line)
+
+        # Preview connections
+        self.preview.playback_error.connect(self.log)
+        self.preview.player.positionChanged.connect(self._script_playback_position)
+        self.preview.mask_requested.connect(self.add_blur_mask)
+        self.preview.blur_requested.connect(lambda: (self.switch_to_step(2), self.add_blur_zone()))
+        self.preview.subtitle_requested.connect(self.open_subtitle_settings)
+        self.preview.subtitle_box_toggled.connect(self._toggle_subtitle_box)
+        self.preview.preview_voice_requested.connect(self._preview_voice_clicked)
+        self.preview.video.mask_rect_changed.connect(self._on_canvas_mask_rect_changed)
+        self.preview.video.mask_delete_requested.connect(self._delete_blur_mask)
+        self.preview.video.subtitle_margin_changed.connect(self._on_canvas_subtitle_margin_changed)
+
+        # Legacy facade event forwarding for tests and existing controllers
+        self.left.import_button.clicked.connect(self.choose_video)
+        self.left.output_button.clicked.connect(self.choose_output)
+        self.left.save_button.clicked.connect(self.save)
+        self.left.load_button.clicked.connect(self.choose_project)
+        self.left.detect_button.clicked.connect(self.detect_tools)
+        self.left.process_button.clicked.connect(self._on_primary_cta_clicked)
+        self.left.capcut_folder_requested.connect(lambda: self.open_settings(3))
+        self.left.voice_settings_changed.connect(self._on_legacy_voice_changed)
         self.left.vbee_voice_requested.connect(self.vbee_controller.start_workflow)
         self.left.vbee_export_srt_requested.connect(self.vbee_controller.export_srt_dialog)
         self.left.vbee_manual_audio_requested.connect(
             self.vbee_controller.import_manual_audio_dialog
         )
-        self.review.export_button.hide()
-        self.review.approve_button.hide()
-        self._auto_pipeline: bool = False
-        self.settings_dialog: SettingsDialog | None = None
-        self.subtitle_dialog: SubtitleStyleDialog | None = None
         self.left.settings_requested.connect(self.open_settings)
         self.left.test_listen_requested.connect(self._test_listen_clicked)
         self.left.manage_voices_requested.connect(lambda: self.open_settings(2))
@@ -156,16 +260,15 @@ class MainWindow(QMainWindow):
         self.left.import_chatgpt_srt_requested.connect(self._on_import_chatgpt_srt_clicked)
         self.left.approve_script_requested.connect(self._on_approve_script_clicked)
         self.left.toggle_mask_requested.connect(self.add_blur_mask)
-        self.preview.mask_requested.connect(self.add_blur_mask)
-        self.preview.blur_requested.connect(self.add_blur_zone)
-        self.preview.subtitle_requested.connect(self.open_subtitle_settings)
-        self.preview.subtitle_box_toggled.connect(self._toggle_subtitle_box)
-        self.preview.preview_voice_requested.connect(self._preview_voice_clicked)
-        self.preview.video.mask_rect_changed.connect(self._on_canvas_mask_rect_changed)
-        self.preview.video.mask_delete_requested.connect(self._delete_blur_mask)
-        self.preview.video.subtitle_margin_changed.connect(self._on_canvas_subtitle_margin_changed)
-        self.review.play_requested.connect(self.play_script_line)
-        self.review.regenerate_requested.connect(self.translation.regenerate_line)
+        self.left.open_browser_requested.connect(
+            lambda: self.local_agent.open_browser("https://chatgpt.com")
+        )
+        self.left.refresh_bridge_requested.connect(self.local_agent.request_status)
+        self.left.pipeline_start_requested.connect(self._start_pipeline_runner)
+        self.left.pipeline_cancel_requested.connect(self._cancel_pipeline_runner)
+        self.left.pipeline_retry_step_requested.connect(self._retry_pipeline_step)
+        self.left.step4_pipeline.view_log_requested.connect(self.open_log_viewer)
+
         self._shortcut("Lưu project", QKeySequence.StandardKey.Save, self.save)
         self._shortcut("Mở project", QKeySequence.StandardKey.Open, self.choose_project)
         self._shortcut("Xem log hệ thống", QKeySequence("F12"), self.open_log_viewer)
@@ -175,23 +278,6 @@ class MainWindow(QMainWindow):
         self.autosave_timer.setInterval(30000)
         self.autosave_timer.timeout.connect(self._on_autosave_timer)
         self.autosave_timer.start()
-
-        # H6 Browser Bridge: Local Agent integration
-        self.local_agent = LocalAgent(parent=self)
-        self.local_agent.status_updated.connect(self.left.browser_bridge.update_status)
-        self.local_agent.log_emitted.connect(self.log)
-        self.left.open_browser_requested.connect(
-            lambda: self.local_agent.open_browser("https://chatgpt.com")
-        )
-        self.left.refresh_bridge_requested.connect(self.local_agent.request_status)
-        self.local_agent.start()
-
-        # Step 4: Automated Pipeline Runner (Whisper -> ChatGPT -> Script -> Vbee)
-        self.pipeline_runner: PipelineRunner | None = None
-        self.left.pipeline_start_requested.connect(self._start_pipeline_runner)
-        self.left.pipeline_cancel_requested.connect(self._cancel_pipeline_runner)
-        self.left.pipeline_retry_step_requested.connect(self._retry_pipeline_step)
-        self.left.step4_pipeline.view_log_requested.connect(self.open_log_viewer)
 
         self._refresh()
         self.log("Sẵn sàng — VK Dub Studio 2.1.")
@@ -333,6 +419,104 @@ class MainWindow(QMainWindow):
         self.settings_dialog.show()
         self.settings_dialog.raise_()
 
+    def switch_to_step(self, step_idx: int) -> None:
+        """Switch active step in left stepper and right contextual stack."""
+        if 0 <= step_idx <= 4:
+            self.stepper.set_current_step(step_idx)
+            self.step_stack.setCurrentIndex(step_idx)
+            if step_idx == 2:
+                # Entering Step 3: Blur inspector mode
+                self.preview.video.interactive_mask_mode = True
+                active_id = self.step3_panel._current_mask_id or (
+                    self.project.masks[0].id if self.project.masks else None
+                )
+                self.preview.video.set_masks(
+                    self.project.masks, active_id, self.preview.player.position()
+                )
+                self.preview.video.update()
+            elif step_idx != 2 and not self.project.masks:
+                self.preview.video.interactive_mask_mode = False
+                self.preview.video.update()
+
+    def _on_download_url_requested(self, url: str) -> None:
+        if not url:
+            return
+        self.log(f"Đang kiểm tra liên kết video: {url}")
+        self.statusBar().showMessage(f"Đang kiểm tra liên kết {url}...", 5000)
+        QMessageBox.information(
+            self,
+            "Tải video từ link",
+            f"Đang xử lý link video:\n{url}\n\n"
+            "Mẹo: Bạn có thể tải video về máy và nhấn '📂 CHỌN VIDEO TỪ MÁY (MP4)' để xử lý ngay.",
+        )
+
+    def _on_voice_panel_changed(self) -> None:
+        v_id = self.step2_panel.voice_combo.currentData()
+        spd = self.step2_panel.speed_combo.currentData() or 1.1
+        self.project.voice = replace(
+            self.project.voice,
+            voice_id=v_id,
+            display_name=self.step2_panel.voice_combo.currentText(),
+            speed=spd,
+        )
+        if hasattr(self, "left"):
+            idx_v = self.left.voice_combo.findData(v_id)
+            if idx_v >= 0 and self.left.voice_combo.currentIndex() != idx_v:
+                self.left.voice_combo.blockSignals(True)
+                self.left.voice_combo.setCurrentIndex(idx_v)
+                self.left.voice_combo.blockSignals(False)
+            idx_s = self.left.speed_combo.findData(spd)
+            if idx_s >= 0 and self.left.speed_combo.currentIndex() != idx_s:
+                self.left.speed_combo.blockSignals(True)
+                self.left.speed_combo.setCurrentIndex(idx_s)
+                self.left.speed_combo.blockSignals(False)
+        self.dirty = True
+        self._refresh()
+
+    def _on_legacy_voice_changed(self) -> None:
+        v_id = self.left.voice_combo.currentData()
+        spd = self.left.speed_combo.currentData() or 1.1
+        self.project.voice = replace(
+            self.project.voice,
+            voice_id=v_id,
+            display_name=self.left.voice_combo.currentText(),
+            speed=spd,
+        )
+        if hasattr(self, "step2_panel"):
+            idx_v = self.step2_panel.voice_combo.findData(v_id)
+            if idx_v >= 0 and self.step2_panel.voice_combo.currentIndex() != idx_v:
+                self.step2_panel.voice_combo.blockSignals(True)
+                self.step2_panel.voice_combo.setCurrentIndex(idx_v)
+                self.step2_panel.voice_combo.blockSignals(False)
+            idx_s = self.step2_panel.speed_combo.findData(spd)
+            if idx_s >= 0 and self.step2_panel.speed_combo.currentIndex() != idx_s:
+                self.step2_panel.speed_combo.blockSignals(True)
+                self.step2_panel.speed_combo.setCurrentIndex(idx_s)
+                self.step2_panel.speed_combo.blockSignals(False)
+        self.dirty = True
+        self._refresh()
+
+    def _on_inspector_region_selected(self, mask_id: str) -> None:
+        self.preview.video.interactive_mask_mode = True
+        self.preview.video.set_masks(
+            self.project.masks, mask_id, self.preview.player.position()
+        )
+        self.preview.video.update()
+
+    def _on_inspector_region_changed(
+        self, mask_id: str, x: float, y: float, w: float, h: float, strength: int
+    ) -> None:
+        mask = next((m for m in self.project.masks if m.id == mask_id), None)
+        if mask:
+            mask.x, mask.y, mask.width, mask.height = x, y, w, h
+            mask.blur_strength = strength
+            self.preview.video.set_masks(
+                self.project.masks, mask_id, self.preview.player.position()
+            )
+            self.preview.video.update()
+            self.dirty = True
+            self.setWindowTitle(self.windowTitle().rstrip(" *") + " *")
+
     def add_blur_mask(self) -> None:
         if self.busy or not self.project.video_path:
             return
@@ -344,6 +528,8 @@ class MainWindow(QMainWindow):
             )
             self.preview.video.interactive_mask_mode = True
             self.preview.video.update()
+            if hasattr(self, "step3_panel"):
+                self.step3_panel.set_masks(self.project.masks, mask.id)
             self.statusBar().showMessage(
                 "Khung che phụ đề: Kéo để di chuyển · Kéo góc để đổi kích thước bao trọn phụ đề cũ",
                 8000,
@@ -362,6 +548,8 @@ class MainWindow(QMainWindow):
         self.project.masks.append(mask)
         self.preview.video.set_masks(self.project.masks, mask.id, self.preview.player.position())
         self.preview.video.interactive_mask_mode = True
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.set_masks(self.project.masks, mask.id)
         self.dirty = True
         self._refresh()
         self.statusBar().showMessage(
@@ -374,7 +562,6 @@ class MainWindow(QMainWindow):
         """Thêm vùng blur để che watermark, logo hoặc chữ không cần dịch."""
         if self.busy or not self.project.video_path:
             return
-        # Đếm số vùng làm mờ hiện có để đặt tên
         blur_count = sum(1 for m in self.project.masks if m.mask_type == "blur")
         mask = MaskItem(
             name=f"Làm mờ {blur_count + 1}",
@@ -388,6 +575,8 @@ class MainWindow(QMainWindow):
         self.project.masks.append(mask)
         self.preview.video.set_masks(self.project.masks, mask.id, self.preview.player.position())
         self.preview.video.interactive_mask_mode = True
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.set_masks(self.project.masks, mask.id)
         self.dirty = True
         self._refresh()
         self.statusBar().showMessage(
@@ -403,6 +592,8 @@ class MainWindow(QMainWindow):
         mask = next((m for m in self.project.masks if m.id == mask_id), None)
         if mask:
             mask.x, mask.y, mask.width, mask.height = x, y, w, h
+            if hasattr(self, "step3_panel"):
+                self.step3_panel.update_mask_rect(mask_id, x, y, w, h)
             self.dirty = True
             self.setWindowTitle(self.windowTitle().rstrip(" *") + " *")
 
@@ -411,6 +602,8 @@ class MainWindow(QMainWindow):
             return
         self.project.masks = [m for m in self.project.masks if m.id != mask_id]
         self.preview.video.set_masks(self.project.masks, time_ms=self.preview.player.position())
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.set_masks(self.project.masks)
         self.dirty = True
         self._refresh()
         self.statusBar().showMessage("Đã xóa vùng xóa chữ.", 4000)
@@ -496,6 +689,34 @@ class MainWindow(QMainWindow):
             )
             return
 
+        # Pre-flight check: Kiểm tra trước kết nối Extension và ChatGPT trước khi bóc băng
+        if self.local_agent and not getattr(self, "_skip_browser_preflight", False):
+            if not self.local_agent.status.browser_connected:
+                ret = QMessageBox.warning(
+                    self,
+                    "Chưa kết nối Edge Extension",
+                    "Tiện ích 'VK Dub Studio Bridge' trong Microsoft Edge chưa kết nối.\n\n"
+                    "👉 Vui lòng mở Microsoft Edge và đảm bảo tiện ích đã được bật tại edge://extensions.\n\n"
+                    "Bạn có muốn mở Edge ngay bây giờ không?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                )
+                if ret == QMessageBox.StandardButton.Yes:
+                    self.local_agent.open_browser("https://chatgpt.com")
+                return
+
+            if not self.local_agent.status.chatgpt_logged_in:
+                ret = QMessageBox.warning(
+                    self,
+                    "Chưa đăng nhập ChatGPT",
+                    "ChatGPT chưa được đăng nhập trong trình duyệt Edge.\n\n"
+                    "👉 Vui lòng mở tab https://chatgpt.com trong Edge và đăng nhập tài khoản trước khi bắt đầu xử lý tự động.\n\n"
+                    "Bạn có muốn mở trang ChatGPT ngay bây giờ không?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                )
+                if ret == QMessageBox.StandardButton.Yes:
+                    self.local_agent.open_browser("https://chatgpt.com")
+                return
+
         # Đảm bảo có khung che phụ đề
         if not self.project.masks:
             self.add_blur_mask()
@@ -514,11 +735,90 @@ class MainWindow(QMainWindow):
 
         self.busy = True
         self.left.step4_pipeline.set_running_state(True)
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.set_running_state(True)
+            self.step4_panel.update_overall("● Đang chạy", "#58a6ff", 10)
+            self.switch_to_step(3)
+
+        if hasattr(self, "diagnostics_drawer"):
+            self.diagnostics_drawer.set_expanded(True)
+
         self.log(
             "🚀 Bắt đầu quy trình xử lý tự động 4 bước (Whisper → ChatGPT → Kịch bản → Vbee)..."
         )
 
         out_name = self.project.video_path.stem or "dubbing"
+        output_dir = workspace_root() / "export" / out_name
+
+        import importlib
+
+        import vkdub.orchestrator.pipeline_runner as pr_mod
+        importlib.reload(pr_mod)
+        PipelineRunner = pr_mod.PipelineRunner
+
+        auto_voice = (
+            self.step4_panel.auto_voice_checked()
+            if hasattr(self, "step4_panel")
+            else False
+        )
+
+        self.pipeline_runner = PipelineRunner(
+            project=self.project,
+            local_agent=self.local_agent,
+            output_dir=output_dir,
+            voice_name=voice_name,
+            speed=speed_str,
+            parent=self,
+            auto_voice=auto_voice,
+        )
+
+        self.pipeline_runner.state_changed.connect(self._on_pipeline_state_changed)
+        self.pipeline_runner.substep_updated.connect(self._on_pipeline_substep_updated)
+        self.pipeline_runner.artifact_ready.connect(self._on_pipeline_artifact_ready)
+        self.pipeline_runner.log_emitted.connect(self.log)
+        self.pipeline_runner.pipeline_completed.connect(self._on_pipeline_completed)
+        self.pipeline_runner.pipeline_failed.connect(self._on_pipeline_failed)
+        self.pipeline_runner.pipeline_cancelled.connect(self._on_pipeline_cancelled)
+
+        self.pipeline_runner.start()
+        self._refresh()
+
+    def _start_vbee_generation(self) -> None:
+        """Kích hoạt tạo giọng Vbee (Bước 4.4) sau khi người dùng chốt duyệt kịch bản tại Bước 5."""
+        if self.busy:
+            return
+        if not self.project.video_path or not self.project.video_path.is_file():
+            self.log("Chưa có video nguồn hợp lệ để tạo giọng đọc tự động.")
+            return
+        if not self.project.script or not self.project.script.lines:
+            QMessageBox.warning(self, "Chưa có kịch bản", "Dự án chưa có câu thoại nào để đọc.")
+            return
+
+        voice_data = self.left.voice_combo.currentText()
+        voice_name = "Ngọc Huyền"
+        if "Ngọc Huyền" in voice_data:
+            voice_name = "Ngọc Huyền"
+        elif "Quỳnh Anh" in voice_data:
+            voice_name = "Quỳnh Anh"
+
+        speed_str = self.left.speed_combo.currentText().split(" ")[0]
+        if not speed_str.endswith("x"):
+            speed_str = f"{self.left.speed_combo.currentData()}x"
+
+        self.busy = True
+        self.left.step4_pipeline.set_running_state(True)
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.set_running_state(True)
+            self.step4_panel.update_overall("● Đang tạo giọng Vbee...", "#58a6ff", 80)
+        if hasattr(self, "stepper"):
+            self.stepper.update_step_summary(3, "●", "Đang tạo giọng...", "#58a6ff")
+
+        if hasattr(self, "diagnostics_drawer"):
+            self.diagnostics_drawer.set_expanded(True)
+
+        self.log("🎙 Bắt đầu tạo giọng đọc Vbee cho kịch bản đã duyệt...")
+
+        out_name = self.project.video_path.stem if self.project.video_path else "dubbing"
         output_dir = workspace_root() / "export" / out_name
 
         import importlib
@@ -533,6 +833,8 @@ class MainWindow(QMainWindow):
             voice_name=voice_name,
             speed=speed_str,
             parent=self,
+            auto_voice=True,
+            target_step="4.4",
         )
 
         self.pipeline_runner.state_changed.connect(self._on_pipeline_state_changed)
@@ -550,6 +852,9 @@ class MainWindow(QMainWindow):
         if self.pipeline_runner and self.pipeline_runner.isRunning():
             self.log("⏹ Đang yêu cầu dừng quy trình xử lý tự động...")
             self.pipeline_runner.cancel()
+            if hasattr(self, "step4_panel"):
+                self.step4_panel.set_running_state(False)
+                self.step4_panel.update_overall("⏹ Đã dừng", "#d29922")
 
     def _retry_pipeline_step(self, step_id: str) -> None:
         if self.busy:
@@ -573,6 +878,13 @@ class MainWindow(QMainWindow):
                 if m_tl.exists():
                     m_tl.unlink()
         self._start_pipeline_runner()
+
+    def _on_health_check_clicked(self) -> None:
+        self.log("🔍 Đang gửi yêu cầu làm mới và kiểm tra trạng thái tới Edge Extension...")
+        if self.local_agent:
+            self.local_agent.reload_extension()
+            self.local_agent.request_status()
+        self.statusBar().showMessage("Đang kiểm tra kết nối Edge, ChatGPT và Vbee...", 3000)
 
     def _on_pipeline_state_changed(self, state: PipelineState, message: str) -> None:
         self.log(f"[{state.value}] {message}")
@@ -606,6 +918,24 @@ class MainWindow(QMainWindow):
             error=error,
             duration_s=duration_s,
         )
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.update_substep(
+                step_id=step_id,
+                status=status,
+                progress=progress,
+                message=message,
+                artifact=artifact,
+                error=error,
+                duration_s=duration_s,
+            )
+            # Calculate approx overall progress (0-100)
+            step_weights = {"4.1": 25, "4.2": 50, "4.3": 70, "4.4": 100}
+            base = {"4.1": 0, "4.2": 25, "4.3": 50, "4.4": 70}.get(step_id, 0)
+            w = step_weights.get(step_id, 25) - base
+            overall_pct = base + int(progress * w / 100)
+            self.step4_panel.update_overall("● Đang chạy", "#58a6ff", overall_pct)
+        if hasattr(self, "stepper"):
+            self.stepper.update_step_summary(3, "●", "Đang chạy...", "#58a6ff")
 
     def _on_pipeline_artifact_ready(self, key: str, path: Path) -> None:
         self.log(f"✓ Đã tạo artifact [{key}]: {path.name}")
@@ -617,29 +947,81 @@ class MainWindow(QMainWindow):
     def _on_pipeline_completed(self, artifacts: Any) -> None:
         self.busy = False
         self.left.step4_pipeline.set_running_state(False)
-        self.left.step4_pipeline.overall_badge.setText("✔ Hoàn thành")
-        self.left.step4_pipeline.overall_badge.setStyleSheet("color: #3fb950; font-weight: bold;")
-        self.left.lbl_review_status.setText(
-            "✓ Đã hoàn tất! Kịch bản và audio timeline đã sẵn sàng."
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.set_running_state(False)
+
+        has_voice = bool(
+            artifacts.timeline_master_audio and Path(artifacts.timeline_master_audio).is_file()
         )
-        self.left.lbl_review_status.setStyleSheet("color: #3fb950; font-weight: bold;")
-        if artifacts.timeline_master_audio and artifacts.timeline_master_audio.is_file():
+        if has_voice:
             self.project.master_voice_path = artifacts.timeline_master_audio
-        self.review_controller.bind_project()
-        self._refresh()
-        self.log("🎉 Quy trình xử lý tự động 4 bước đã hoàn tất thành công!")
-        QMessageBox.information(
-            self,
-            "Xử lý tự động hoàn tất",
-            "Toàn bộ quy trình (Bóc băng → ChatGPT → Kịch bản → Vbee Timeline Audio) đã hoàn tất!\n\n"
-            "Bạn có thể duyệt lại kịch bản ở khung bên phải và nhấn '✔ BƯỚC 5: CHỐT KỊCH BẢN (DUYỆT)' rồi xuất CapCut.",
-        )
+            self.left.step4_pipeline.overall_badge.setText("✔ Hoàn thành (4/4)")
+            self.left.step4_pipeline.overall_badge.setStyleSheet("color: #3fb950; font-weight: bold;")
+            self.left.lbl_review_status.setText(
+                "✓ Đã hoàn tất! Kịch bản và audio timeline đã sẵn sàng."
+            )
+            self.left.lbl_review_status.setStyleSheet("color: #3fb950; font-weight: bold;")
+            if hasattr(self, "step4_panel"):
+                self.step4_panel.update_overall("✔ Hoàn thành (4/4)", "#3fb950", 100)
+                self.step4_panel.btn_continue.setEnabled(True)
+            if hasattr(self, "stepper"):
+                self.stepper.update_step_summary(3, "✓", "Hoàn tất (4/4)", "#3fb950")
+                line_count = len(self.project.script.lines) if self.project.script else 0
+                self.stepper.update_step_summary(4, "✓", f"{line_count} câu", "#3fb950")
+                self.stepper.update_step_summary(5, "●", "Sẵn sàng xuất", "#58a6ff")
+
+            self.review_controller.bind_project()
+            self._refresh()
+            self.log("🎉 Quy trình xử lý tự động hoàn tất! Đã có voice Vbee timeline.")
+            self.notify_success("Xử lý hoàn tất!", "Kịch bản và audio timeline đã sẵn sàng.")
+            QMessageBox.information(
+                self,
+                "Hoàn tất tạo giọng đọc",
+                "Toàn bộ quy trình (Bóc băng → ChatGPT → Kịch bản → Vbee Voice) đã hoàn tất!\n\n"
+                "Audio timeline đã sẵn sàng. Bạn có thể sang Bước 06 để xuất CapCut hoặc render video.",
+            )
+        else:
+            # Tạm dừng ở Bước 4.3 để người dùng duyệt kịch bản
+            self.left.step4_pipeline.overall_badge.setText("✔ Đã dịch (3/4)")
+            self.left.step4_pipeline.overall_badge.setStyleSheet("color: #58a6ff; font-weight: bold;")
+            self.left.lbl_review_status.setText(
+                "⏳ Đã dịch xong. Vui lòng kiểm tra và duyệt kịch bản tại Bước 05."
+            )
+            self.left.lbl_review_status.setStyleSheet("color: #d29922; font-weight: bold;")
+            if hasattr(self, "step4_panel"):
+                self.step4_panel.update_overall("✔ Đã dịch (3/4)", "#58a6ff", 75)
+                self.step4_panel.btn_continue.setEnabled(True)
+            if hasattr(self, "stepper"):
+                self.stepper.update_step_summary(3, "✓", "Đã dịch (3/4)", "#3fb950")
+                line_count = len(self.project.script.lines) if self.project.script else 0
+                self.stepper.update_step_summary(4, "●", f"{line_count} câu (Cần duyệt)", "#d29922")
+
+            self.review_controller.bind_project()
+            self._refresh()
+            if hasattr(self, "switch_to_step"):
+                self.switch_to_step(4)  # Chuyển sang Bước 5 để người dùng xem kịch bản
+
+            self.log("📋 Đã dịch xong kịch bản (3/4). Dừng lại để người dùng kiểm tra và chốt kịch bản!")
+            QMessageBox.information(
+                self,
+                "Dịch kịch bản hoàn tất — Chờ duyệt",
+                "ChatGPT đã dịch xong phụ đề (3/4 bước).\n\n"
+                "👉 Hệ thống tạm dừng để bạn kiểm tra và chỉnh sửa nội dung dịch ở Bước 05 (cột bên phải).\n\n"
+                "Khi đã ưng ý, hãy nhấn nút:\n"
+                "   [ ✔ BƯỚC 5: CHỐT KỊCH BẢN & TẠO GIỌNG (VBEE) ]\n"
+                "để hệ thống tự động gửi kịch bản đã chỉnh sửa sang Vbee tạo giọng đọc!",
+            )
 
     def _on_pipeline_failed(self, short_err: str, trace: str) -> None:
         self.busy = False
         self.left.step4_pipeline.set_running_state(False)
         self.left.step4_pipeline.overall_badge.setText("✖ Thất bại")
         self.left.step4_pipeline.overall_badge.setStyleSheet("color: #f85149; font-weight: bold;")
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.set_running_state(False)
+            self.step4_panel.update_overall("✖ Thất bại", "#f85149")
+        if hasattr(self, "stepper"):
+            self.stepper.update_step_summary(3, "✖", "Lỗi xử lý", "#f85149")
         self._refresh()
         self.log(f"✖ Lỗi quy trình xử lý tự động: {short_err}")
         QMessageBox.critical(
@@ -653,6 +1035,11 @@ class MainWindow(QMainWindow):
         self.left.step4_pipeline.set_running_state(False)
         self.left.step4_pipeline.overall_badge.setText("⏹ Đã hủy")
         self.left.step4_pipeline.overall_badge.setStyleSheet("color: #d29922; font-weight: bold;")
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.set_running_state(False)
+            self.step4_panel.update_overall("⏹ Đã hủy", "#d29922")
+        if hasattr(self, "stepper"):
+            self.stepper.update_step_summary(3, "⏹", "Đã hủy", "#d29922")
         self._refresh()
         self.log("⏹ Đã dừng quy trình xử lý tự động theo yêu cầu.")
 
@@ -664,13 +1051,16 @@ class MainWindow(QMainWindow):
         ok = self.review_controller.approve()
         if ok:
             self._refresh()
-            self.log("Đã chốt duyệt kịch bản thành công! Sẵn sàng xuất CapCut.")
-            QMessageBox.information(
-                self,
-                "Đã chốt kịch bản",
-                "Kịch bản dịch đã được duyệt thành công!\n\n"
-                "Tiếp theo: Nhấn '🎬 XUẤT PROJECT CAPCUT' để mở dự án CapCut với video, phụ đề và voice.",
-            )
+            if self.project.voice_ready:
+                self.log("Đã chốt duyệt kịch bản thành công! Sẵn sàng xuất CapCut.")
+                QMessageBox.information(
+                    self,
+                    "Đã chốt kịch bản",
+                    "Kịch bản dịch đã được duyệt thành công!\n\n"
+                    "Tiếp theo: Nhấn '🎬 XUẤT PROJECT CAPCUT' để mở dự án CapCut với video, phụ đề và voice.",
+                )
+            else:
+                self.log("Đã chốt kịch bản. Hệ thống đang chuyển sang Vbee để tạo giọng đọc...")
         else:
             QMessageBox.warning(
                 self, "Không thể duyệt", "Vui lòng kiểm tra lại lỗi câu kịch bản trước khi duyệt."
@@ -760,17 +1150,40 @@ class MainWindow(QMainWindow):
     def log(self, message: str) -> None:
         message = redact(message)
         elapsed = int(time.monotonic() - self.started_at)
-        self.left.logs.appendPlainText(
-            f"{datetime.now():%H:%M:%S}  +{elapsed // 60:02}:{elapsed % 60:02}  {message}"
-        )
+        formatted = f"{datetime.now():%H:%M:%S}  +{elapsed // 60:02}:{elapsed % 60:02}  {message}"
+        self.left.logs.appendPlainText(formatted)
         self.left.activity_header.setText(f"● ĐANG THEO DÕI  •  {message[:34]}")
         self.left.logs.moveCursor(QTextCursor.MoveOperation.End)
         self.left.logs.ensureCursorVisible()
+        if hasattr(self, "diagnostics_drawer"):
+            self.diagnostics_drawer.append_log(formatted)
         self.statusBar().showMessage(message, 10000)
         logging.getLogger("vkdub").info(message)
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "toast_manager"):
+            self.toast_manager.reposition()
+
+    def notify_success(self, title: str, message: str = "") -> None:
+        if hasattr(self, "toast_manager"):
+            self.toast_manager.show_toast(title, message, ToastType.SUCCESS)
+
+    def notify_info(self, title: str, message: str = "") -> None:
+        if hasattr(self, "toast_manager"):
+            self.toast_manager.show_toast(title, message, ToastType.INFO)
+
+    def notify_warning(self, title: str, message: str = "") -> None:
+        if hasattr(self, "toast_manager"):
+            self.toast_manager.show_toast(title, message, ToastType.WARNING)
+
+    def notify_error(self, title: str, message: str = "") -> None:
+        if hasattr(self, "toast_manager"):
+            self.toast_manager.show_toast(title, message, ToastType.ERROR)
+
     def _error(self, message: str) -> None:
         self.log(message)
+        self.notify_error("Lỗi", message)
         QMessageBox.warning(self, "VK Dub Studio", message)
 
     def _refresh(self) -> None:
@@ -778,6 +1191,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(
             f"{APP_BRANDING}  |  v{__version__}  |  {filename}{' *' if self.dirty else ''}"
         )
+
+        # Update TopBar project name & status
+        if hasattr(self, "top_bar"):
+            self.top_bar.set_project_name(filename, self.dirty)
+
         if self.project.video_path:
             dur_str = ""
             if self.project.duration_ms:
@@ -799,6 +1217,59 @@ class MainWindow(QMainWindow):
         self.left.language_voice.setText(
             f"Nguồn: {source}  →  {target}\nGiọng mặc định: HN - Ngọc Huyền"
         )
+
+        # Update Step 1 Source info
+        if hasattr(self, "step1_panel"):
+            metadata = self.video_metadata if self.project.video_path else None
+            self.step1_panel.set_video_info(self.project.video_path, metadata)
+
+        # Update Stepper 5-stage summaries
+        if hasattr(self, "stepper"):
+            # 01 Source
+            if self.project.video_path:
+                self.stepper.update_step_summary(
+                    0, "✓", self.project.video_path.name, "#3fb950"
+                )
+            else:
+                self.stepper.update_step_summary(0, "○", "Chưa chọn video", "#8b949e")
+
+            # 02 Voice
+            if hasattr(self, "step2_panel"):
+                self.stepper.update_step_summary(
+                    1, "✓", self.step2_panel.voice_summary(), "#3fb950"
+                )
+
+            # 03 Blur Regions
+            if hasattr(self, "step3_panel"):
+                self.stepper.update_step_summary(
+                    2,
+                    "✓" if self.project.masks else "○",
+                    self.step3_panel.regions_summary(),
+                    "#3fb950" if self.project.masks else "#8b949e",
+                )
+
+            # 04 Automation
+            if hasattr(self, "step4_panel"):
+                st4 = self.step4_panel.automation_summary()
+                ico = "✓" if "Hoàn tất" in st4 else "●" if "Đang chạy" in st4 else "○"
+                col = (
+                    "#3fb950"
+                    if "Hoàn tất" in st4
+                    else "#58a6ff"
+                    if "Đang chạy" in st4
+                    else "#8b949e"
+                )
+                self.stepper.update_step_summary(3, ico, st4, col)
+
+            # 05 Review & Export
+            if self.project.is_approved:
+                self.stepper.update_step_summary(4, "✓", "Đã duyệt kịch bản", "#3fb950")
+            elif self.project.script and self.project.script.lines:
+                self.stepper.update_step_summary(
+                    4, "○", f"Chờ duyệt ({len(self.project.script.lines)} câu)", "#fbbf24"
+                )
+            else:
+                self.stepper.update_step_summary(4, "○", "Chờ kịch bản", "#8b949e")
 
         busy = self.busy
         enabled = not busy
@@ -823,8 +1294,14 @@ class MainWindow(QMainWindow):
                         "Bắt đầu quy trình tự động 4 bước: Whisper → ChatGPT → Kịch bản → Vbee"
                     )
 
+        if hasattr(self, "step4_panel"):
+            if not self.busy:
+                self.step4_panel.btn_start.setEnabled(can_run_pipeline)
+
         can_approve = bool(self.project.script and self.project.script.lines) and not busy
         self.left.btn_approve_script.setEnabled(can_approve)
+        if hasattr(self, "review"):
+            self.review.approve_button.setEnabled(can_approve)
 
         self.transcription.refresh()
         self.translation.refresh()
@@ -874,6 +1351,28 @@ class MainWindow(QMainWindow):
             widget.setStyleSheet(
                 f"color: {'#34d399' if done else '#fbbf24' if active else '#69768b'};"
             )
+
+        # Sync Step 5 CapCut & Export buttons
+        if hasattr(self, "review") and hasattr(self.review, "export_video_button"):
+            has_ffmpeg = bool(self.tools.paths.get("ffmpeg"))
+            has_ffprobe = bool(self.tools.paths.get("ffprobe"))
+            tools_ok = has_ffmpeg and has_ffprobe
+            self.review.export_video_button.setEnabled(
+                has_ffmpeg and not self.busy and self.project.voice_ready
+            )
+            self.review.export_capcut_button.setEnabled(
+                tools_ok and not self.busy and self.project.voice_ready
+            )
+            settings = load_app_settings()
+            dest = settings.capcut_draft_root
+            if dest:
+                p_dest = Path(dest)
+                self.review.capcut_dest_lbl.setText(
+                    f"📁 CapCut: {p_dest.name if p_dest.name else dest}"
+                )
+                self.review.capcut_dest_lbl.setToolTip(dest)
+            else:
+                self.review.capcut_dest_lbl.setText("📁 CapCut Draft Root: Chưa kết nối")
 
     def _refresh_primary_cta(self) -> None:
         state = self.workflow_state
@@ -1188,10 +1687,24 @@ class MainWindow(QMainWindow):
         self.project.masks = [default_mask]
         self.preview.video.set_masks(self.project.masks, default_mask.id, 0)
         self.preview.video.interactive_mask_mode = True
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.set_masks(self.project.masks, default_mask.id)
+        if hasattr(self, "step4_panel"):
+            self.step4_panel.reset_state()
+        if hasattr(self.left, "step4_pipeline") and hasattr(self.left.step4_pipeline, "reset_state"):
+            self.left.step4_pipeline.reset_state()
+        if hasattr(self, "stepper"):
+            self.stepper.update_step_summary(0, "✓", path.name, "#3fb950")
+            self.stepper.update_step_summary(1, "○", "Chưa đặt", "#8b949e")
+            self.stepper.update_step_summary(2, "✓", "Đã che phụ đề", "#3fb950")
+            self.stepper.update_step_summary(3, "○", "Sẵn sàng", "#8b949e")
+            self.stepper.update_step_summary(4, "○", "Chờ kịch bản", "#8b949e")
+            self.stepper.update_step_summary(5, "○", "Chưa sẵn sàng", "#8b949e")
 
         self.review_controller.bind_project()
         self.project_file = None
         self.dirty = True
+        self.video_metadata = metadata
         self.preview.load(path)
         if metadata:
             self.preview.show_metadata(metadata)
@@ -1206,6 +1719,7 @@ class MainWindow(QMainWindow):
             self._apply_import(path, metadata)
         elif self.project.video_path == path:
             self.busy = False
+            self.video_metadata = metadata
             self.project.video_duration_ms = (
                 round(metadata.duration * 1000) if metadata.duration > 0 else None
             )
@@ -1232,34 +1746,56 @@ class MainWindow(QMainWindow):
         path = QFileDialog.getExistingDirectory(
             self,
             "Chọn thư mục đầu ra",
-            str(self.project.output_directory or ""),
+            str(self.project.output_directory or Path.home()),
         )
         if path:
             self.set_output_directory(Path(path))
 
     def set_output_directory(self, path: Path) -> bool:
+        path = path.resolve()
         if not path.is_dir():
-            self._error("Thư mục đầu ra không tồn tại. Hãy chọn thư mục khác.")
+            self._error("Thư mục đầu ra không tồn tại.")
             return False
-        self.project.output_directory = path.resolve()
+        self.project.output_directory = path
         self.dirty = True
         self._refresh()
-        self.log("Đã chọn thư mục đầu ra.")
+        self.log(f"Đã đổi thư mục đầu ra: {path}")
         return True
 
     def save(self) -> bool:
         if self.busy:
             return False
-        path = self.project_file
-        if path is None:
-            name, _ = QFileDialog.getSaveFileName(
-                self, "Lưu project", "project.vkdub", "VK Dub project (*.vkdub)"
+        if self.project_file is None:
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Lưu project",
+                str(Path.cwd() / "project.vkdub"),
+                "VK Dub project (*.vkdub)",
             )
-            if not name:
+            if not path:
                 return False
-            path = Path(name)
+            path = Path(path)
             if path.suffix.lower() != ".vkdub":
-                path = Path(f"{path}.vkdub")
+                path = path.with_suffix(".vkdub")
+            if (
+                not self.dirty
+                or self.project_file != path
+            ):
+                if (
+                    path.exists()
+                    and QMessageBox.question(
+                        self,
+                        "Ghi đè project?",
+                        f"{path.name} đã tồn tại. Ghi đè?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No,
+                    )
+                    != QMessageBox.StandardButton.Yes
+                ):
+                    return False
+        else:
+            path = self.project_file
+            if not path.is_file():
                 if (
                     path.exists()
                     and QMessageBox.question(
@@ -1285,6 +1821,7 @@ class MainWindow(QMainWindow):
         clear_recovery_state()
         self._refresh()
         self.log(f"Đã lưu project: {path.name}")
+        self.notify_success("Đã lưu dự án", f"Lưu thành công: {path.name}")
         return True
 
     def choose_project(self) -> None:
@@ -1305,11 +1842,14 @@ class MainWindow(QMainWindow):
         self.project = project
         self._script_play_end_ms = None
         self.review_controller.bind_project()
+        self._sync_project_voice_controls()
         self.project_file = path.resolve()
         self.dirty = False
         available = project.video_path is not None and project.video_path.is_file()
         self.preview.load(project.video_path if available else None)
         self.preview.video.set_masks(project.masks)
+        if hasattr(self, "step3_panel"):
+            self.step3_panel.set_masks(project.masks)
         self._refresh()
         self.log(f"Đã mở project: {path.name}")
         if project.video_path is not None and not available:
@@ -1324,6 +1864,48 @@ class MainWindow(QMainWindow):
         if project.output_directory is not None and not project.output_directory.is_dir():
             self.log("Thư mục đầu ra không còn tồn tại. Hãy chọn lại thư mục.")
         return True
+
+    def _sync_project_voice_controls(self) -> None:
+        """Restore the saved project's Vbee voice and speed without mutating it."""
+        voice_combo = self.left.voice_combo
+        speed_combo = self.left.speed_combo
+
+        voice_combo.blockSignals(True)
+        try:
+            voice_index = voice_combo.findData(self.project.voice.voice_id)
+            if voice_index < 0:
+                voice_index = voice_combo.findText(self.project.voice.display_name)
+            if voice_index >= 0:
+                voice_combo.setCurrentIndex(voice_index)
+        finally:
+            voice_combo.blockSignals(False)
+
+        speed_combo.blockSignals(True)
+        try:
+            speed_index = speed_combo.findData(float(self.project.voice.speed))
+            if speed_index >= 0:
+                speed_combo.setCurrentIndex(speed_index)
+        finally:
+            speed_combo.blockSignals(False)
+
+        if hasattr(self, "step2_panel"):
+            self.step2_panel.voice_combo.blockSignals(True)
+            try:
+                v_idx = self.step2_panel.voice_combo.findData(self.project.voice.voice_id)
+                if v_idx < 0:
+                    v_idx = self.step2_panel.voice_combo.findText(self.project.voice.display_name)
+                if v_idx >= 0:
+                    self.step2_panel.voice_combo.setCurrentIndex(v_idx)
+            finally:
+                self.step2_panel.voice_combo.blockSignals(False)
+
+            self.step2_panel.speed_combo.blockSignals(True)
+            try:
+                s_idx = self.step2_panel.speed_combo.findData(float(self.project.voice.speed))
+                if s_idx >= 0:
+                    self.step2_panel.speed_combo.setCurrentIndex(s_idx)
+            finally:
+                self.step2_panel.speed_combo.blockSignals(False)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.capcut_export.job is not None:

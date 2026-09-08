@@ -2,6 +2,7 @@
  * VK Dub Studio — Background Service Worker (H6.1 & H6.2 Router)
  *
  * Coordinates Native Messaging with ChatGPT & Vbee content script adapters.
+ * Implements self-healing script injection, dynamic tab management, and streaming logs.
  */
 
 import { NativeMessagingBridge } from "../bridge/nativeMessaging.js";
@@ -17,6 +18,8 @@ const state = {
   vbeeLoggedIn: false,
   chatgptTabs: 0,
   vbeeTabs: 0,
+  chatgptAdapterReady: false,
+  vbeeAdapterReady: false,
 };
 
 let bridge = null;
@@ -54,14 +57,24 @@ async function refreshAllStatus() {
   let chatgptTabs = [];
   try {
     chatgptTabs = await chrome.tabs.query({
-      url: ["*://chatgpt.com/*", "*://*.chatgpt.com/*"],
+      url: [
+        "*://chatgpt.com/*",
+        "*://*.chatgpt.com/*",
+        "*://chat.openai.com/*",
+        "*://*.openai.com/*",
+      ],
     });
   } catch (e) {}
 
   let vbeeTabs = [];
   try {
     vbeeTabs = await chrome.tabs.query({
-      url: ["*://vbee.vn/*", "*://*.vbee.vn/*"],
+      url: [
+        "*://vbee.vn/*",
+        "*://*.vbee.vn/*",
+        "*://studio.vbee.vn/*",
+        "*://*.studio.vbee.vn/*",
+      ],
     });
   } catch (e) {}
 
@@ -74,6 +87,7 @@ async function refreshAllStatus() {
   let chatgptLoggedIn = chatgptAuthFromCookie;
   let vbeeLoggedIn = vbeeAuthFromCookie;
 
+  let chatgptAdapterReady = false;
   if (chatgptTabs.length > 0 && chatgptTabs[0].id) {
     try {
       const resp = await chrome.tabs.sendMessage(chatgptTabs[0].id, {
@@ -81,10 +95,28 @@ async function refreshAllStatus() {
       });
       if (resp && typeof resp.logged_in === "boolean") {
         chatgptLoggedIn = resp.logged_in;
+        chatgptAdapterReady = true;
       }
-    } catch (e) {}
+    } catch (e) {
+      if (chrome.scripting) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: chatgptTabs[0].id },
+            files: ["content/chatgptAdapter.js"],
+          });
+          const retry = await chrome.tabs.sendMessage(chatgptTabs[0].id, {
+            action: "CHECK_CHATGPT_STATUS",
+          });
+          if (retry && typeof retry.logged_in === "boolean") {
+            chatgptLoggedIn = retry.logged_in;
+            chatgptAdapterReady = true;
+          }
+        } catch (e2) {}
+      }
+    }
   }
 
+  let vbeeAdapterReady = false;
   if (vbeeTabs.length > 0 && vbeeTabs[0].id) {
     try {
       const resp = await chrome.tabs.sendMessage(vbeeTabs[0].id, {
@@ -92,12 +124,31 @@ async function refreshAllStatus() {
       });
       if (resp && typeof resp.logged_in === "boolean") {
         vbeeLoggedIn = resp.logged_in;
+        vbeeAdapterReady = true;
       }
-    } catch (e) {}
+    } catch (e) {
+      if (chrome.scripting) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: vbeeTabs[0].id },
+            files: ["content/vbeeAdapter.js"],
+          });
+          const retry = await chrome.tabs.sendMessage(vbeeTabs[0].id, {
+            action: "CHECK_VBEE_STATUS",
+          });
+          if (retry && typeof retry.logged_in === "boolean") {
+            vbeeLoggedIn = retry.logged_in;
+            vbeeAdapterReady = true;
+          }
+        } catch (e2) {}
+      }
+    }
   }
 
   state.chatgptLoggedIn = chatgptLoggedIn;
   state.vbeeLoggedIn = vbeeLoggedIn;
+  state.chatgptAdapterReady = chatgptAdapterReady;
+  state.vbeeAdapterReady = vbeeAdapterReady;
   return state;
 }
 
@@ -114,18 +165,79 @@ async function sendStatusReport() {
     browserName: browserName,
     chatgptTabs: state.chatgptTabs,
     vbeeTabs: state.vbeeTabs,
+    details: {
+      chatgpt_adapter_ready: state.chatgptAdapterReady,
+      vbee_adapter_ready: state.vbeeAdapterReady,
+    },
   });
 
   bridge.send(report);
 }
 
-async function getOrOpenTab(urlPatterns, targetUrl) {
-  const tabs = await chrome.tabs.query({ url: urlPatterns });
-  if (tabs.length > 0 && tabs[0].id) {
-    await chrome.tabs.update(tabs[0].id, { active: true });
-    return tabs[0];
+async function findMatchingTab(urlPatterns, domainKeywords = []) {
+  try {
+    const matched = await chrome.tabs.query({ url: urlPatterns });
+    if (matched.length > 0 && matched[0].id) return matched[0];
+  } catch (e) {}
+
+  try {
+    const allTabs = await chrome.tabs.query({});
+    for (const t of allTabs) {
+      const u = (t.url || t.pendingUrl || "").toLowerCase();
+      for (const kw of domainKeywords) {
+        if (u.includes(kw)) return t;
+      }
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+async function createTabSafely(targetUrl) {
+  let targetWindow = null;
+  try {
+    targetWindow = await chrome.windows.getLastFocused({ populate: false });
+  } catch (e) {}
+
+  if (!targetWindow || targetWindow.id === chrome.windows.WINDOW_ID_NONE) {
+    try {
+      const wins = await chrome.windows.getAll({ windowTypes: ["normal"] });
+      if (wins.length > 0) {
+        targetWindow = wins[0];
+      }
+    } catch (e) {}
   }
-  const newTab = await chrome.tabs.create({ url: targetUrl });
+
+  if (targetWindow && targetWindow.id && targetWindow.id !== chrome.windows.WINDOW_ID_NONE) {
+    try {
+      return await chrome.tabs.create({ windowId: targetWindow.id, url: targetUrl });
+    } catch (createErr) {
+      console.warn("[SW] tabs.create with windowId failed, falling back to windows.create:", createErr);
+    }
+  }
+
+  // Fallback: create a new browser window with targetUrl
+  const win = await chrome.windows.create({ url: targetUrl, focused: true });
+  if (win.tabs && win.tabs.length > 0) {
+    return win.tabs[0];
+  }
+  const createdTabs = await chrome.tabs.query({ windowId: win.id });
+  return createdTabs[0];
+}
+
+async function getOrOpenTab(urlPatterns, targetUrl, domainKeywords = []) {
+  const existingTab = await findMatchingTab(urlPatterns, domainKeywords);
+  if (existingTab && existingTab.id) {
+    try {
+      await chrome.tabs.update(existingTab.id, { active: true });
+      if (existingTab.windowId && existingTab.windowId !== chrome.windows.WINDOW_ID_NONE) {
+        await chrome.windows.update(existingTab.windowId, { focused: true }).catch(() => {});
+      }
+    } catch (e) {}
+    return existingTab;
+  }
+
+  const newTab = await createTabSafely(targetUrl);
   // Wait for tab to load
   await new Promise((resolve) => {
     const listener = (tabId, info) => {
@@ -137,91 +249,130 @@ async function getOrOpenTab(urlPatterns, targetUrl) {
     chrome.tabs.onUpdated.addListener(listener);
     setTimeout(resolve, 8000); // 8s safety timeout
   });
-  // Extra wait for content script injection
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 1200));
   return newTab;
 }
 
-async function ensureAdapterInjected(tabId, scriptPath, pingAction) {
-  const REQUIRED_VERSION = "2.1.6";
-  try {
-    const res = await chrome.tabs.sendMessage(tabId, { action: pingAction });
-    if (res && res.version === REQUIRED_VERSION) {
-      return true;
-    }
-    console.log(`[SW] Adapter version mismatch on tab ${tabId} (${res?.version} vs ${REQUIRED_VERSION}). Upgrading...`);
-  } catch (err) {
-    // Content script is not listening in this tab yet
-  }
-
-  console.log(`[SW] Injecting updated ${scriptPath} into tab ${tabId}...`);
+async function ensureInjected(tabId, scriptPath) {
   if (chrome.scripting) {
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
         files: [scriptPath],
       });
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 500));
       return true;
     } catch (e) {
-      console.warn(`[SW] Failed executeScript on tab ${tabId}:`, e);
+      console.warn(`[SW] Script execution warning on tab ${tabId}:`, e);
     }
   }
-
-  // Fallback: reload tab so content script loads automatically via manifest match
-  try {
-    console.log(`[SW] Reloading tab ${tabId} to activate content script...`);
-    await chrome.tabs.reload(tabId);
-    await new Promise((resolve) => {
-      const listener = (tid, info) => {
-        if (tid === tabId && info.status === "complete") {
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
-        }
-      };
-      chrome.tabs.onUpdated.addListener(listener);
-      setTimeout(resolve, 8000);
-    });
-    await new Promise((r) => setTimeout(r, 1500));
-  } catch (e) {
-    console.warn(`[SW] Tab reload failed:`, e);
-  }
   return false;
+}
+
+async function waitForVbeeDownload(jobName, startedAtMs, timeoutMs = 45000) {
+  if (!chrome.downloads || !jobName) return null;
+  const jobKey = String(jobName).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const deadline = Date.now() + timeoutMs;
+  let latest = null;
+  while (Date.now() < deadline) {
+    const items = await chrome.downloads.search({
+      startedAfter: new Date(startedAtMs - 2000).toISOString(),
+    });
+    const matches = items
+      .filter((item) =>
+        String(item.filename || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "")
+          .includes(jobKey)
+      )
+      .sort((a, b) => (b.startTime || "").localeCompare(a.startTime || ""));
+    if (matches.length) {
+      latest = matches[0];
+      if (latest.state === "complete" || latest.state === "interrupted") break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  if (!latest) return null;
+  return {
+    filename: latest.filename || null,
+    state: latest.state || "unknown",
+    bytes_received: latest.bytesReceived || 0,
+    total_bytes: latest.totalBytes || 0,
+    error: latest.error || null,
+  };
 }
 
 async function handleChatGPTTranslate(payload) {
   try {
     const tab = await getOrOpenTab(
-      ["*://chatgpt.com/*", "*://*.chatgpt.com/*"],
-      "https://chatgpt.com"
+      [
+        "*://chatgpt.com/*",
+        "*://*.chatgpt.com/*",
+        "*://chat.openai.com/*",
+        "*://*.openai.com/*",
+      ],
+      "https://chatgpt.com",
+      ["chatgpt.com", "openai.com"]
     );
-    await ensureAdapterInjected(tab.id, "content/chatgptAdapter.js", "CHECK_CHATGPT_STATUS");
-    const resp = await chrome.tabs.sendMessage(tab.id, {
-      action: "CHATGPT_TRANSLATE",
-      payload,
-    });
-    bridge.send({
-      action: Actions.CHATGPT_TRANSLATE_RESULT,
-      payload: resp,
-    });
+
+    // Self-healing: inject adapter directly into the tab
+    await ensureInjected(tab.id, "content/chatgptAdapter.js");
+
+    let ack;
+    try {
+      ack = await chrome.tabs.sendMessage(tab.id, {
+        action: "CHATGPT_TRANSLATE",
+        payload,
+      });
+    } catch (msgErr) {
+      console.warn("[SW] First sendMessage failed, re-injecting chatgptAdapter.js...", msgErr);
+      await ensureInjected(tab.id, "content/chatgptAdapter.js");
+      ack = await chrome.tabs.sendMessage(tab.id, {
+        action: "CHATGPT_TRANSLATE",
+        payload,
+      });
+    }
+
+    if (!ack || ack.status !== "STARTED") {
+      throw new Error("ChatGPT tab không xác nhận đã bắt đầu xử lý.");
+    }
+    // Kết quả thật sự tới sau (có thể vài phút) qua message "CHATGPT_TRANSLATE_DONE"
+    // được xử lý trong listener chrome.runtime.onMessage ở cuối file — không giữ
+    // kênh sendMessage này mở, vì Chrome/Edge tự đóng kênh bất đồng bộ sau ~5 phút.
   } catch (err) {
+    console.error("[SW] Error in handleChatGPTTranslate:", err);
     bridge.send({
       action: Actions.CHATGPT_TRANSLATE_RESULT,
       payload: {
         success: false,
-        error: err.message,
+        error: `ChatGPT: ${err.message}`,
         request_id: payload?.request_id,
       },
     });
   }
 }
 
+// request_id -> thời điểm bắt đầu, dùng để lọc đúng download khi kết quả
+// VBEE_GENERATE_DONE tới muộn (không còn nằm trong closure của handleVbeeGenerate).
+const vbeeStartedAt = new Map();
+
 async function handleVbeeGenerate(payload) {
   try {
+    const startedAtMs = Date.now();
+    if (payload?.request_id) {
+      vbeeStartedAt.set(payload.request_id, startedAtMs);
+    }
     const tab = await getOrOpenTab(
-      ["*://studio.vbee.vn/*dubbing*", "*://studio.vbee.vn/*", "*://vbee.vn/*"],
-      "https://studio.vbee.vn/studio/dubbing"
+      [
+        "*://studio.vbee.vn/*dubbing*",
+        "*://studio.vbee.vn/*",
+        "*://vbee.vn/*",
+        "*://*.vbee.vn/*",
+      ],
+      "https://studio.vbee.vn/studio/dubbing",
+      ["studio.vbee.vn", "vbee.vn"]
     );
+
     if (!tab.url || !tab.url.includes("/dubbing")) {
       console.log(`[SW] Navigating tab ${tab.id} to /studio/dubbing...`);
       await chrome.tabs.update(tab.id, { url: "https://studio.vbee.vn/studio/dubbing" });
@@ -237,25 +388,69 @@ async function handleVbeeGenerate(payload) {
       });
       await new Promise((r) => setTimeout(r, 2000));
     }
-    await ensureAdapterInjected(tab.id, "content/vbeeAdapter.js", "CHECK_VBEE_STATUS");
-    const resp = await chrome.tabs.sendMessage(tab.id, {
-      action: "VBEE_GENERATE_VOICE",
-      payload,
-    });
-    bridge.send({
-      action: Actions.VBEE_VOICE_RESULT,
-      payload: resp,
-    });
+
+    // Self-healing: inject adapter directly into the tab
+    await ensureInjected(tab.id, "content/vbeeAdapter.js");
+
+    let ack;
+    try {
+      ack = await chrome.tabs.sendMessage(tab.id, {
+        action: "VBEE_GENERATE_VOICE",
+        payload,
+      });
+    } catch (msgErr) {
+      console.warn("[SW] First sendMessage to Vbee failed, re-injecting vbeeAdapter.js...", msgErr);
+      await ensureInjected(tab.id, "content/vbeeAdapter.js");
+      ack = await chrome.tabs.sendMessage(tab.id, {
+        action: "VBEE_GENERATE_VOICE",
+        payload,
+      });
+    }
+
+    if (!ack || ack.status !== "STARTED") {
+      throw new Error("Vbee adapter không xác nhận đã bắt đầu xử lý.");
+    }
+    // Kết quả thật sự tới sau (có thể tới 10 phút) qua message "VBEE_GENERATE_DONE"
+    // được xử lý trong listener chrome.runtime.onMessage ở cuối file.
   } catch (err) {
+    console.error("[SW] Error in handleVbeeGenerate:", err);
+    if (payload?.request_id) vbeeStartedAt.delete(payload.request_id);
     bridge.send({
       action: Actions.VBEE_VOICE_RESULT,
       payload: {
         success: false,
-        error: err.message,
+        error: `Vbee: ${err.message}`,
         request_id: payload?.request_id,
       },
     });
   }
+}
+
+async function finalizeVbeeResult(resp) {
+  const requestId = resp?.request_id;
+  const startedAtMs = (requestId && vbeeStartedAt.get(requestId)) || Date.now() - 5000;
+  if (requestId) vbeeStartedAt.delete(requestId);
+
+  if (resp?.download_triggered) {
+    const download = await waitForVbeeDownload(resp.job_name, startedAtMs);
+    resp = {
+      ...resp,
+      download_path: download?.filename || null,
+      download_state: download?.state || "not_found",
+      download_bytes: download?.bytes_received || 0,
+      download_error: download?.error || null,
+    };
+  }
+
+  if (resp?.success && !resp.audio_base64 && !resp.audio_url && !resp.download_triggered) {
+    resp = {
+      ...resp,
+      success: false,
+      error: "Vbee adapter báo thành công nhưng không cung cấp audio hoặc sự kiện tải file.",
+    };
+  }
+
+  bridge.send({ action: Actions.VBEE_VOICE_RESULT, payload: resp });
 }
 
 function initBridge() {
@@ -284,6 +479,14 @@ function initBridge() {
         case Actions.PING:
           bridge.send({ action: Actions.PONG, timestamp: Date.now() });
           break;
+        case Actions.RELOAD_EXTENSION:
+          console.log("[SW] Reloading extension on request...");
+          try {
+            chrome.runtime.reload();
+          } catch (e) {
+            console.warn("[SW] Reload failed:", e);
+          }
+          break;
       }
     },
   });
@@ -292,6 +495,31 @@ function initBridge() {
 }
 
 chrome.runtime.onMessage.addListener((message) => {
+  if (message?.action === "CHATGPT_TRANSLATE_DONE") {
+    bridge.send({ action: Actions.CHATGPT_TRANSLATE_RESULT, payload: message.payload });
+    return;
+  }
+
+  if (message?.action === "VBEE_GENERATE_DONE") {
+    const resp = message.payload;
+    finalizeVbeeResult(resp).catch((err) => {
+      console.error("[SW] Error finalizing Vbee result:", err);
+      bridge.send({
+        action: Actions.VBEE_VOICE_RESULT,
+        payload: { success: false, error: `Vbee: ${err.message}`, request_id: resp?.request_id },
+      });
+    });
+    return;
+  }
+
+  if (message?.action === "LOG_EVENT" && bridge && bridge.isConnected) {
+    bridge.send({
+      action: Actions.LOG_EVENT,
+      payload: { message: message.message },
+    });
+    return;
+  }
+
   if (
     message?.action === "CHATGPT_TAB_READY" ||
     message?.action === "CHATGPT_STATUS_CHANGED" ||
@@ -304,7 +532,11 @@ chrome.runtime.onMessage.addListener((message) => {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    if (tab.url.includes("chatgpt.com") || tab.url.includes("vbee.vn")) {
+    if (
+      tab.url.includes("chatgpt.com") ||
+      tab.url.includes("openai.com") ||
+      tab.url.includes("vbee.vn")
+    ) {
       sendStatusReport();
     }
   }

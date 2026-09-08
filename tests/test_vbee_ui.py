@@ -206,3 +206,29 @@ def test_vbee_controller_api_mode_with_credentials(monkeypatch, tmp_path) -> Non
     assert controller.job.provider.app_id == "app-id-123"
     assert controller.job.provider.token == "token-456"
     assert controller.job.speed == 1.1
+
+
+def test_vbee_controller_extension_mode_default(monkeypatch, tmp_path) -> None:
+    """VbeeController instantiates VbeeExtensionProvider by default (browser mode)."""
+    from vkdub.integrations.vbee.provider import VbeeExtensionProvider
+    from vkdub.services.app_settings import AppSettings, save_app_settings
+
+    monkeypatch.setattr("vkdub.services.app_settings.data_root", lambda: tmp_path)
+    save_app_settings(AppSettings(vbee_mode="browser"))
+    monkeypatch.setattr("vkdub.ui.vbee_controller.validate_project_for_vbee", lambda p: None)
+
+    window = DummyMainWindow()
+    window.local_agent = MagicMock()
+    window.local_agent.status.browser_connected = True
+    window.left.speed_combo = MagicMock()
+    window.left.speed_combo.currentData.return_value = 1.1
+
+    controller = VbeeController(window)
+    monkeypatch.setattr("vkdub.ui.vbee_controller.VbeeWorkflowJob.start", lambda self: None)
+
+    started = controller.start_workflow()
+    assert started is True
+    assert controller.job is not None
+    assert isinstance(controller.job.provider, VbeeExtensionProvider)
+    assert controller.job.provider.local_agent == window.local_agent
+

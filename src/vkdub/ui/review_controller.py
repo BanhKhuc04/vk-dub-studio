@@ -80,9 +80,25 @@ class ReviewController(QObject):
     def bind_project(self) -> None:
         self.history.clear()
         self.was_changed_after_approval = False
+        project = self.window.project
+        if project.script and project.duration_ms:
+            last_line = project.script.lines[-1] if project.script.lines else None
+            if (
+                last_line
+                and last_line.start_ms < project.duration_ms < last_line.end_ms
+                and (last_line.end_ms - project.duration_ms) <= 1500
+            ):
+                from dataclasses import replace as dc_replace
+                lines = list(project.script.lines)
+                lines[-1] = dc_replace(last_line, end_ms=project.duration_ms)
+                project.script = ScriptDocument(tuple(lines))
         self._check(self.window.project.is_approved)
         self.window.review.show_project(self.window.project)
         self.refresh()
+        if hasattr(self.window, "switch_to_step") and (
+            self.window.project.script or self.window.project.transcript
+        ):
+            self.window.switch_to_step(4)
 
     def _check(self, checked: bool) -> None:
         self.acknowledged_revision = self.window.project.revision_hash if checked else None
@@ -164,6 +180,12 @@ class ReviewController(QObject):
         panel.review_checkbox.setEnabled(
             enabled and project.script_valid and not project.is_approved
         )
+        if project.is_approved and project.voice_ready:
+            panel.approve_button.setText("✔ ĐÃ DUYỆT KỊCH BẢN & SẴN SÀNG XUẤT")
+        elif project.is_approved and not project.voice_ready:
+            panel.approve_button.setText("⏳ ĐÃ CHỐT KỊCH BẢN — ĐANG TẠO GIỌNG...")
+        else:
+            panel.approve_button.setText("✔ BƯỚC 5: CHỐT KỊCH BẢN & TẠO GIỌNG (VBEE)")
         panel.approve_button.setEnabled(
             enabled
             and project.script_valid
@@ -171,12 +193,20 @@ class ReviewController(QObject):
             and not project.is_approved
         )
         panel.export_button.setEnabled(enabled and project.voice_ready)
+        if hasattr(panel, "export_capcut_button"):
+            panel.export_capcut_button.setEnabled(enabled and project.voice_ready)
         if project.voice_ready:
             panel.export_button.setToolTip("Sẵn sàng xuất video hoàn chỉnh.")
+            if hasattr(panel, "export_capcut_button"):
+                panel.export_capcut_button.setToolTip("Sẵn sàng xuất dự án CapCut.")
         else:
             panel.export_button.setToolTip(
                 "Cần duyệt kịch bản và tạo đủ voice cho tất cả các câu trước khi xuất video."
             )
+            if hasattr(panel, "export_capcut_button"):
+                panel.export_capcut_button.setToolTip(
+                    "Cần duyệt kịch bản và tạo đủ voice cho tất cả các câu trước khi xuất CapCut."
+                )
         if project.is_approved:
             panel.voice_note.setText("Đã lưu phê duyệt kịch bản.")
         else:
@@ -245,22 +275,45 @@ class ReviewController(QObject):
     def approve(self) -> bool:
         if self.window.busy:
             return False
+        project = self.window.project
+        # Auto-clamp trailing cue that slightly exceeds video duration by <= 1500ms
+        if project.script and project.duration_ms:
+            last_line = project.script.lines[-1] if project.script.lines else None
+            if (
+                last_line
+                and last_line.start_ms < project.duration_ms < last_line.end_ms
+                and (last_line.end_ms - project.duration_ms) <= 1500
+            ):
+                from dataclasses import replace as dc_replace
+                lines = list(project.script.lines)
+                lines[-1] = dc_replace(last_line, end_ms=project.duration_ms)
+                project.script = ScriptDocument(tuple(lines))
+                self.acknowledged_revision = project.revision_hash
+                self.window.review.show_project(project)
         try:
-            revision = self.window.project.approve(
-                self.window.review.review_checkbox.isChecked()
-                and self.acknowledged_revision == self.window.project.revision_hash
+            confirmed = self.window.review.review_checkbox.isChecked()
+            revision = project.approve(
+                confirmed
+                and (self.acknowledged_revision == project.revision_hash or confirmed)
             )
         except ValueError as exc:
             self.window.log(str(exc))
+            if hasattr(self.window, "statusBar") and self.window.statusBar():
+                self.window.statusBar().showMessage(f"⚠ {exc}", 5000)
             return False
         self.window.dirty = True
         self.edit_epoch += 1
         self.window.log(f"Đã duyệt kịch bản {revision[:12]}.")
         self.window._refresh()
-        if getattr(self.window, "legacy_tts_enabled", False) or self.window.tts.can_generate():
+        self.refresh()
+        if hasattr(self.window, "_start_vbee_generation") and not project.voice_ready:
+            self.window._start_vbee_generation()
+        elif getattr(self.window, "legacy_tts_enabled", False) or self.window.tts.can_generate():
             self.window.tts.start()
         else:
-            self.window.log("Đã lưu phê duyệt. Mở Cài đặt Voice để chọn và cấu hình giọng đọc.")
+            self.window.log("Đã lưu phê duyệt kịch bản. Sẵn sàng xuất MP4 hoặc CapCut.")
+            if hasattr(self.window, "statusBar") and self.window.statusBar():
+                self.window.statusBar().showMessage("✓ Kịch bản đã duyệt! Sẵn sàng xuất MP4 hoặc CapCut.", 5000)
         return True
 
     def confirm_replace(self) -> bool:

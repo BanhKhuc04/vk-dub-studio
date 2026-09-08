@@ -108,7 +108,12 @@ class VoiceAsset:
         VoiceSettings(self.provider, self.voice_id, DEFAULT_LABEL, self.speed)
         if type(self.duration_ms) is not int or not 0 < self.duration_ms <= 86_400_000:
             raise ValueError("Thời lượng voice không hợp lệ.")
-        if not isinstance(self.output_path, Path) or self.output_path.suffix.lower() != ".wav":
+        if not isinstance(self.output_path, Path) or self.output_path.suffix.lower() not in (
+            ".wav",
+            ".mp3",
+            ".m4a",
+            ".aac",
+        ):
             raise ValueError("Đường dẫn voice không hợp lệ.")
         if (
             not isinstance(self.generated_at, str)

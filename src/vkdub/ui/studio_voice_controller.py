@@ -148,7 +148,9 @@ class StudioVoiceController(TTSController):
         )
         if project.is_approved:
             panel.stage.setText(f"Đã tạo voice {len(current)}/{total} câu")
-        panel.export_button.setEnabled(False)
+        panel.export_button.setEnabled(not self.window.busy and project.voice_ready)
+        if hasattr(panel, "export_capcut_button"):
+            panel.export_capcut_button.setEnabled(not self.window.busy and project.voice_ready)
         if self.job:
             self.window.left.stop_button.setEnabled(not self.job.cancel_event.is_set())
 

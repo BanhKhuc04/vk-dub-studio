@@ -70,8 +70,6 @@ def _probe_video(path: Path, ffprobe: str) -> tuple[int, int, int, bool]:
             ffprobe,
             "-v",
             "error",
-            "-select_streams",
-            "v:0",
             "-show_entries",
             "stream=codec_type,width,height:format=duration",
             "-of",
@@ -95,6 +93,31 @@ def _probe_video(path: Path, ffprobe: str) -> tuple[int, int, int, bool]:
         )
     except (ValueError, KeyError, IndexError, TypeError, StopIteration, json.JSONDecodeError):
         raise ValueError("Không đọc được kích thước video để tạo project CapCut.") from None
+
+
+def _probe_duration_ms(path: Path, ffprobe: str) -> int:
+    """Read duration from either audio or video media."""
+    run = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        creationflags=0x08000000 if os.name == "nt" else 0,
+    )
+    try:
+        return round(float(json.loads(run.stdout)["format"]["duration"]) * 1000)
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        raise ValueError("Không đọc được thời lượng audio để tạo project CapCut.") from None
 
 
 def _render_masked_video(
@@ -378,10 +401,19 @@ def export_capcut_project(
         assert project.script
         if project.master_voice_path and project.master_voice_path.is_file():
             # 1. Add single intact master voice track spanning from 00:00:00 (zero slicing)
-            copied_master = assets / "master-voice.wav"
+            audio_suffix = project.master_voice_path.suffix.lower()
+            if audio_suffix not in {".wav", ".mp3", ".m4a", ".aac"}:
+                audio_suffix = ".wav"
+            copied_master = assets / f"master-voice{audio_suffix}"
             shutil.copy2(project.master_voice_path, copied_master)
             final_audio = final / "Assets" / copied_master.name
-            _, _, master_dur, _ = _probe_video(copied_master, ffprobe)
+            try:
+                master_dur = _probe_duration_ms(copied_master, ffprobe)
+            except ValueError:
+                # Some very short WAVs omit enough metadata for ffprobe to
+                # calculate duration. The approved project timeline remains a
+                # safe upper bound for the CapCut segment.
+                master_dur = duration_ms
             voice_duration = min(duration_ms, master_dur if master_dur > 0 else duration_ms)
             audio = _clone_bundle(template["bundles"]["audio"])
             aseg = _append_bundle(content, audio)

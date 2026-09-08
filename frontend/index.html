@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VK Dub Studio — Cyber Obsidian Pro Studio v2.5</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: '#080b11',
+              surface: '#0d121c',
+              elevated: '#121826',
+              card: '#161f31',
+              cardHover: '#1c273d',
+              border: 'rgba(255,255,255,0.08)',
+              borderStrong: 'rgba(255,255,255,0.14)',
+            },
+            cyan: {
+              glow: '#06b6d4',
+              accent: '#22d3ee',
+              light: '#67e8f9',
+            },
+            emerald: {
+              glow: '#10b981',
+              accent: '#34d399',
+            },
+            violet: {
+              glow: '#8b5cf6',
+              accent: '#a78bfa',
+            },
+            amber: {
+              glow: '#f59e0b',
+              accent: '#fbbf24',
+            }
+          },
+          boxShadow: {
+            'glow-cyan': '0 0 20px -3px rgba(6, 182, 212, 0.35)',
+            'glow-emerald': '0 0 16px -2px rgba(16, 185, 129, 0.4)',
+            'glow-violet': '0 0 16px -2px rgba(139, 92, 246, 0.35)',
+            'card': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+            'card-elevated': '0 12px 40px 0 rgba(0, 0, 0, 0.5)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+    
+    :root {
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    
+    * {
+      font-family: var(--font-sans);
+      user-select: none;
+      box-sizing: border-box;
+    }
+    
+    .font-mono {
+      font-family: var(--font-mono);
+    }
+    
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080b11;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1c273d;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2a3b5c;
+    }
+
+    @keyframes breathingPulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
+      }
+      50% {
+        opacity: 0.75;
+        transform: scale(0.96);
+        filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.2));
+      }
+    }
+
+    .status-pulse {
+      animation: breathingPulse 2.4s ease-in-out infinite;
+    }
+
+    input[type="range"] {
+      accent-color: #06b6d4;
+    }
+
+    .glass-panel {
+      background: rgba(18, 24, 38, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+  </style>
+</head>
+<body class="bg-app-bg text-slate-200 h-screen w-screen flex flex-col overflow-hidden text-sm">
+
+  <!-- 1. TOP BAR -->
+  <header class="h-14 bg-app-surface/90 border-b border-app-border px-4 flex items-center justify-between z-30 shrink-0 select-none glass-panel">
+    <div class="flex items-center space-x-3.5">
+      <!-- Official App Logo -->
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl overflow-hidden shadow-glow-cyan border border-cyan-500/30 bg-app-card flex items-center justify-center p-0.5">
+          <img src="data:image/png;base64,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" alt="VK Dub Logo" class="w-full h-full object-contain rounded-lg">
+        </div>
+        <div class="flex items-baseline space-x-1.5">
+          <span class="font-extrabold text-base tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+            VK Dub Studio
+          </span>
+          <span class="text-[10px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded-md bg-gradient-to-r from-violet-600 to-cyan-500 text-white shadow-sm">
+            PRO STUDIO
+          </span>
+          <span class="text-[11px] font-mono text-slate-400 font-semibold">v2.5</span>
+        </div>
+      </div>
+
+      <div class="h-4 w-px bg-white/10 mx-1"></div>
+
+      <!-- Project Badge -->
+      <div class="flex items-center bg-app-card border border-app-border rounded-lg px-2.5 py-1 text-xs">
+        <span class="w-2 h-2 rounded-full bg-amber-400 mr-2 animate-ping"></span>
+        <span class="font-semibold text-slate-200">hehhee.mp4 *</span>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center space-x-1 text-xs">
+        <button onclick="saveProject()" class="hover:bg-app-card text-slate-300 hover:text-white px-2.5 py-1 rounded-md transition flex items-center space-x-1 border border-transparent hover:border-app-border">
+          <span>💾</span> <span>Lưu (Ctrl+S)</span>
+        </button>
+        <button onclick="alert('Đã mở hộp thoại chọn dự án mới!')" class="hover:bg-app-card text-slate-300 hover:text-white px-2.5 py-1 rounded-md transition flex items-center space-x-1 border border-transparent hover:border-app-border">
+          <span>📂</span> <span>Mở Dự Án</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Bridge Status Pills -->
+    <div class="flex items-center space-x-2.5">
+      <div id="pill-edge" class="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-glow-emerald status-pulse transition-all">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>🟢 Edge Extension</span>
+      </div>
+
+      <div id="pill-chatgpt" class="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-glow-emerald status-pulse transition-all">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>🟢 ChatGPT (3 Tabs)</span>
+      </div>
+
+      <div id="pill-vbee" class="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-glow-emerald status-pulse transition-all">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>🟢 Vbee Synced</span>
+      </div>
+
+      <div class="h-4 w-px bg-white/10 mx-1"></div>
+
+      <button onclick="openSettingsModal()" class="bg-app-card hover:bg-app-cardHover text-slate-300 hover:text-white border border-app-border rounded-lg px-3 py-1.5 text-xs font-semibold transition flex items-center space-x-1.5 shadow-sm">
+        <span>⚙</span> <span>Cài đặt</span>
+      </button>
+      <button onclick="openCapcutModal()" class="bg-gradient-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-600/50 hover:to-blue-600/50 text-cyan-300 border border-cyan-500/40 rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center space-x-1.5 shadow-glow-cyan">
+        <span>🚀</span> <span>CapCut Studio</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. MAIN WORKSPACE -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- LEFT SIDEBAR: STEPPER -->
+    <aside class="w-64 bg-app-surface border-r border-app-border flex flex-col justify-between shrink-0 select-none z-20">
+      <div class="p-3.5 space-y-1">
+        <div class="text-[11px] font-bold tracking-wider text-slate-400 uppercase px-2 mb-2.5 flex items-center justify-between">
+          <span>Workflow Pipeline</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-mono font-bold border border-cyan-500/20">5 BƯỚC</span>
+        </div>
+
+        <!-- Step 1 -->
+        <div onclick="switchStep(1)" id="step-btn-1" class="step-nav group cursor-pointer relative flex items-start p-2.5 rounded-xl transition-all border border-transparent hover:bg-app-card/60">
+          <div class="flex flex-col items-center mr-3">
+            <div class="step-node w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 group-hover:scale-105 transition">
+              ✓
+            </div>
+            <div class="w-0.5 h-6 bg-emerald-500/40 mt-1"></div>
+          </div>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <span class="text-xs font-bold text-slate-200 group-hover:text-white block">01 Video nguồn</span>
+            <span class="text-[11px] text-emerald-400/90 truncate block font-mono">hehhee.mp4 (63s)</span>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div onclick="switchStep(2)" id="step-btn-2" class="step-nav group cursor-pointer relative flex items-start p-2.5 rounded-xl transition-all border border-transparent hover:bg-app-card/60">
+          <div class="flex flex-col items-center mr-3">
+            <div class="step-node w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 group-hover:scale-105 transition">
+              ✓
+            </div>
+            <div class="w-0.5 h-6 bg-emerald-500/40 mt-1"></div>
+          </div>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <span class="text-xs font-bold text-slate-200 group-hover:text-white block">02 Giọng đọc & AI</span>
+            <span class="text-[11px] text-slate-400 truncate block">HN - Ngọc Huyền • 1.1x</span>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div onclick="switchStep(3)" id="step-btn-3" class="step-nav group cursor-pointer relative flex items-start p-2.5 rounded-xl transition-all border border-transparent hover:bg-app-card/60">
+          <div class="flex flex-col items-center mr-3">
+            <div class="step-node w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 group-hover:scale-105 transition">
+              ✓
+            </div>
+            <div class="w-0.5 h-6 bg-emerald-500/40 mt-1"></div>
+          </div>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <span class="text-xs font-bold text-slate-200 group-hover:text-white block">03 Vùng che mờ</span>
+            <span class="text-[11px] text-slate-400 truncate block">1 vùng phụ đề gốc</span>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div onclick="switchStep(4)" id="step-btn-4" class="step-nav group cursor-pointer relative flex items-start p-2.5 rounded-xl transition-all border border-transparent hover:bg-app-card/60">
+          <div class="flex flex-col items-center mr-3">
+            <div class="step-node w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 group-hover:scale-105 transition">
+              ✓
+            </div>
+            <div class="w-0.5 h-6 bg-emerald-500/40 mt-1"></div>
+          </div>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <span class="text-xs font-bold text-slate-200 group-hover:text-white block">04 Xử lý tự động</span>
+            <span class="text-[11px] text-slate-400 truncate block">Đã hoàn thành 4/4</span>
+          </div>
+        </div>
+
+        <!-- Step 5 (Active) -->
+        <div onclick="switchStep(5)" id="step-btn-5" class="step-nav group cursor-pointer relative flex items-start p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/40 shadow-glow-cyan">
+          <div class="flex flex-col items-center mr-3">
+            <div class="step-node w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-cyan-500 text-app-bg shadow-sm">
+              5
+            </div>
+          </div>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">05 Kịch bản & Xuất</span>
+              <span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-cyan-500 text-app-bg uppercase">CURRENT</span>
+            </div>
+            <span class="text-[11px] text-cyan-300 font-medium truncate block">31 câu • Đã duyệt</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stepper Footer Progress -->
+      <div class="p-3.5 bg-app-elevated border-t border-app-border text-xs">
+        <div class="flex justify-between items-center text-[11px] text-slate-300 mb-2">
+          <span class="font-medium">Tiến độ hoàn tất dự án</span>
+          <span class="font-bold text-cyan-400 font-mono">5/5 (100%)</span>
+        </div>
+        <div class="w-full bg-app-bg rounded-full h-2 overflow-hidden border border-app-border p-0.5">
+          <div class="bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 h-full rounded-full w-full"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- WORKSPACE -->
+    <main class="flex-1 flex overflow-hidden">
+
+      <!-- LEFT COLUMN: VIDEO PLAYER & WAVEFORM PREVIEW -->
+      <section class="w-[52%] flex flex-col bg-app-bg border-r border-app-border p-3.5 space-y-3.5 overflow-y-auto">
+        <!-- Video Player Card -->
+        <div class="relative bg-black rounded-2xl overflow-hidden border border-app-border aspect-video flex items-center justify-center group shadow-card">
+          <div class="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black/90 flex items-center justify-center">
+            <div class="text-center space-y-2.5">
+              <div class="w-16 h-16 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center mx-auto text-2xl text-cyan-400 shadow-glow-cyan cursor-pointer hover:scale-105 transition" onclick="togglePlay()">
+                <span id="play-icon">▶</span>
+              </div>
+              <p class="text-xs font-mono text-slate-400">hehhee.mp4 (720×1280 • 30.00 fps • HEVC)</p>
+            </div>
+          </div>
+
+          <!-- Video File Tag -->
+          <div class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-md border border-white/10 text-xs font-mono text-slate-200 flex items-center space-x-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>hehhee.mp4</span>
+          </div>
+
+          <!-- Subtitle Preview Overlay -->
+          <div id="subtitle-overlay" class="absolute bottom-5 inset-x-6 text-center">
+            <span class="inline-block bg-black/90 text-amber-300 font-bold text-sm md:text-base px-4 py-2 rounded-xl border border-amber-400/30 backdrop-blur-md shadow-2xl">
+              "Xin chào các bạn, hôm nay tôi sẽ hướng dẫn các bạn làm video!"
+            </span>
+          </div>
+
+          <!-- Interactive Blur Mask Box Overlay -->
+          <div id="blur-box-overlay" class="absolute bottom-16 inset-x-12 h-14 border-2 border-dashed border-red-400/90 bg-red-500/20 backdrop-blur-md rounded-xl flex items-center justify-between px-4 text-xs text-red-200 font-bold hidden">
+            <span>🔒 [Vùng che mờ phụ đề gốc #1: 76% × 14%]</span>
+            <span class="text-[11px] bg-red-950/80 px-2 py-0.5 rounded border border-red-500/40">Gaussian Blur 85%</span>
+          </div>
+        </div>
+
+        <!-- Video Player Controls Card -->
+        <div class="bg-app-surface border border-app-border rounded-xl p-3.5 space-y-2.5 shadow-sm">
+          <div class="flex items-center space-x-3">
+            <span id="time-current" class="text-xs font-mono text-cyan-400 font-bold w-14">00:00:14</span>
+            <input type="range" id="video-seekbar" min="0" max="63" value="14" oninput="updateSeek(this.value)" class="flex-1 h-2 bg-app-card rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            <span class="text-xs font-mono text-slate-400 font-semibold w-14 text-right">00:01:03</span>
+          </div>
+
+          <div class="flex items-center justify-between pt-1 text-xs">
+            <div class="flex items-center space-x-2">
+              <button onclick="togglePlay()" class="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-app-bg font-black transition flex items-center space-x-1.5 shadow-glow-cyan">
+                <span id="btn-play-text">▶ Phát</span>
+              </button>
+              <button onclick="alert('Đã bật chế độ thêm khung phụ đề')" class="px-3 py-1.5 rounded-lg bg-app-card hover:bg-app-cardHover text-slate-200 border border-app-border transition font-medium">
+                + Phụ đề
+              </button>
+              <button onclick="switchStep(3)" class="px-3 py-1.5 rounded-lg bg-app-card hover:bg-app-cardHover text-slate-200 border border-app-border transition font-medium">
+                🔒 Che mờ
+              </button>
+              <button onclick="alert('Đang phát thử giọng thuyết minh tiếng Việt…')" class="px-3 py-1.5 rounded-lg bg-violet-950/40 hover:bg-violet-900/60 text-violet-300 border border-violet-500/40 transition font-semibold flex items-center space-x-1">
+                <span>🎧</span> <span>Nghe voice</span>
+              </button>
+            </div>
+
+            <div class="text-[11px] font-mono text-slate-400 bg-app-card px-2.5 py-1 rounded-md border border-app-border">
+              720 × 1280 • 43.3 MB • HEVC/AAC
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Narration Timeline Waveform Visualizer -->
+        <div class="bg-app-surface border border-app-border rounded-xl p-3.5 space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-slate-200 flex items-center space-x-2">
+              <span class="text-cyan-400">📊</span> <span>Master Narration Timeline Waveform</span>
+            </span>
+            <span class="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-500/40">
+              ✓ HOÀN TOÀN ĐỒNG BỘ (00:00:00.000)
+            </span>
+          </div>
+
+          <div class="h-14 bg-app-bg rounded-xl border border-app-border p-2 flex items-center justify-between space-x-0.5 overflow-hidden">
+            <div class="w-1 bg-cyan-500/40 h-3 rounded-full"></div>
+            <div class="w-1 bg-cyan-500/60 h-7 rounded-full"></div>
+            <div class="w-1 bg-cyan-400 h-11 rounded-full animate-pulse"></div>
+            <div class="w-1 bg-cyan-400 h-9 rounded-full"></div>
+            <div class="w-1 bg-cyan-500/50 h-4 rounded-full"></div>
+            <div class="w-1 bg-slate-800 h-1.5 rounded-full"></div>
+            <div class="w-1 bg-slate-800 h-1.5 rounded-full"></div>
+            <div class="w-1 bg-violet-500/60 h-6 rounded-full"></div>
+            <div class="w-1 bg-violet-400 h-12 rounded-full animate-pulse"></div>
+            <div class="w-1 bg-violet-400 h-8 rounded-full"></div>
+            <div class="w-1 bg-violet-500/50 h-5 rounded-full"></div>
+            <div class="w-1 bg-slate-800 h-1.5 rounded-full"></div>
+            <div class="w-1 bg-emerald-500/50 h-4 rounded-full"></div>
+            <div class="w-1 bg-emerald-400 h-10 rounded-full"></div>
+            <div class="w-1 bg-emerald-400 h-12 rounded-full animate-pulse"></div>
+            <div class="w-1 bg-emerald-400 h-7 rounded-full"></div>
+            <div class="w-1 bg-slate-800 h-1.5 rounded-full"></div>
+            <div class="w-1 bg-cyan-500/60 h-6 rounded-full"></div>
+            <div class="w-1 bg-cyan-400 h-10 rounded-full"></div>
+            <div class="w-1 bg-cyan-400 h-8 rounded-full"></div>
+            <div class="w-1 bg-slate-800 h-1.5 rounded-full"></div>
+            <div class="w-1 bg-violet-500/60 h-5 rounded-full"></div>
+            <div class="w-1 bg-violet-400 h-10 rounded-full"></div>
+            <div class="w-1 bg-violet-500/50 h-4 rounded-full"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: STEP PANELS (1 TO 5) -->
+      <section class="w-[48%] flex flex-col bg-app-surface overflow-y-auto p-4 space-y-4">
+
+        <!-- STEP 1 PANEL -->
+        <div id="panel-step-1" class="step-panel hidden space-y-4">
+          <div>
+            <h2 class="text-base font-extrabold text-white flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-mono text-xs">01</span>
+              <span>Chọn & Nạp Video Nguồn</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Hỗ trợ MP4, MKV, MOV. Tự động đọc thông số FPS, codec và độ phân giải.</p>
+          </div>
+
+          <div class="border-2 border-dashed border-cyan-500/30 hover:border-cyan-400/60 bg-app-bg rounded-2xl p-8 text-center transition cursor-pointer space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto text-2xl border border-cyan-500/20">
+              📥
+            </div>
+            <div>
+              <p class="text-sm font-bold text-slate-200">Kéo thả tệp video vào đây</p>
+              <p class="text-xs text-slate-400 mt-0.5">hoặc bấm để duyệt tệp từ máy tính</p>
+            </div>
+            <button class="px-4 py-2 rounded-xl bg-app-card hover:bg-app-cardHover text-xs text-slate-200 border border-app-border font-semibold transition">
+              📂 Chọn tệp Video...
+            </button>
+          </div>
+
+          <div class="bg-app-card border border-app-border rounded-xl p-4 space-y-3">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Thông số Video đang xử lý</span>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div class="p-3 rounded-lg bg-app-bg border border-app-border">
+                <span class="text-slate-400 block text-[11px]">Tên tệp:</span>
+                <span class="font-bold text-slate-200 font-mono">hehhee.mp4</span>
+              </div>
+              <div class="p-3 rounded-lg bg-app-bg border border-app-border">
+                <span class="text-slate-400 block text-[11px]">Thời lượng:</span>
+                <span class="font-bold text-slate-200 font-mono">00:01:03 (63s)</span>
+              </div>
+              <div class="p-3 rounded-lg bg-app-bg border border-app-border">
+                <span class="text-slate-400 block text-[11px]">Độ phân giải:</span>
+                <span class="font-bold text-slate-200 font-mono">720 × 1280 (Dọc TikTok/Shorts)</span>
+              </div>
+              <div class="p-3 rounded-lg bg-app-bg border border-app-border">
+                <span class="text-slate-400 block text-[11px]">Chuẩn mã hóa:</span>
+                <span class="font-bold text-slate-200 font-mono">HEVC / 30.00 fps</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 PANEL -->
+        <div id="panel-step-2" class="step-panel hidden space-y-4">
+          <div>
+            <h2 class="text-base font-extrabold text-white flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded bg-violet-500/20 text-violet-400 font-mono text-xs">02</span>
+              <span>Cấu Hình Giọng Đọc Vbee & AI</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Giọng đọc phòng thu chất lượng cao Vbee Dubbing Studio (kết nối trực tiếp qua Edge).</p>
+          </div>
+
+          <div class="bg-app-card border border-app-border rounded-xl p-4 space-y-3.5">
+            <label class="text-xs font-bold text-slate-200 block">Chọn giọng đọc thuyết minh:</label>
+            <select class="w-full bg-app-bg border border-app-border rounded-xl p-3 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none font-medium">
+              <option selected>HN - Ngọc Huyền (Nữ miền Bắc truyền cảm • Chuẩn Studio)</option>
+              <option>HN - Mai Phương (Nữ miền Bắc tin tức, chuyên nghiệp)</option>
+              <option>SG - Tường Vy (Nữ miền Nam dịu dàng, tự nhiên)</option>
+              <option>SG - Lan Trinh (Nữ miền Nam năng động, quảng cáo)</option>
+              <option>SG - Thảo Trinh (Nữ miền Nam vui tươi, kể chuyện)</option>
+            </select>
+
+            <div class="grid grid-cols-2 gap-4 pt-2">
+              <div>
+                <div class="flex justify-between text-xs text-slate-300 mb-1.5">
+                  <span>Tốc độ đọc:</span>
+                  <span class="font-mono text-cyan-400 font-bold">1.1x (Khuyến nghị)</span>
+                </div>
+                <input type="range" min="0.8" max="1.5" step="0.05" value="1.1" class="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-cyan-400">
+              </div>
+              <div>
+                <div class="flex justify-between text-xs text-slate-300 mb-1.5">
+                  <span>Cao độ (Pitch):</span>
+                  <span class="font-mono text-cyan-400 font-bold">1.0x (Tự nhiên)</span>
+                </div>
+                <input type="range" min="0.8" max="1.3" step="0.05" value="1.0" class="w-full h-2 bg-app-bg rounded-lg appearance-none cursor-pointer accent-cyan-400">
+              </div>
+            </div>
+
+            <button onclick="alert('Đang phát mẫu giọng HN - Ngọc Huyền tốc độ 1.1x…')" class="w-full mt-2 py-2.5 rounded-xl bg-app-elevated hover:bg-app-cardHover text-xs font-bold text-slate-200 border border-app-border transition flex items-center justify-center space-x-2 shadow-sm">
+              <span>🔊</span> <span>Nghe thử giọng mẫu Ngọc Huyền (1.1x)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 3 PANEL -->
+        <div id="panel-step-3" class="step-panel hidden space-y-4">
+          <div>
+            <h2 class="text-base font-extrabold text-white flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-xs">03</span>
+              <span>Che Mờ Vùng Phụ Đề Gốc</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Làm mờ phụ đề tiếng Trung/Anh có sẵn trên video để chuẩn bị chèn phụ đề tiếng Việt.</p>
+          </div>
+
+          <div class="bg-app-card border border-app-border rounded-xl p-4 space-y-3.5">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-slate-200">Danh sách vùng che mờ (1 vùng)</span>
+              <button onclick="alert('Đã thêm 1 vùng che mờ mới!')" class="px-3 py-1.5 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/40 text-xs font-bold">
+                + Thêm vùng
+              </button>
+            </div>
+
+            <div class="bg-app-bg border border-app-border rounded-xl p-3.5 space-y-2.5">
+              <div class="flex justify-between items-center text-xs">
+                <span class="font-bold text-slate-200 flex items-center space-x-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+                  <span>Vùng #1 (Khung phụ đề gốc chân video)</span>
+                </span>
+                <span class="px-2 py-0.5 rounded bg-app-card text-cyan-400 font-mono text-xs font-bold border border-app-border">[76% × 14%]</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs text-slate-400 font-mono bg-app-card p-2.5 rounded-lg">
+                <div>Tọa độ X: 12% | Y: 78%</div>
+                <div>Kích thước: 76% × 14%</div>
+              </div>
+
+              <div class="flex justify-between items-center text-xs pt-1">
+                <span class="text-slate-300 font-medium">Cường độ làm mờ: 85%</span>
+                <button class="text-red-400 hover:text-red-300 font-semibold">Xóa vùng</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4 PANEL -->
+        <div id="panel-step-4" class="step-panel hidden space-y-4">
+          <div>
+            <h2 class="text-base font-extrabold text-white flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-xs">04</span>
+              <span>Xử Lý Tự Động (Automation Console)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Bóc băng Whisper ➔ Dịch ChatGPT qua Edge ➔ Đồng bộ Timeline ➔ Tạo Voice Vbee.</p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="p-3.5 bg-app-card border border-emerald-500/40 rounded-xl flex items-center justify-between shadow-sm">
+              <div class="flex items-center space-x-3">
+                <div class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 flex items-center justify-center font-bold text-xs">✓</div>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">4.1 Bóc băng phụ đề gốc (Whisper AI)</div>
+                  <div class="text-[11px] text-slate-400">Đã nhận diện chuẩn xác 31 câu phụ đề</div>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-emerald-400 font-bold">100%</span>
+            </div>
+
+            <div class="p-3.5 bg-app-card border border-emerald-500/40 rounded-xl flex items-center justify-between shadow-sm">
+              <div class="flex items-center space-x-3">
+                <div class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 flex items-center justify-center font-bold text-xs">✓</div>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">4.2 Dịch ngữ cảnh chuẩn Studio (ChatGPT qua Edge)</div>
+                  <div class="text-[11px] text-slate-400">Đã dịch xong 31/31 câu sang tiếng Việt</div>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-emerald-400 font-bold">100%</span>
+            </div>
+
+            <div class="p-3.5 bg-app-card border border-emerald-500/40 rounded-xl flex items-center justify-between shadow-sm">
+              <div class="flex items-center space-x-3">
+                <div class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 flex items-center justify-center font-bold text-xs">✓</div>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">4.3 Kiểm tra kịch bản & timeline</div>
+                  <div class="text-[11px] text-slate-400">Khớp thời lượng video, đồng bộ khoảng lặng</div>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-emerald-400 font-bold">100%</span>
+            </div>
+
+            <div class="p-3.5 bg-app-card border border-emerald-500/40 rounded-xl flex items-center justify-between shadow-sm">
+              <div class="flex items-center space-x-3">
+                <div class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 flex items-center justify-center font-bold text-xs">✓</div>
+                <div>
+                  <div class="text-xs font-bold text-slate-200">4.4 Tạo giọng đọc (Vbee Dubbing qua Edge Extension)</div>
+                  <div class="text-[11px] text-slate-400">Đã tải master audio (3.8 MB) không cần mở cửa sổ phụ</div>
+                </div>
+              </div>
+              <span class="text-xs font-mono text-emerald-400 font-bold">100%</span>
+            </div>
+          </div>
+
+          <button onclick="runEntirePipeline()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-app-bg font-black text-sm tracking-wide shadow-glow-emerald flex items-center justify-center space-x-2 transition transform active:scale-95">
+            <span>⚡</span> <span>BẮT ĐẦU XỬ LÝ TOÀN BỘ</span>
+          </button>
+        </div>
+
+        <!-- STEP 5 PANEL (CURRENT) -->
+        <div id="panel-step-5" class="step-panel space-y-4 flex-1 flex flex-col">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-extrabold text-white flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-mono text-xs">05</span>
+                <span>KỊCH BẢN & XUẤT THÀNH PHẨM</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">31 câu • 0 lỗi • Đã tạo voice 31/31 câu • Sẵn sàng xuất</p>
+            </div>
+
+            <button onclick="openVbeeDubbingModal()" class="px-3.5 py-2 rounded-xl bg-app-card hover:bg-app-cardHover text-xs font-bold text-cyan-300 border border-cyan-500/30 transition flex items-center space-x-1.5 shadow-sm">
+              <span>🎙</span> <span>Tạo Voice Vbee...</span>
+            </button>
+          </div>
+
+          <!-- Subtitle Review Table -->
+          <div class="flex-1 bg-app-card border border-app-border rounded-xl overflow-hidden flex flex-col min-h-[300px] shadow-sm">
+            <div class="grid grid-cols-12 bg-app-bg px-3.5 py-2.5 text-[11px] font-bold text-slate-400 border-b border-app-border select-none">
+              <div class="col-span-1">#</div>
+              <div class="col-span-2">Timeline</div>
+              <div class="col-span-4">Câu thoại gốc (Tiếng Trung)</div>
+              <div class="col-span-4">Bản dịch tiếng Việt (Sửa trực tiếp)</div>
+              <div class="col-span-1 text-right">Voice</div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto divide-y divide-app-border text-xs" id="script-rows-container">
+              <div class="grid grid-cols-12 px-3.5 py-2.5 items-center hover:bg-app-surface/50 transition">
+                <div class="col-span-1 font-mono text-slate-400 font-bold">1</div>
+                <div class="col-span-2 font-mono text-cyan-400 text-[11px] font-semibold">00:00 ➔ 00:02</div>
+                <div class="col-span-4 text-slate-300 pr-2">大家好，今天给大家带来一个新视频。</div>
+                <div class="col-span-4">
+                  <input type="text" value="Xin chào các bạn, hôm nay tôi sẽ hướng dẫn các bạn làm video." class="w-full bg-app-bg border border-app-border rounded-lg px-2.5 py-1 text-xs text-white focus:border-cyan-500 focus:outline-none font-medium">
+                </div>
+                <div class="col-span-1 text-right">
+                  <button onclick="alert('Đang phát voice câu 1…')" class="text-cyan-400 hover:text-cyan-300 font-bold">▶</button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-12 px-3.5 py-2.5 items-center hover:bg-app-surface/50 transition">
+                <div class="col-span-1 font-mono text-slate-400 font-bold">2</div>
+                <div class="col-span-2 font-mono text-cyan-400 text-[11px] font-semibold">00:02 ➔ 00:05</div>
+                <div class="col-span-4 text-slate-300 pr-2">这个方法非常简单，任何人都能学会。</div>
+                <div class="col-span-4">
+                  <input type="text" value="Phương pháp này cực kỳ đơn giản, ai cũng có thể làm được." class="w-full bg-app-bg border border-app-border rounded-lg px-2.5 py-1 text-xs text-white focus:border-cyan-500 focus:outline-none font-medium">
+                </div>
+                <div class="col-span-1 text-right">
+                  <button onclick="alert('Đang phát voice câu 2…')" class="text-cyan-400 hover:text-cyan-300 font-bold">▶</button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-12 px-3.5 py-2.5 items-center hover:bg-app-surface/50 transition">
+                <div class="col-span-1 font-mono text-slate-400 font-bold">3</div>
+                <div class="col-span-2 font-mono text-cyan-400 text-[11px] font-semibold">00:05 ➔ 00:08</div>
+                <div class="col-span-4 text-slate-300 pr-2">首先打开软件，点击开始按钮。</div>
+                <div class="col-span-4">
+                  <input type="text" value="Đầu tiên bạn mở phần mềm lên và bấm nút bắt đầu." class="w-full bg-app-bg border border-app-border rounded-lg px-2.5 py-1 text-xs text-white focus:border-cyan-500 focus:outline-none font-medium">
+                </div>
+                <div class="col-span-1 text-right">
+                  <button onclick="alert('Đang phát voice câu 3…')" class="text-cyan-400 hover:text-cyan-300 font-bold">▶</button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-12 px-3.5 py-2.5 items-center hover:bg-app-surface/50 transition">
+                <div class="col-span-1 font-mono text-slate-400 font-bold">4</div>
+                <div class="col-span-2 font-mono text-cyan-400 text-[11px] font-semibold">00:08 ➔ 00:12</div>
+                <div class="col-span-4 text-slate-300 pr-2">整个过程全自动进行，节省你大量时间。</div>
+                <div class="col-span-4">
+                  <input type="text" value="Toàn bộ quy trình diễn ra hoàn toàn tự động, giúp bạn tiết kiệm thời gian." class="w-full bg-app-bg border border-app-border rounded-lg px-2.5 py-1 text-xs text-white focus:border-cyan-500 focus:outline-none font-medium">
+                </div>
+                <div class="col-span-1 text-right">
+                  <button onclick="alert('Đang phát voice câu 4…')" class="text-cyan-400 hover:text-cyan-300 font-bold">▶</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Export Section (2 Tiers) -->
+          <div class="space-y-3 pt-1">
+            <div class="grid grid-cols-2 gap-3.5">
+              <button onclick="alert('Đang xuất video MP4 với phụ đề tiếng Việt & âm thanh lồng tiếng hoàn chỉnh…')" class="py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md flex items-center justify-center space-x-2 transition">
+                <span>🎞</span> <span>XUẤT VIDEO MP4</span>
+              </button>
+              <button onclick="openCapcutModal()" class="py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md flex items-center justify-center space-x-2 transition">
+                <span>🎬</span> <span>XUẤT DỰ ÁN CAPCUT</span>
+              </button>
+            </div>
+
+            <div class="bg-app-card border border-app-border rounded-xl p-3.5 flex items-center justify-between text-xs">
+              <div class="flex items-center space-x-2 truncate">
+                <span class="text-slate-400 font-semibold">📁 CapCut Drafts:</span>
+                <span class="font-mono text-slate-300 truncate">com.lveditor.draft/VKDub_hehhee_20260908</span>
+              </div>
+              <div class="flex items-center space-x-2 shrink-0 ml-2">
+                <button onclick="alert('Đã mở thư mục chứa bản nháp CapCut!')" class="px-3 py-1.5 rounded-lg bg-app-bg hover:bg-app-elevated text-slate-300 border border-app-border text-[11px] font-semibold transition">
+                  📂 Mở Thư Mục
+                </button>
+                <button onclick="openCapcutModal()" class="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-app-bg font-bold text-[11px] transition shadow-glow-cyan">
+                  🚀 Mở CapCut
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 3. BOTTOM LIVE TERMINAL / DIAGNOSTICS DRAWER -->
+  <footer id="diagnostics-drawer" class="bg-app-surface border-t border-app-border z-30 transition-all duration-300 flex flex-col shrink-0 select-none">
+    <div class="h-9 px-4 bg-app-elevated flex items-center justify-between border-b border-app-border cursor-pointer select-none" onclick="toggleDrawer()">
+      <div class="flex items-center space-x-3 text-xs">
+        <span id="drawer-toggle-icon" class="text-cyan-400 font-bold">▲</span>
+        <span class="font-extrabold tracking-wider text-slate-200 uppercase text-[11px] flex items-center space-x-1.5">
+          <span>⚡</span> <span>Live Terminal & Diagnostics</span>
+        </span>
+
+        <div class="flex items-center space-x-1 ml-4" onclick="event.stopPropagation()">
+          <button onclick="filterLogs('all')" class="log-tab active px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+            Tất cả (72)
+          </button>
+          <button onclick="filterLogs('success')" class="log-tab px-2.5 py-0.5 rounded-lg text-[11px] font-semibold text-emerald-400 hover:bg-app-card transition">
+            ✓ Thành công (48)
+          </button>
+          <button onclick="filterLogs('error')" class="log-tab px-2.5 py-0.5 rounded-lg text-[11px] font-semibold text-rose-400 hover:bg-app-card transition">
+            ✖ Lỗi (0)
+          </button>
+          <button onclick="filterLogs('warn')" class="log-tab px-2.5 py-0.5 rounded-lg text-[11px] font-semibold text-amber-400 hover:bg-app-card transition">
+            ⚠ Cảnh báo (4)
+          </button>
+          <button onclick="filterLogs('bridge')" class="log-tab px-2.5 py-0.5 rounded-lg text-[11px] font-semibold text-cyan-400 hover:bg-app-card transition">
+            🔗 Bridge (20)
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3 text-xs text-slate-400">
+        <span class="text-[11px] font-mono text-emerald-400 flex items-center space-x-1.5 font-bold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>ONLINE • PORT 49814</span>
+        </span>
+      </div>
+    </div>
+
+    <div id="drawer-content" class="h-44 bg-black/90 p-3.5 font-mono text-xs overflow-y-auto space-y-1.5 select-text">
+      <div class="log-item log-bridge text-cyan-400/90">
+        <span class="text-slate-500">10:35:09</span> [INFO] Native host connected from ('127.0.0.1', 57697)
+      </div>
+      <div class="log-item log-bridge text-cyan-400/90">
+        <span class="text-slate-500">10:35:09</span> [INFO] Trình duyệt Microsoft Edge đã kết nối thành công qua VK Dub Studio Bridge.
+      </div>
+      <div class="log-item log-success text-emerald-400">
+        <span class="text-slate-500">10:35:09</span> [INFO] Trạng thái kết nối: Edge=Kết nối, ChatGPT=Đã đăng nhập, Vbee=Đã đăng nhập.
+      </div>
+      <div class="log-item log-success text-emerald-400">
+        <span class="text-slate-500">10:35:10</span> [INFO] Đã nhập video: hehhee.mp4 (720x1280, 63 giây, 30.00 fps).
+      </div>
+      <div class="log-item log-success text-emerald-400">
+        <span class="text-slate-500">10:35:12</span> [INFO] Whisper hoàn tất bóc băng: 31 câu thoại gốc.
+      </div>
+      <div class="log-item log-success text-emerald-400">
+        <span class="text-slate-500">10:35:18</span> [INFO] ChatGPT hoàn tất dịch ngữ cảnh: 31/31 câu tiếng Việt.
+      </div>
+      <div class="log-item log-bridge text-cyan-400/90">
+        <span class="text-slate-500">10:35:22</span> [INFO] Đã gửi kịch bản sang Vbee qua Edge Extension (giọng HN - Ngọc Huyền 1.1x).
+      </div>
+      <div class="log-item log-success text-emerald-400">
+        <span class="text-slate-500">10:35:35</span> [INFO] ✓ Đã nhận file master audio từ Vbee (3,842 KB) không cần mở cửa sổ phụ.
+      </div>
+      <div class="log-item log-success text-emerald-400">
+        <span class="text-slate-500">10:35:38</span> [INFO] Đã tạo project CapCut: 1 video, 1 voice tiếng Việt, 31 caption, 1 vùng xóa chữ.
+      </div>
+      <div class="log-item log-warn text-amber-400">
+        <span class="text-slate-500">10:35:40</span> [WARN] Kiểm tra timeline: 2 khoảng lặng dưới 100ms đã được căn chỉnh tự động.
+      </div>
+    </div>
+  </footer>
+
+  <!-- 4. MODALS -->
+  <div id="modal-vbee" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-app-surface border border-cyan-500/40 rounded-2xl max-w-lg w-full p-6 shadow-glow-cyan space-y-4">
+      <div class="flex justify-between items-start">
+        <div>
+          <h3 class="text-base font-extrabold text-cyan-400 flex items-center space-x-2">
+            <span>🎙</span> <span>TẠO VOICE TỰ ĐỘNG BẰNG VBEE (EDGE EXTENSION)</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">Tự động xuất SRT tiếng Việt, gửi qua tiện ích VK Dub Studio Bridge trong Edge, không cần mở trình duyệt riêng.</p>
+        </div>
+        <button onclick="closeModal('modal-vbee')" class="text-slate-400 hover:text-white text-base font-bold">✕</button>
+      </div>
+
+      <div class="bg-app-bg border border-app-border rounded-xl p-3 text-xs flex items-center justify-between">
+        <span class="text-slate-300 font-semibold" id="vbee-modal-status">Trạng thái: Sẵn sàng gửi kịch bản sang Edge…</span>
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      </div>
+
+      <div class="w-full bg-app-bg rounded-full h-2.5 overflow-hidden border border-app-border p-0.5">
+        <div id="vbee-modal-progressbar" class="bg-gradient-to-r from-cyan-500 to-emerald-500 h-full rounded-full w-4/5 transition-all duration-500"></div>
+      </div>
+
+      <div class="bg-app-bg border border-app-border rounded-xl p-3.5 space-y-2 text-xs">
+        <div class="flex items-center space-x-2 text-emerald-400 font-medium">
+          <span>✓</span> <span>Xuất file SRT tiếng Việt</span>
+        </div>
+        <div class="flex items-center space-x-2 text-emerald-400 font-medium">
+          <span>✓</span> <span>Kết nối tiện ích VK Dub Studio Bridge (Edge)</span>
+        </div>
+        <div class="flex items-center space-x-2 text-emerald-400 font-medium">
+          <span>✓</span> <span>Tải phụ đề và chọn giọng HN - Ngọc Huyền (1.1x)</span>
+        </div>
+        <div class="flex items-center space-x-2 text-emerald-400 font-medium">
+          <span>✓</span> <span>Vbee chuyển đổi phụ đề thành voice</span>
+        </div>
+        <div class="flex items-center space-x-2 text-emerald-400 font-medium">
+          <span>✓</span> <span>Tải file âm thanh kết quả (3.8 MB)</span>
+        </div>
+        <div class="flex items-center space-x-2 text-emerald-400 font-medium">
+          <span>✓</span> <span>Đồng bộ voice vào project VK Dub Studio</span>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2">
+        <button onclick="closeModal('modal-vbee')" class="px-4 py-2 rounded-xl bg-app-card hover:bg-app-cardHover text-xs font-bold text-slate-300 border border-app-border transition">
+          Đóng
+        </button>
+        <button onclick="alert('Đã lưu và đồng bộ thành công vào video!')" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-app-bg font-black text-xs shadow-md transition">
+          Áp dụng vào Project
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-capcut" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-app-surface border border-emerald-500/40 rounded-2xl max-w-md w-full p-6 shadow-glow-emerald space-y-4">
+      <div class="flex justify-between items-start">
+        <div>
+          <h3 class="text-base font-extrabold text-emerald-400 flex items-center space-x-2">
+            <span>🎬</span> <span>XUẤT DỰ ÁN CAPCUT HOÀN TẤT</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">Dự án CapCut đã được tạo với đầy đủ timeline, voice thuyết minh và vùng che chữ.</p>
+        </div>
+        <button onclick="closeModal('modal-capcut')" class="text-slate-400 hover:text-white text-base font-bold">✕</button>
+      </div>
+
+      <div class="bg-app-bg border border-app-border rounded-xl p-3.5 space-y-2.5 text-xs">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Tên dự án:</span>
+          <span class="font-mono text-slate-200 font-bold">VKDub_hehhee_20260908</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Số lượng caption:</span>
+          <span class="font-mono text-cyan-400 font-bold">31 phụ đề</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Âm thanh thuyết minh:</span>
+          <span class="font-mono text-emerald-400 font-bold">1 voice timeline</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Vùng che mờ:</span>
+          <span class="font-mono text-amber-400 font-bold">1 vùng che chữ</span>
+        </div>
+      </div>
+
+      <div class="flex space-x-2 pt-2">
+        <button onclick="alert('Đã mở thư mục CapCut Drafts!')" class="flex-1 py-2.5 rounded-xl bg-app-card hover:bg-app-cardHover text-xs font-bold text-slate-300 border border-app-border transition">
+          📂 Mở Thư Mục
+        </button>
+        <button onclick="alert('Đang khởi động phần mềm CapCut Desktop…'); closeModal('modal-capcut')" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-app-bg font-black text-xs shadow-md transition">
+          🚀 Khởi Động CapCut
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-settings" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-app-surface border border-app-border rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-app-border pb-3">
+        <h3 class="text-base font-extrabold text-white flex items-center space-x-2">
+          <span>⚙</span> <span>Cài Đặt Hệ Thống VK Dub Studio</span>
+        </h3>
+        <button onclick="closeModal('modal-settings')" class="text-slate-400 hover:text-white font-bold">✕</button>
+      </div>
+
+      <div class="flex space-x-2 text-xs border-b border-app-border pb-2">
+        <button class="px-3 py-1.5 rounded-lg bg-cyan-600 text-app-bg font-black">Voice Vbee</button>
+        <button class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold">AI ChatGPT</button>
+        <button class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold">CapCut</button>
+        <button class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white font-semibold">Hệ thống</button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <div>
+          <label class="block text-slate-200 font-bold mb-1.5">Chế độ tạo Voice Vbee:</label>
+          <select class="w-full bg-app-bg border border-app-border rounded-xl p-2.5 text-slate-200 font-medium">
+            <option selected>🌐 Tiện ích Edge Extension (VK Dub Studio Bridge — Đã đăng nhập sẵn)</option>
+            <option>⚡ API chính thức (Vbee Realtime API — Dùng App ID & Token)</option>
+            <option>🖥️ Trình duyệt Playwright độc lập (Mở cửa sổ phụ riêng)</option>
+          </select>
+          <p class="text-[11px] text-cyan-400 mt-1.5 font-medium">✓ Đang dùng chế độ Extension: Không mở trình duyệt mới, tận dụng phiên đăng nhập có sẵn.</p>
+        </div>
+
+        <div>
+          <label class="block text-slate-200 font-bold mb-1.5">Cổng kết nối nội bộ (Bridge Port):</label>
+          <input type="text" value="127.0.0.1:49814" readonly class="w-full bg-app-bg border border-app-border rounded-xl p-2 text-slate-400 font-mono">
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2 border-t border-app-border">
+        <button onclick="closeModal('modal-settings')" class="px-4 py-2 rounded-xl bg-app-card hover:bg-app-cardHover text-xs font-bold text-slate-300 border border-app-border">
+          Đóng
+        </button>
+        <button onclick="alert('Đã lưu cài đặt!'); closeModal('modal-settings')" class="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-app-bg font-black text-xs shadow-glow-cyan">
+          Lưu Cài Đặt
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. JAVASCRIPT LOGIC -->
+  <script>
+    let isPlaying = false;
+    let currentStep = 5;
+    let isDrawerOpen = true;
+
+    function switchStep(stepNumber) {
+      currentStep = stepNumber;
+
+      document.querySelectorAll('.step-nav').forEach((el, idx) => {
+        const step = idx + 1;
+        if (step === stepNumber) {
+          el.className = 'step-nav group cursor-pointer relative flex items-start p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/40 shadow-glow-cyan';
+          el.querySelector('.step-node').className = 'step-node w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-cyan-500 text-app-bg shadow-sm';
+        } else {
+          el.className = 'step-nav group cursor-pointer relative flex items-start p-2.5 rounded-xl transition-all border border-transparent hover:bg-app-card/60';
+          el.querySelector('.step-node').className = 'step-node w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 group-hover:scale-105 transition';
+        }
+      });
+
+      document.querySelectorAll('.step-panel').forEach(panel => panel.classList.add('hidden'));
+      const activePanel = document.getElementById(`panel-step-${stepNumber}`);
+      if (activePanel) {
+        activePanel.classList.remove('hidden');
+      }
+
+      const blurOverlay = document.getElementById('blur-box-overlay');
+      if (blurOverlay) {
+        blurOverlay.style.display = (stepNumber === 3) ? 'flex' : 'none';
+      }
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const playIcon = document.getElementById('play-icon');
+      const btnPlayText = document.getElementById('btn-play-text');
+      if (isPlaying) {
+        playIcon.textContent = '⏸';
+        btnPlayText.textContent = '⏸ Tạm dừng';
+      } else {
+        playIcon.textContent = '▶';
+        btnPlayText.textContent = '▶ Phát';
+      }
+    }
+
+    function updateSeek(val) {
+      const mins = Math.floor(val / 60).toString().padStart(2, '0');
+      const secs = (val % 60).toString().padStart(2, '0');
+      document.getElementById('time-current').textContent = `00:${mins}:${secs}`;
+    }
+
+    function toggleDrawer() {
+      const drawer = document.getElementById('diagnostics-drawer');
+      const content = document.getElementById('drawer-content');
+      const icon = document.getElementById('drawer-toggle-icon');
+      isDrawerOpen = !isDrawerOpen;
+      if (isDrawerOpen) {
+        content.classList.remove('hidden');
+        icon.textContent = '▲';
+      } else {
+        content.classList.add('hidden');
+        icon.textContent = '▼';
+      }
+    }
+
+    function filterLogs(category) {
+      document.querySelectorAll('.log-tab').forEach(tab => {
+        tab.className = 'log-tab px-2.5 py-0.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:bg-app-card transition';
+      });
+      event.target.className = 'log-tab active px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+
+      const items = document.querySelectorAll('.log-item');
+      items.forEach(item => {
+        if (category === 'all') {
+          item.style.display = 'block';
+        } else if (category === 'success') {
+          item.style.display = item.classList.contains('log-success') ? 'block' : 'none';
+        } else if (category === 'warn') {
+          item.style.display = item.classList.contains('log-warn') ? 'block' : 'none';
+        } else if (category === 'bridge') {
+          item.style.display = item.classList.contains('log-bridge') ? 'block' : 'none';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    function openVbeeDubbingModal() {
+      document.getElementById('modal-vbee').classList.remove('hidden');
+    }
+    function openCapcutModal() {
+      document.getElementById('modal-capcut').classList.remove('hidden');
+    }
+    function openSettingsModal() {
+      document.getElementById('modal-settings').classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function saveProject() {
+      alert('✓ Đã lưu dự án thành công vào thư mục làm việc!');
+    }
+
+    function runEntirePipeline() {
+      alert('⚡ Bắt đầu thực thi toàn bộ quy trình: Bóc băng ➔ Dịch ChatGPT ➔ Tạo Voice Vbee ➔ Xuất CapCut!');
+      openVbeeDubbingModal();
+    }
+
+    switchStep(5);
+  </script>
+</body>
+</html>
