@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VK Dub Studio Bridge",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "description": "Microsoft Edge & Chrome Bridge for VK Dub Studio Automation (ChatGPT & Vbee)",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0rUwetRNAsoPBo0o0hVtgMJJL0bQfOUs5LiCdDlMg242irjOt4L75Qr3+322+SHDUEA/lYcQglaEHKD3tSlE/pwUIhekHHadAAZnYladqLEApp9Lk1587C82LnfK9K+qmI1PM7jviNJxFdFHtHttF3O00eFYrPWw0P9ygtL92mEFFxcV1qh3lG8zWiJtRe1Ph2oOw5YjWuDFm+5WrtgfFA0xJgn9hK76Y8aCtTK+oQXGhBnzrb5p9wSDC7s6NRHUjBytONPXD1o1OonDmnfLi7ZnUjJjzHx8GX54tBcZ/7F/tBWqvUoZEwN/xIiERxxjvh4WFhnRcAu1r6yo5i5QjQIDAQAB",
   "permissions": [

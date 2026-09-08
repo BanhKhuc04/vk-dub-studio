@@ -228,15 +228,12 @@ def update_manifest(installer_path: Path) -> Path:
         "sha256": sha256,
         "file_size_bytes": file_size,
         "changelog": [
-            f"VK Dub Studio v{__version__} — Bản cập nhật vá lỗi và cải tiến trải nghiệm",
-            "Bổ sung quy trình Vbee thủ công: Tải file SRT tiếng Việt về máy và "
-            "Nhập file audio Vbee để tự động cắt ghép, đồng bộ",
-            "Vá triệt để lỗi kết nối CapCut Voice: Tích hợp sẵn bộ SDK và chuyển sang "
-            "thực thi trực tiếp in-process (không cần subprocess)",
-            "Vá triệt để lỗi kết nối VieNeu: Tự động dò tìm Python hệ thống, không còn "
-            "lỗi khi gọi từ bản đóng gói .exe",
-            "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS, xác thực SHA-256 trước khi chạy",
-            "Bảo toàn toàn bộ dự án, cấu hình và phiên đăng nhập qua các lần cập nhật",
+            f"VK Dub Studio v{__version__} — Vá triệt để lỗi Vbee & FFmpeg trên máy tính khác",
+            "Khắc phục hoàn toàn lỗi [WinError 2] The system cannot find the file specified ở Bước 4.4 khi tạo master timeline audio",
+            "Tự động nhận diện công cụ FFmpeg và ffprobe trong thư mục tools/ của ứng dụng và tự động nạp vào PATH hệ thống",
+            "Cơ chế Fallback an toàn 100%: Tự động sử dụng trực tiếp file audio Vbee vừa tải về khi máy tính thiếu FFmpeg, không ngắt quãng quy trình tự động",
+            "Nâng cấp Extension v2.1.9 đồng bộ hóa kết nối Edge Bridge mượt mà",
+            "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS với xác thực mã băm SHA-256",
         ],
     }
 

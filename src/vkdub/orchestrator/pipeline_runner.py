@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.domain.project import Project
+from vkdub.media.process import find_tool
 from vkdub.media.timeline_audio import build_master_timeline_audio, get_audio_duration_ms
 from vkdub.orchestrator.checkpoint import load_checkpoint, save_checkpoint
 from vkdub.orchestrator.pipeline_state import (
@@ -614,11 +615,18 @@ class PipelineRunner(QThread):
                     )
                     self.artifacts.vbee_master_audio = saved_vbee_audio
                     audio_size_kb = saved_vbee_audio.stat().st_size // 1024 if saved_vbee_audio.exists() else 0
-                    self.log_emitted.emit(
-                        f"✓ Đã nhận file audio từ Vbee ({audio_size_kb} KB). Đang dùng FFmpeg căn chỉnh timeline master..."
-                    )
+                    ffmpeg_exe = find_tool("ffmpeg")
+                    if ffmpeg_exe:
+                        self.log_emitted.emit(
+                            f"✓ Đã nhận file audio từ Vbee ({audio_size_kb} KB). Đang dùng FFmpeg căn chỉnh timeline master..."
+                        )
+                    else:
+                        self.log_emitted.emit(
+                            f"✓ Đã nhận file audio từ Vbee ({audio_size_kb} KB). Đang hoàn thiện timeline master..."
+                        )
                 else:
                     saved_vbee_audio = master_audio_path
+                    ffmpeg_exe = find_tool("ffmpeg")
 
                 self._update_substep(
                     "4.4",
@@ -632,6 +640,7 @@ class PipelineRunner(QThread):
                     srt_path=trans_srt_path,
                     output_path=timeline_audio_path,
                     total_duration_ms=self.project.duration_ms,
+                    ffmpeg_exe=ffmpeg_exe,
                 )
 
                 duration = time.monotonic() - t0

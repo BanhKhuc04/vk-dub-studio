@@ -9,13 +9,24 @@ from vkdub.media.ffprobe import parse_metadata
 
 
 def find_tool(name: str) -> str | None:
+    def _inject_and_return(filepath: Path | str) -> str:
+        resolved = str(Path(filepath).resolve())
+        # Inject tool's parent directory into PATH so short calls (ffmpeg) work everywhere
+        parent_dir = str(Path(resolved).parent)
+        cur_path = os.environ.get("PATH", "")
+        paths = [p.lower() for p in cur_path.split(os.pathsep) if p]
+        if parent_dir.lower() not in paths:
+            os.environ["PATH"] = f"{parent_dir}{os.pathsep}{cur_path}"
+        return resolved
+
     # 1. Explicit environment override (e.g. FFMPEG_PATH, FFPROBE_PATH)
     configured = os.environ.get(f"{name.upper()}_PATH")
     if configured:
         path = Path(configured).expanduser()
-        return str(path.resolve()) if path.is_file() else None
+        if path.is_file():
+            return _inject_and_return(path)
 
-    # 2. Bundled tools inside application directory (production standalone bundle)
+    # 2. Bundled tools inside application directory (production standalone bundle or repo)
     base_dirs: list[Path] = []
     if getattr(sys, "frozen", False):
         exe_dir = Path(sys.executable).parent
@@ -26,28 +37,58 @@ def find_tool(name: str) -> str | None:
         repo_root = Path(__file__).resolve().parents[3]
         base_dirs.extend([repo_root, repo_root / "resources"])
 
+    try:
+        base_dirs.append(Path.cwd())
+        if sys.argv and sys.argv[0]:
+            base_dirs.append(Path(sys.argv[0]).resolve().parent)
+    except Exception:
+        pass
+
     for b in base_dirs:
-        for sub in ["", "tools", "tools/ffmpeg", "bin", "_internal/tools", "resources/tools"]:
+        for sub in ["", "tools", "tools/ffmpeg", "bin", "_internal/tools", "resources/tools", "resources"]:
             candidate = (b / sub / f"{name}.exe") if os.name == "nt" else (b / sub / name)
             if candidate.is_file():
-                return str(candidate.resolve())
+                return _inject_and_return(candidate)
 
     # 3. System PATH
     found = shutil.which(name)
     if found:
-        return found
+        return _inject_and_return(found)
 
     # 4. Windows WinGet paths
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
         winget_links = Path(local_app_data) / "Microsoft" / "WinGet" / "Links" / f"{name}.exe"
         if winget_links.is_file():
-            return str(winget_links.resolve())
+            return _inject_and_return(winget_links)
         pkg_dir = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
         if pkg_dir.is_dir():
             for exe in pkg_dir.glob(f"**/{name}.exe"):
                 if exe.is_file():
-                    return str(exe.resolve())
+                    return _inject_and_return(exe)
+
+    # 5. Common Windows installation directories
+    if os.name == "nt":
+        common_candidates: list[Path] = [
+            Path("C:/ffmpeg/bin") / f"{name}.exe",
+            Path("C:/tools/ffmpeg/bin") / f"{name}.exe",
+            Path("C:/Program Files/ffmpeg/bin") / f"{name}.exe",
+            Path("C:/Program Files (x86)/ffmpeg/bin") / f"{name}.exe",
+        ]
+        program_files = os.environ.get("PROGRAMFILES")
+        if program_files:
+            common_candidates.append(Path(program_files) / "ffmpeg" / "bin" / f"{name}.exe")
+        user_profile = os.environ.get("USERPROFILE")
+        if user_profile:
+            common_candidates.append(Path(user_profile) / "scoop" / "shims" / f"{name}.exe")
+        all_users = os.environ.get("ALLUSERSPROFILE")
+        if all_users:
+            common_candidates.append(Path(all_users) / "chocolatey" / "bin" / f"{name}.exe")
+
+        for cand in common_candidates:
+            if cand.is_file():
+                return _inject_and_return(cand)
+
     return None
 
 

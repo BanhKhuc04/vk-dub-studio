@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vk-dub-studio"
-version = "2.1.8"
+version = "2.1.9"
 description = "Auto-dubbing pipeline for short drama & Douyin clips"
 requires-python = ">=3.12,<3.14"
 dependencies = ["PySide6>=6.8,<6.11", "faster-whisper>=1.2,<2", "httpx>=0.28,<1", "keyring>=25,<26", "numpy>=2,<3", "playwright>=1.40,<2"]
