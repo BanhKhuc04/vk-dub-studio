@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -39,6 +41,7 @@ class SubstepConsoleCard(QFrame):
 
     retry_requested = Signal(str)
     open_artifact_requested = Signal(object)
+    import_srt_requested = Signal()
 
     STATUS_MAP = {
         SubstepStatus.PENDING: ("○", "#475569", "Chờ"),
@@ -58,6 +61,8 @@ class SubstepConsoleCard(QFrame):
         self._current_status = SubstepStatus.PENDING
 
         self.setObjectName("substepCard")
+        self.setMinimumHeight(78)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self._apply_card_style(SubstepStatus.PENDING)
 
         self._spin_timer = QTimer(self)
@@ -67,24 +72,26 @@ class SubstepConsoleCard(QFrame):
         self._spin_idx = 0
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(5)
 
         # Header: Icon + Step ID & Title + Duration badge
         header_row = QHBoxLayout()
         header_row.setSpacing(8)
+        header_row.setContentsMargins(0, 0, 0, 0)
 
         self.lbl_icon = QLabel("○")
-        self.lbl_icon.setFixedSize(24, 24)
+        self.lbl_icon.setFixedSize(22, 22)
         self.lbl_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_icon.setStyleSheet("""
             font-size: 12px; font-weight: bold; color: #475569;
             background-color: #0c111c; border: 2px solid #1e293b;
-            border-radius: 12px;
+            border-radius: 11px;
         """)
         header_row.addWidget(self.lbl_icon)
 
         self.lbl_title = QLabel(f"<b>{step_id}</b> {title}")
+        self.lbl_title.setMinimumHeight(20)
         self.lbl_title.setStyleSheet("font-size: 12px; color: #cbd5e1; font-weight: 500;")
         header_row.addWidget(self.lbl_title, 1)
 
@@ -98,7 +105,7 @@ class SubstepConsoleCard(QFrame):
         self.step_progress = QProgressBar()
         self.step_progress.setRange(0, 100)
         self.step_progress.setValue(0)
-        self.step_progress.setFixedHeight(3)
+        self.step_progress.setFixedHeight(4)
         self.step_progress.setTextVisible(False)
         self.step_progress.setStyleSheet("""
             QProgressBar {
@@ -115,13 +122,14 @@ class SubstepConsoleCard(QFrame):
 
         # Message / Summary line
         self.lbl_summary = QLabel("Đang chờ...")
-        self.lbl_summary.setStyleSheet("font-size: 11px; color: #475569; padding-left: 32px;")
+        self.lbl_summary.setMinimumHeight(18)
+        self.lbl_summary.setStyleSheet("font-size: 11px; color: #475569; padding-left: 30px;")
         self.lbl_summary.setWordWrap(True)
         layout.addWidget(self.lbl_summary)
 
-        # Action row (Retry button, open artifact, tech details toggle)
+        # Action row (Retry button, open artifact, tech details toggle, import srt)
         self.action_row = QHBoxLayout()
-        self.action_row.setContentsMargins(32, 2, 0, 0)
+        self.action_row.setContentsMargins(30, 2, 0, 0)
         self.action_row.setSpacing(8)
 
         self.btn_open_file = QPushButton("📂 Mở file kết quả")
@@ -150,6 +158,21 @@ class SubstepConsoleCard(QFrame):
         self.btn_retry.hide()
         self.btn_retry.clicked.connect(lambda: self.retry_requested.emit(self.step_id))
         self.action_row.addWidget(self.btn_retry)
+
+        if self.step_id == "4.2":
+            self.btn_import_srt = QPushButton("📥 Nạp file SRT dịch")
+            self.btn_import_srt.setToolTip(
+                "Nạp file phụ đề dịch đã tải từ ChatGPT hoặc có sẵn để tiếp tục ngay không cần dịch lại"
+            )
+            self.btn_import_srt.setStyleSheet("""
+                QPushButton {
+                    background-color: #082f49; color: #38bdf8; border: 1px solid #0284c7;
+                    border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 600;
+                }
+                QPushButton:hover { background-color: #0c4a6e; color: #ffffff; border-color: #38bdf8; }
+            """)
+            self.btn_import_srt.clicked.connect(self.import_srt_requested.emit)
+            self.action_row.addWidget(self.btn_import_srt)
 
         self.btn_toggle_details = QPushButton("Technical details ›")
         self.btn_toggle_details.setStyleSheet("""
@@ -352,6 +375,7 @@ class Step4AutomationPanel(QFrame):
     retry_step_requested = Signal(str)
     continue_requested = Signal()
     open_log_requested = Signal()
+    import_srt_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -368,9 +392,44 @@ class Step4AutomationPanel(QFrame):
             }
         """)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #050810;
+                width: 6px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background: #1e293b;
+                min-height: 24px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #0284c7;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+
+        container = QWidget()
+        container.setObjectName("step4Container")
+        container.setStyleSheet("QWidget#step4Container { background-color: #050810; }")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(12)
 
         # 1. Header & Overall State Badge
         header_row = QHBoxLayout()
@@ -479,6 +538,8 @@ class Step4AutomationPanel(QFrame):
         for s_id, s_title in substep_configs:
             card = SubstepConsoleCard(s_id, s_title)
             card.retry_requested.connect(self.retry_step_requested.emit)
+            if s_id == "4.2":
+                card.import_srt_requested.connect(self.import_srt_requested.emit)
             self.substeps[s_id] = card
             cards_col.addWidget(card)
         layout.addLayout(cards_col)
@@ -550,6 +611,9 @@ class Step4AutomationPanel(QFrame):
         """)
         self.btn_continue.clicked.connect(self.continue_requested.emit)
         layout.addWidget(self.btn_continue)
+
+        scroll.setWidget(container)
+        main_layout.addWidget(scroll)
 
     def auto_voice_checked(self) -> bool:
         return self.chk_auto_voice.isChecked()

@@ -126,11 +126,12 @@ def parse_cues(raw_srt: str) -> list[Cue]:
     return cues
 
 
-def format_cues_to_srt(cues: list[Cue]) -> str:
+def format_cues_to_srt(cues: list[Cue], preserve_indices: bool = False) -> str:
     """Format a list of Cues back into standard SRT string."""
     output = []
     for idx, cue in enumerate(cues, 1):
-        output.append(str(idx))
+        num = cue.index if preserve_indices else idx
+        output.append(str(num))
         output.append(f"{cue.start_raw} --> {cue.end_raw}")
         output.append(cue.text)
         output.append("")

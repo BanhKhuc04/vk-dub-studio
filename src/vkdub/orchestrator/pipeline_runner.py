@@ -25,7 +25,12 @@ from vkdub.orchestrator.pipeline_state import (
 )
 from vkdub.domain.transcript import srt_timestamp
 from vkdub.services.srt_service import parse_srt, write_srt
-from vkdub.services.srt_validator import validate_and_repair_srt
+from vkdub.services.srt_validator import (
+    Cue,
+    format_cues_to_srt,
+    parse_cues,
+    validate_and_repair_srt,
+)
 from vkdub.utils.paths import workspace_root
 
 logger = logging.getLogger("vkdub.pipeline_runner")
@@ -277,45 +282,125 @@ class PipelineRunner(QThread):
                 trans_srt_path = self.artifacts.translated_srt or (self.output_dir / "translated.srt")
                 if not (trans_srt_path and trans_srt_path.is_file()):
                     self.state = PipelineState.TRANSLATING
-                    self.state_changed.emit(self.state, "Đang gửi phụ đề sang ChatGPT qua Edge...")
-                    self._update_substep(
-                        "4.2",
-                        SubstepStatus.RUNNING,
-                        15,
-                        "Đang kết nối ChatGPT trong Edge...",
-                    )
+                    self.state_changed.emit(self.state, "Đang chuẩn bị gửi phụ đề sang ChatGPT...")
                     t0 = time.monotonic()
 
                     assert orig_srt_path is not None
                     raw_original_srt = orig_srt_path.read_text(encoding="utf-8", errors="replace")
 
-                    num_lines = raw_original_srt.count("-->")
-                    try:
-                        d_orig = parse_srt(raw_original_srt)
-                        f_tc = srt_timestamp(d_orig.lines[0].start_ms / 1000) if d_orig.lines else "00:00:00"
-                        l_tc = srt_timestamp(d_orig.lines[-1].end_ms / 1000) if d_orig.lines else "00:00:00"
-                        range_str = f"từ đoạn {f_tc[:8]} ➔ {l_tc[:8]}"
-                    except Exception:
-                        range_str = ""
+                    orig_cues = parse_cues(raw_original_srt)
+                    total_cues = len(orig_cues)
+                    if total_cues == 0:
+                        raise ValueError("File phụ đề gốc (original.srt) rỗng hoặc không có câu thoại nào.")
 
+                    f_tc = orig_cues[0].start_raw[:8]
+                    l_tc = orig_cues[-1].end_raw[:8]
+                    range_str = f"từ đoạn {f_tc} ➔ {l_tc}"
+
+                    CHUNK_SIZE = 35
+                    if total_cues <= 40:
+                        chunks = [orig_cues]
+                    else:
+                        chunks = [
+                            orig_cues[i : i + CHUNK_SIZE]
+                            for i in range(0, total_cues, CHUNK_SIZE)
+                        ]
+
+                    total_chunks = len(chunks)
+                    if total_chunks > 1:
+                        self.log_emitted.emit(
+                            f"📝 Phụ đề dài ({total_cues} câu, {range_str}): "
+                            f"Tự động chia thành {total_chunks} đoạn (mỗi đoạn ~{CHUNK_SIZE} câu) "
+                            f"để ChatGPT dịch trọn vẹn không bị tràn giới hạn token..."
+                        )
+                    else:
+                        self.log_emitted.emit(
+                            f"📝 Gửi {total_cues} câu phụ đề ({range_str}) sang ChatGPT qua Edge để dịch ngữ cảnh..."
+                        )
+
+                    all_trans_cues: list[Cue] = []
+
+                    for chunk_idx, chunk in enumerate(chunks, 1):
+                        if self.cancel_event.is_set():
+                            self.pipeline_cancelled.emit()
+                            return
+
+                        start_num = chunk[0].index
+                        end_num = chunk[-1].index
+                        chunk_count = len(chunk)
+                        chunk_srt_text = format_cues_to_srt(chunk, preserve_indices=True)
+
+                        pct = int(15 + ((chunk_idx - 1) / total_chunks) * 70)
+                        if total_chunks > 1:
+                            chunk_msg = f"ChatGPT đang dịch đoạn {chunk_idx}/{total_chunks} (câu {start_num}-{end_num})..."
+                            self.log_emitted.emit(
+                                f"  🤖 [Đoạn {chunk_idx}/{total_chunks}] Gửi {chunk_count} câu "
+                                f"(từ câu #{start_num} đến #{end_num}) sang ChatGPT..."
+                            )
+                        else:
+                            chunk_msg = f"ChatGPT đang dịch ({total_cues} câu)..."
+
+                        self._update_substep("4.2", SubstepStatus.WAITING, pct, chunk_msg)
+
+                        prompt_instr = (
+                            f"Dịch đoạn phụ đề SRT sau đây sang tiếng Việt (từ câu {start_num} đến câu {end_num}, đúng {chunk_count} câu):\n"
+                            "- Sát nghĩa, tự nhiên, đúng bối cảnh và cảm xúc câu chuyện.\n"
+                            f"- Giữ nguyên 100% định dạng SRT, số thứ tự câu ({start_num} đến {end_num}) và toàn bộ mốc thời gian (timecode).\n"
+                            "- Không gộp câu, không tách câu, không bỏ sót bất kỳ câu nào.\n"
+                            "- Tuyệt đối không thay đổi mốc thời gian.\n"
+                            "- Xuất toàn bộ kết quả trong khối mã ```srt."
+                        )
+
+                        raw_chunk_trans = self.local_agent.translate_srt_sync(
+                            chunk_srt_text,
+                            prompt_instruction=prompt_instr,
+                            timeout_s=360.0,
+                        )
+
+                        parsed_chunk_cues = parse_cues(raw_chunk_trans)
+                        if not parsed_chunk_cues:
+                            raise ValueError(
+                                f"Không trích xuất được câu phụ đề nào từ kết quả dịch đoạn {chunk_idx}/{total_chunks}."
+                            )
+
+                        if len(parsed_chunk_cues) != chunk_count:
+                            self.log_emitted.emit(
+                                f"  ℹ Đoạn {chunk_idx}: bản dịch có {len(parsed_chunk_cues)} câu "
+                                f"(gốc có {chunk_count} câu). Đang tự động đối soát và khớp timecode gốc..."
+                            )
+
+                        for k, orig_c in enumerate(chunk):
+                            if k < len(parsed_chunk_cues):
+                                trans_c = parsed_chunk_cues[k]
+                                cue_text = trans_c.text.strip() or orig_c.text.strip()
+                            else:
+                                cue_text = orig_c.text.strip()
+
+                            all_trans_cues.append(
+                                Cue(
+                                    index=orig_c.index,
+                                    start_raw=orig_c.start_raw,
+                                    end_raw=orig_c.end_raw,
+                                    text=cue_text,
+                                    start_ms=orig_c.start_ms,
+                                    end_ms=orig_c.end_ms,
+                                )
+                            )
+
+                        if total_chunks > 1:
+                            self.log_emitted.emit(
+                                f"  ✓ Đã hoàn thành đoạn {chunk_idx}/{total_chunks} ({chunk_count} câu)."
+                            )
+                        if chunk_idx < total_chunks:
+                            time.sleep(1.0)
+
+                    raw_translated_srt = format_cues_to_srt(all_trans_cues)
                     self.log_emitted.emit(
-                        f"📝 Gửi {num_lines} câu phụ đề ({range_str}) sang ChatGPT qua Edge để dịch ngữ cảnh..."
-                    )
-                    self._update_substep(
-                        "4.2",
-                        SubstepStatus.WAITING,
-                        45,
-                        f"ChatGPT đang dịch ({num_lines} câu)...",
-                    )
-                    raw_translated_srt = self.local_agent.translate_srt_sync(
-                        raw_original_srt, timeout_s=360.0
-                    )
-                    self.log_emitted.emit(
-                        f"✓ Đã nhận bản dịch từ ChatGPT ({len(raw_translated_srt)} ký tự). Đang đối soát và chuẩn hóa timecode..."
+                        f"✓ Đã hoàn tất toàn bộ {total_chunks} đoạn dịch. Đang đối soát và chuẩn hóa 100% timecode..."
                     )
 
                     self._update_substep(
-                        "4.2", SubstepStatus.VALIDATING, 85, "Đang kiểm tra và sửa lỗi timecode..."
+                        "4.2", SubstepStatus.VALIDATING, 90, "Đang kiểm tra và hoàn thiện file phụ đề..."
                     )
                     val_res = validate_and_repair_srt(
                         raw_original_srt, raw_translated_srt, auto_repair_timecodes=True

@@ -14,7 +14,7 @@ def test_version_is_semantic():
     parts = __version__.split(".")
     assert len(parts) >= 3
     assert all(p.isdigit() for p in parts[:3])
-    assert __version__ == "2.1.7"
+    assert __version__ == "2.1.8"
 
 
 def test_resource_path_resolution(tmp_path):

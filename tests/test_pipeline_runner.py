@@ -193,3 +193,60 @@ def test_pipeline_runner_voice_only_step_4_4(qapp, tmp_path, monkeypatch):
     assert s44.status == SubstepStatus.SUCCESS
     assert runner.state == PipelineState.REVIEW_READY
 
+
+def test_pipeline_runner_chunked_chatgpt_translation(qapp, tmp_path):
+    """Test that a 140-cue original SRT is automatically chunked into batches of 35 cues."""
+    from unittest.mock import MagicMock
+    from vkdub.domain.transcript import srt_timestamp
+    from vkdub.services.srt_validator import parse_cues
+
+    # Create 140 cues with valid timestamps
+    lines = []
+    for i in range(1, 141):
+        s_sec = (i - 1) * 2.0
+        e_sec = s_sec + 1.5
+        s_tc = srt_timestamp(s_sec)
+        e_tc = srt_timestamp(e_sec)
+        lines.append(f"{i}\n{s_tc} --> {e_tc}\nOriginal sentence #{i}\n")
+    orig_content = "\n".join(lines)
+    orig_file = tmp_path / "original.srt"
+    orig_file.write_text(orig_content, encoding="utf-8")
+
+    project = Project()
+    agent = LocalAgent()
+
+    # Mock translate_srt_sync to simulate ChatGPT translating each chunk cleanly
+    def mock_translate(chunk_srt, prompt_instruction="", timeout_s=360.0):
+        chunk_cues = parse_cues(chunk_srt)
+        trans_lines = []
+        for c in chunk_cues:
+            trans_lines.append(f"{c.index}\n{c.start_raw} --> {c.end_raw}\nCâu dịch tiếng Việt #{c.index}\n")
+        return "\n".join(trans_lines)
+
+    agent.translate_srt_sync = MagicMock(side_effect=mock_translate)
+
+    runner = PipelineRunner(
+        project=project,
+        local_agent=agent,
+        output_dir=tmp_path,
+        auto_voice=False,
+    )
+    runner.run()
+
+    s42 = next(s for s in runner.substeps if s.id == "4.2")
+    assert s42.status == SubstepStatus.SUCCESS
+    assert "140" in s42.message
+
+    # 140 cues divided by CHUNK_SIZE (35) must equal exactly 4 calls
+    assert agent.translate_srt_sync.call_count == 4
+
+    # Verify final translated.srt
+    trans_file = tmp_path / "translated.srt"
+    assert trans_file.is_file()
+    final_cues = parse_cues(trans_file.read_text(encoding="utf-8"))
+    assert len(final_cues) == 140
+    assert final_cues[0].text == "Câu dịch tiếng Việt #1"
+    assert final_cues[139].text == "Câu dịch tiếng Việt #140"
+    assert final_cues[139].index == 140
+
+

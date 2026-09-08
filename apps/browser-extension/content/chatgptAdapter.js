@@ -207,6 +207,11 @@
       ? `${prompt_instruction}\n\n${srt_content}`
       : defaultInstruction;
 
+    // Record assistant message count prior to sending new prompt
+    const initialAssistantCount = document.querySelectorAll(
+      "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
+    ).length;
+
     // 3. Inject text into input element
     insertPromptText(inputEl, promptText);
     await new Promise((r) => setTimeout(r, 800));
@@ -248,16 +253,27 @@
       }
     }
 
-    console.log("[ChatGPTAdapter] Prompt submitted. Waiting for generation to complete...");
+    console.log("[ChatGPTAdapter] Prompt submitted. Waiting for generation to begin...");
     try {
       chrome.runtime.sendMessage({
         action: "LOG_EVENT",
-        message: "ChatGPT: Đã gửi kịch bản sang AI. Đang chờ AI phản hồi...",
+        message: "ChatGPT: Đã gửi kịch bản sang AI. Đang chờ AI bắt đầu phản hồi...",
       });
     } catch (e) {}
 
-    // 5. Wait for streaming to start then complete
-    await new Promise((r) => setTimeout(r, 2500));
+    // 5. Wait for streaming to begin
+    let hasStarted = false;
+    const waitStart = Date.now();
+    while (Date.now() - waitStart < 15000) {
+      const currentAssistantCount = document.querySelectorAll(
+        "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
+      ).length;
+      if (isGenerating() || currentAssistantCount > initialAssistantCount) {
+        hasStarted = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
 
     const startTime = Date.now();
     const maxWaitMs = 360000; // 6 minutes max
@@ -297,25 +313,32 @@
         } catch (e) {}
       }
 
-      if (!generating) {
+      if (!generating && (hasStarted || (Date.now() - startTime > 4000))) {
         // Wait an extra 1.5s to ensure DOM finalized
         await new Promise((r) => setTimeout(r, 1500));
         if (!isGenerating()) {
-          const srtResult = extractSRTFromResponses();
-          if (srtResult && srtResult.includes("-->")) {
-            console.log("[ChatGPTAdapter] Translation extracted successfully!");
-            const totalCues = (srtResult.match(/-->/g) || []).length;
-            try {
-              chrome.runtime.sendMessage({
-                action: "LOG_EVENT",
-                message: `ChatGPT: Đã hoàn tất tạo bản dịch (${totalCues} câu)! Đang gửi dữ liệu về VK Dub Studio...`,
-              });
-            } catch (e) {}
-            return {
-              success: true,
-              translated_srt: srtResult,
-              request_id: request_id,
-            };
+          const assistantMessages = Array.from(
+            document.querySelectorAll(
+              "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
+            )
+          );
+          if (assistantMessages.length > initialAssistantCount || initialAssistantCount === 0) {
+            const srtResult = extractSRTFromResponses();
+            if (srtResult && srtResult.includes("-->")) {
+              console.log("[ChatGPTAdapter] Translation extracted successfully!");
+              const totalCues = (srtResult.match(/-->/g) || []).length;
+              try {
+                chrome.runtime.sendMessage({
+                  action: "LOG_EVENT",
+                  message: `ChatGPT: Đã hoàn tất tạo bản dịch (${totalCues} câu)! Đang gửi dữ liệu về VK Dub Studio...`,
+                });
+              } catch (e) {}
+              return {
+                success: true,
+                translated_srt: srtResult,
+                request_id: request_id,
+              };
+            }
           }
         }
       }

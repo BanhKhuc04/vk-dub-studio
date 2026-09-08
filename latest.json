@@ -1,15 +1,15 @@
 {
-  "version": "2.1.7",
-  "published_at": "2026-09-08T14:50:27Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.7/VKDubStudio-Setup-2.1.7.exe",
-  "sha256": "dec38eb2c0e140a8275c2a4d96ef5ef33a5b160cd668bd044fd1a0ab8813fc33",
-  "file_size_bytes": 301829096,
+  "version": "2.1.8",
+  "published_at": "2026-09-08T15:32:06Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.8/VKDubStudio-Setup-2.1.8.exe",
+  "sha256": "ef51c63d3c3290e13c8ced3f84659041a1e53cc20871e391e6b32541929dae35",
+  "file_size_bytes": 301830537,
   "changelog": [
-    "VK Dub Studio v2.1.7 — Dual-Channel WebSocket Bridge & Fix kết nối Extension",
-    "Nâng cấp cầu nối Extension: Hỗ trợ WebSocket trực tiếp kết nối ngay lập tức trên mọi máy tính không cần Python",
-    "Sửa triệt để lỗi không nhận diện tiện ích Extension khi cài đặt trên máy mới",
-    "Tự động tạo Native Messaging Manifest chuẩn xác theo thư mục cài đặt thực tế",
-    "Đồng bộ Extension v2.1.7 với giao diện và logo Cyber Obsidian Pro Studio",
-    "Cập nhật an toàn qua HTTPS với xác thực SHA-256"
+    "VK Dub Studio v2.1.8 — Fix giao diện Bước 04 & Dịch kịch bản dài ChatGPT",
+    "Sửa triệt để lỗi giao diện Bước 04: Thêm thanh cuộn QScrollArea, cố định chiều cao và khoảng cách các thẻ để không bao giờ bị đè chữ hay cắt tiến trình",
+    "Tự động chia nhỏ kịch bản dài khi dịch ChatGPT: Tự động phân đoạn ~35 câu khi dịch (ví dụ 140 câu chia thành 4 đoạn) giúp ChatGPT dịch trọn vẹn 100% không bị ngắt quãng giữa chừng",
+    "Thêm nút '📥 Nạp file SRT dịch' tại Thẻ 4.2: Cho phép chọn nạp trực tiếp file SRT dịch nếu bạn tự gửi file vào ChatGPT hoặc có sẵn file dịch",
+    "Nâng cấp Extension v2.1.8: Quét thông minh mọi tab ChatGPT/Vbee trên Edge kể cả tab đang ngủ (sleeping tabs)",
+    "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS với xác thực SHA-256"
   ]
 }

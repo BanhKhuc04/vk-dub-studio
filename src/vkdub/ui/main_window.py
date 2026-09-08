@@ -210,6 +210,7 @@ class MainWindow(QMainWindow):
         self.step4_panel.start_requested.connect(self._start_pipeline_runner)
         self.step4_panel.cancel_requested.connect(self._cancel_pipeline_runner)
         self.step4_panel.retry_step_requested.connect(self._retry_pipeline_step)
+        self.step4_panel.import_srt_requested.connect(self._on_import_chatgpt_srt_clicked)
         self.step4_panel.continue_requested.connect(lambda: self.switch_to_step(4))
         self.step4_panel.btn_health_check.clicked.connect(self._on_health_check_clicked)
 
@@ -878,6 +879,84 @@ class MainWindow(QMainWindow):
                 if m_tl.exists():
                     m_tl.unlink()
         self._start_pipeline_runner()
+
+    def _on_import_chatgpt_srt_clicked(self) -> None:
+        """Cho phép người dùng nạp trực tiếp file phụ đề SRT đã dịch vào bước 4.2."""
+        if not self.project.video_path:
+            QMessageBox.warning(
+                self,
+                "Chưa chọn video",
+                "Vui lòng chọn video nguồn (Bước 01) trước khi nạp file phụ đề dịch.",
+            )
+            return
+
+        out_name = self.project.video_path.stem or "dubbing"
+        output_dir = workspace_root() / "export" / out_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        orig_srt_path = output_dir / "original.srt"
+        if not orig_srt_path.is_file():
+            QMessageBox.warning(
+                self,
+                "Chưa có phụ đề gốc",
+                "Chưa tìm thấy file phụ đề gốc (original.srt) để đối soát khớp timecode.\n\n"
+                "👉 Vui lòng nhấn 'BẮT ĐẦU XỬ LÝ TOÀN BỘ' để hoàn thành bước 4.1 Bóc băng trước khi nạp file dịch.",
+            )
+            return
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Chọn file phụ đề SRT đã dịch",
+            str(output_dir),
+            "SubRip Subtitle (*.srt);;Tất cả các tệp (*.*)",
+        )
+        if not file_path:
+            return
+
+        try:
+            chosen_path = Path(file_path)
+            raw_translated = chosen_path.read_text(encoding="utf-8", errors="replace")
+            raw_original = orig_srt_path.read_text(encoding="utf-8", errors="replace")
+
+            from vkdub.services.srt_validator import validate_and_repair_srt
+
+            val_res = validate_and_repair_srt(
+                raw_original, raw_translated, auto_repair_timecodes=True
+            )
+            if not val_res.is_valid:
+                errors_str = "\n• ".join(val_res.errors)
+                QMessageBox.warning(
+                    self,
+                    "Phụ đề dịch không hợp lệ",
+                    f"File phụ đề dịch không khớp với phụ đề gốc:\n\n• {errors_str}\n\n"
+                    "Vui lòng kiểm tra lại số lượng câu thoại trong file.",
+                )
+                return
+
+            final_content = val_res.repaired_srt or raw_translated
+            dest_trans_path = output_dir / "translated.srt"
+            dest_trans_path.write_text(final_content, encoding="utf-8")
+
+            self.log(
+                f"✓ Đã nạp thành công file phụ đề dịch: {chosen_path.name} ({val_res.cue_count} câu)"
+            )
+            self.notify_success(
+                "Nạp phụ đề dịch thành công",
+                f"Đã khớp {val_res.cue_count} câu thoại với file gốc.",
+            )
+
+            if hasattr(self, "step4_panel"):
+                self.step4_panel.update_substep(
+                    "4.2",
+                    SubstepStatus.SUCCESS,
+                    100,
+                    f"Đã nạp file dịch ({val_res.cue_count} câu)",
+                    artifact=dest_trans_path,
+                )
+            self._on_pipeline_artifact_ready("translated_srt", dest_trans_path)
+
+        except Exception as exc:
+            self._error(f"Không thể đọc file SRT dịch: {exc}")
 
     def _on_health_check_clicked(self) -> None:
         self.log("🔍 Đang gửi yêu cầu làm mới và kiểm tra trạng thái tới Edge Extension...")
