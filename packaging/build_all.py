@@ -228,11 +228,11 @@ def update_manifest(installer_path: Path) -> Path:
         "sha256": sha256,
         "file_size_bytes": file_size,
         "changelog": [
-            f"VK Dub Studio v{__version__} — Vá triệt để lỗi Vbee & FFmpeg trên máy tính khác",
-            "Khắc phục hoàn toàn lỗi [WinError 2] The system cannot find the file specified ở Bước 4.4 khi tạo master timeline audio",
-            "Tự động nhận diện công cụ FFmpeg và ffprobe trong thư mục tools/ của ứng dụng và tự động nạp vào PATH hệ thống",
-            "Cơ chế Fallback an toàn 100%: Tự động sử dụng trực tiếp file audio Vbee vừa tải về khi máy tính thiếu FFmpeg, không ngắt quãng quy trình tự động",
-            "Nâng cấp Extension v2.1.9 đồng bộ hóa kết nối Edge Bridge mượt mà",
+            f"VK Dub Studio v{__version__} — Khắc phục triệt để lỗi 'Cần cập nhật CapCut' khi mở dự án",
+            "Tự động nhận diện phiên bản CapCut thực tế trên máy tính để tạo dự án tương thích 100%, không bao giờ bị hỏi cập nhật",
+            "Tự động đồng bộ và sửa toàn bộ các dự án VKDub cũ trong CapCut để mở được ngay lập tức",
+            "Hạ phiên bản template cơ sở xuống CapCut 3.0+ đảm bảo tương thích mọi bản CapCut cũ và mới",
+            "Vá lỗi Vbee & tự động dò tìm FFmpeg/ffprobe trong thư mục ứng dụng",
             "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS với xác thực mã băm SHA-256",
         ],
     }

@@ -172,3 +172,66 @@ def test_export_accepts_single_master_audio_track(tmp_path):
     assert len(tracks["audio"]["segments"]) == 1
     assert len(tracks["text"]["segments"]) == 1
     assert (result.path / "Assets" / f"master-voice{master.suffix}").is_file()
+
+
+def test_export_adapts_to_local_capcut_draft_version(tmp_path):
+    root = tmp_path / "drafts"
+    root.mkdir()
+
+    # Simulate an existing CapCut draft from an older version (e.g. CapCut 8.5.0)
+    existing_draft = root / "0511_user_project"
+    existing_draft.mkdir()
+    existing_content = {
+        "version": 360000,
+        "new_version": "167.0.0",
+        "platform": {"os": "windows", "app_version": "8.5.0"},
+        "last_modified_platform": {"os": "windows", "app_version": "8.5.0"},
+    }
+    (existing_draft / "draft_content.json").write_text(
+        json.dumps(existing_content), encoding="utf-8"
+    )
+
+    project = ready_project(tmp_path)
+    result = export_capcut_project(
+        project, root, shutil.which("ffprobe"), shutil.which("ffmpeg")
+    )
+
+    exported_content = json.loads((result.path / "draft_content.json").read_text(encoding="utf-8"))
+    assert exported_content["new_version"] == "167.0.0"
+    assert exported_content["platform"]["app_version"] == "8.5.0"
+    assert exported_content["last_modified_platform"]["app_version"] == "8.5.0"
+
+
+def test_patch_existing_vkdub_drafts(tmp_path):
+    root = tmp_path / "drafts"
+    root.mkdir()
+
+    # Create an old VKDub draft that was saved with a newer version
+    old_vkdub = root / "VKDub 20260901-120000-TEST001"
+    old_vkdub.mkdir()
+    (old_vkdub / "draft_content.json").write_text(
+        json.dumps({
+            "version": 360000,
+            "new_version": "181.0.0",
+            "platform": {"app_version": "9.2.0"},
+            "last_modified_platform": {"app_version": "9.2.0"},
+        }),
+        encoding="utf-8",
+    )
+
+    from vkdub.services.capcut_export import patch_existing_vkdub_drafts
+
+    profile = {
+        "version": 360000,
+        "new_version": "167.0.0",
+        "platform": {"app_version": "8.5.0"},
+        "last_modified_platform": {"app_version": "8.5.0"},
+    }
+    count = patch_existing_vkdub_drafts(root, profile)
+    assert count == 1
+
+    patched = json.loads((old_vkdub / "draft_content.json").read_text(encoding="utf-8"))
+    assert patched["new_version"] == "167.0.0"
+    assert patched["platform"]["app_version"] == "8.5.0"
+    assert patched["last_modified_platform"]["app_version"] == "8.5.0"
+

@@ -288,6 +288,7 @@ class MainWindow(QMainWindow):
         self.recovery_timer.timeout.connect(self._check_crash_recovery)
         self.recovery_timer.start(500)
         QTimer.singleShot(2500, self._check_background_update)
+        QTimer.singleShot(1500, self._sync_capcut_drafts_compatibility)
 
     def _on_autosave_timer(self) -> None:
         if load_app_settings().autosave and self.dirty and not self.busy and self.project.script:
@@ -336,6 +337,28 @@ class MainWindow(QMainWindow):
 
         t = threading.Thread(target=worker, daemon=True)
         t.start()
+
+    def _sync_capcut_drafts_compatibility(self) -> None:
+        def worker() -> None:
+            try:
+                from vkdub.services.app_settings import load_app_settings
+                from vkdub.services.capcut_export import patch_existing_vkdub_drafts
+
+                root_str = load_app_settings().capcut_draft_root
+                if root_str:
+                    root = Path(root_str).expanduser()
+                    if root.is_dir():
+                        count = patch_existing_vkdub_drafts(root)
+                        if count > 0:
+                            self.log(
+                                f"🎬 Đã tự động đồng bộ {count} dự án CapCut cũ tương thích với máy tính này."
+                            )
+            except Exception as e:
+                logger.debug("Background CapCut patch error: %s", e)
+
+        import threading
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _prompt_update_ready(self, info: Any, target: Path) -> None:
         from vkdub.services.update_service import apply_update_and_restart

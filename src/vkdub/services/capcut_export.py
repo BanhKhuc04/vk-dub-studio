@@ -2,7 +2,9 @@
 
 import copy
 import json
+import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +20,8 @@ from vkdub.domain.subtitle import SUBTITLE_REFERENCE_HEIGHT, SubtitleStyle
 from vkdub.services.audio_mix_service import fit_voice_wav, voice_slot_duration_ms
 from vkdub.services.cache_service import atomic_json
 from vkdub.services.mask_service import build_ffmpeg_mask_filter
+
+logger = logging.getLogger("vkdub.capcut_export")
 
 TIME_SCALE = 1000  # local CapCut v360000: microseconds; VKDub uses milliseconds
 
@@ -42,6 +46,127 @@ def _template_path() -> Path:
     if not path.is_file() or path.stat().st_size > 2_000_000:
         raise ValueError("Thiếu mẫu CapCut đã xác minh cho phiên bản này.")
     return path
+
+
+def _detect_local_capcut_profile(draft_root: Path) -> dict[str, Any]:
+    """Detect the actual CapCut version running on the host machine.
+
+    Prevents CapCut from displaying the 'Cần cập nhật: Dự án này được tạo trên phiên bản CapCut mới hơn'
+    popup by ensuring the exported draft matches or is lower than the local CapCut installation.
+    """
+    # 1. Inspect existing non-VKDub user drafts (most authentic reflection of local CapCut)
+    candidates: list[tuple[float, Path]] = []
+    if draft_root.is_dir():
+        for d in draft_root.iterdir():
+            if d.is_dir() and not d.name.startswith(".") and not d.name.startswith("VKDub"):
+                cf = d / "draft_content.json"
+                if cf.is_file():
+                    try:
+                        candidates.append((cf.stat().st_mtime, cf))
+                    except OSError:
+                        pass
+
+    if candidates:
+        candidates.sort(reverse=True)
+        for _, cf in candidates:
+            try:
+                data = json.loads(cf.read_text(encoding="utf-8"))
+                new_ver = data.get("new_version")
+                platform_info = data.get("platform")
+                if new_ver or (isinstance(platform_info, dict) and platform_info.get("app_version")):
+                    return {
+                        "version": data.get("version", 360000),
+                        "new_version": new_ver or "100.0.0",
+                        "platform": copy.deepcopy(platform_info) if isinstance(platform_info, dict) else {},
+                        "last_modified_platform": copy.deepcopy(data.get("last_modified_platform"))
+                        if isinstance(data.get("last_modified_platform"), dict)
+                        else {},
+                    }
+            except Exception as e:
+                logger.debug("Error reading draft profile from %s: %s", cf, e)
+
+    # 2. Inspect CapCut installed application metadata (ProductInfo.xml)
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        for app_folder in ("CapCut", "JianyingPro"):
+            prod_xml = Path(local_appdata) / app_folder / "Apps" / "ProductInfo.xml"
+            if prod_xml.is_file():
+                try:
+                    xml_text = prod_xml.read_text(encoding="utf-8", errors="replace")
+                    match = re.search(r'<appver\s+value="([^"]+)"', xml_text)
+                    if match:
+                        appver = match.group(1).strip()
+                        return {
+                            "version": 360000,
+                            "new_version": "100.0.0",
+                            "platform": {"os": "windows", "app_version": appver},
+                            "last_modified_platform": {"os": "windows", "app_version": appver},
+                        }
+                except Exception as e:
+                    logger.debug("Error reading ProductInfo.xml: %s", e)
+
+    # 3. Safe fallback: Baseline version compatible with all CapCut versions (CapCut 3.0+)
+    return {
+        "version": 360000,
+        "new_version": "100.0.0",
+        "platform": {"os": "windows", "app_version": "3.0.0"},
+        "last_modified_platform": {"os": "windows", "app_version": "3.0.0"},
+    }
+
+
+def patch_existing_vkdub_drafts(draft_root: Path, profile: dict[str, Any] | None = None) -> int:
+    """Retroactively patch existing VKDub drafts in CapCut so they open immediately without update popups."""
+    if not draft_root.is_dir():
+        return 0
+    if profile is None:
+        profile = _detect_local_capcut_profile(draft_root)
+    if not profile:
+        return 0
+
+    target_ver = profile.get("version", 360000)
+    target_new_ver = profile.get("new_version")
+    target_platform = profile.get("platform")
+    target_last_mod = profile.get("last_modified_platform")
+
+    patched_count = 0
+    try:
+        for folder in draft_root.iterdir():
+            if not folder.is_dir() or not folder.name.startswith("VKDub"):
+                continue
+            cf = folder / "draft_content.json"
+            if not cf.is_file():
+                continue
+            try:
+                content = json.loads(cf.read_text(encoding="utf-8"))
+                changed = False
+                if target_ver and content.get("version") != target_ver:
+                    content["version"] = target_ver
+                    changed = True
+                if target_new_ver and content.get("new_version") != target_new_ver:
+                    content["new_version"] = target_new_ver
+                    changed = True
+                if target_platform and isinstance(target_platform, dict):
+                    cur_plat = content.get("platform", {})
+                    if not isinstance(cur_plat, dict) or cur_plat.get("app_version") != target_platform.get("app_version"):
+                        content["platform"] = copy.deepcopy(target_platform)
+                        changed = True
+                if target_last_mod and isinstance(target_last_mod, dict):
+                    cur_last = content.get("last_modified_platform", {})
+                    if not isinstance(cur_last, dict) or cur_last.get("app_version") != target_last_mod.get("app_version"):
+                        content["last_modified_platform"] = copy.deepcopy(target_last_mod)
+                        changed = True
+
+                if changed:
+                    atomic_json(cf, content)
+                    patched_count += 1
+            except Exception as exc:
+                logger.debug("Could not patch draft %s: %s", folder.name, exc)
+    except Exception as exc:
+        logger.debug("Error iterating draft_root for patching: %s", exc)
+
+    if patched_count > 0:
+        logger.info("Đã tự động đồng bộ %d dự án VKDub cũ tương thích với CapCut hiện tại.", patched_count)
+    return patched_count
 
 
 def _replace_ids(value: Any, mapping: dict[str, str]) -> Any:
@@ -362,6 +487,18 @@ def export_capcut_project(
         now = int(time.time())
         content["create_time"] = content["update_time"] = now
 
+        # Match local CapCut version to prevent "Cần cập nhật" popup
+        profile = _detect_local_capcut_profile(draft_root)
+        if profile:
+            if profile.get("version"):
+                content["version"] = profile["version"]
+            if profile.get("new_version"):
+                content["new_version"] = profile["new_version"]
+            if profile.get("platform"):
+                content["platform"] = copy.deepcopy(profile["platform"])
+            if profile.get("last_modified_platform"):
+                content["last_modified_platform"] = copy.deepcopy(profile["last_modified_platform"])
+
         video_source = project.video_path
         final_video_source = project.video_path
         if project.masks:
@@ -478,6 +615,8 @@ def export_capcut_project(
         _register_root(
             draft_root, final, draft_id, safe_name, duration_ms, template["root_entry"], now
         )
+        # Retroactively patch existing VKDub drafts in the same draft_root to prevent update alerts
+        patch_existing_vkdub_drafts(draft_root, profile)
         return CapCutExportResult(
             final,
             draft_id,
