@@ -29,17 +29,29 @@ async function checkCookiesAuth() {
   let vbeeAuthFromCookie = false;
 
   try {
-    const chatgptCookies = await chrome.cookies.getAll({ domain: "chatgpt.com" });
+    const [c1, c2, c3] = await Promise.all([
+      chrome.cookies.getAll({ url: "https://chatgpt.com" }).catch(() => []),
+      chrome.cookies.getAll({ url: "https://chat.openai.com" }).catch(() => []),
+      chrome.cookies.getAll({ domain: "chatgpt.com" }).catch(() => []),
+    ]);
+    const chatgptCookies = [...c1, ...c2, ...c3];
     chatgptAuthFromCookie = chatgptCookies.some(
       (c) =>
         c.name.includes("session-token") ||
         c.name.includes("auth") ||
+        c.name.includes("token") ||
+        c.name.includes("user") ||
         c.name === "__Secure-next-auth.session-token"
     );
   } catch (err) {}
 
   try {
-    const vbeeCookies = await chrome.cookies.getAll({ domain: "vbee.vn" });
+    const [v1, v2, v3] = await Promise.all([
+      chrome.cookies.getAll({ url: "https://vbee.vn" }).catch(() => []),
+      chrome.cookies.getAll({ url: "https://studio.vbee.vn" }).catch(() => []),
+      chrome.cookies.getAll({ domain: "vbee.vn" }).catch(() => []),
+    ]);
+    const vbeeCookies = [...v1, ...v2, ...v3];
     vbeeAuthFromCookie = vbeeCookies.some(
       (c) =>
         c.name.toLowerCase().includes("token") ||
@@ -53,30 +65,38 @@ async function checkCookiesAuth() {
   return { chatgptAuthFromCookie, vbeeAuthFromCookie };
 }
 
-async function refreshAllStatus() {
-  let chatgptTabs = [];
-  try {
-    chatgptTabs = await chrome.tabs.query({
-      url: [
-        "*://chatgpt.com/*",
-        "*://*.chatgpt.com/*",
-        "*://chat.openai.com/*",
-        "*://*.openai.com/*",
-      ],
-    });
-  } catch (e) {}
+function isChatGPTTab(t) {
+  const u = (t.url || t.pendingUrl || "").toLowerCase();
+  const title = (t.title || "").toLowerCase();
+  return (
+    u.includes("chatgpt.com") ||
+    u.includes("chat.openai.com") ||
+    (u.includes("edge://sleeping-tab") && u.includes("chatgpt")) ||
+    title.includes("chatgpt")
+  );
+}
 
-  let vbeeTabs = [];
+function isVbeeTab(t) {
+  const u = (t.url || t.pendingUrl || "").toLowerCase();
+  const title = (t.title || "").toLowerCase();
+  return (
+    u.includes("vbee.vn") ||
+    u.includes("studio.vbee.vn") ||
+    (u.includes("edge://sleeping-tab") && u.includes("vbee")) ||
+    title.includes("vbee")
+  );
+}
+
+async function refreshAllStatus() {
+  let allTabs = [];
   try {
-    vbeeTabs = await chrome.tabs.query({
-      url: [
-        "*://vbee.vn/*",
-        "*://*.vbee.vn/*",
-        "*://studio.vbee.vn/*",
-        "*://*.studio.vbee.vn/*",
-      ],
-    });
-  } catch (e) {}
+    allTabs = await chrome.tabs.query({});
+  } catch (e) {
+    console.warn("[SW] chrome.tabs.query failed:", e);
+  }
+
+  const chatgptTabs = allTabs.filter(isChatGPTTab);
+  const vbeeTabs = allTabs.filter(isVbeeTab);
 
   state.chatgptTabs = chatgptTabs.length;
   state.vbeeTabs = vbeeTabs.length;
@@ -88,60 +108,82 @@ async function refreshAllStatus() {
   let vbeeLoggedIn = vbeeAuthFromCookie;
 
   let chatgptAdapterReady = false;
-  if (chatgptTabs.length > 0 && chatgptTabs[0].id) {
+  for (const t of chatgptTabs) {
+    if (!t.id) continue;
     try {
-      const resp = await chrome.tabs.sendMessage(chatgptTabs[0].id, {
+      const resp = await chrome.tabs.sendMessage(t.id, {
         action: "CHECK_CHATGPT_STATUS",
       });
       if (resp && typeof resp.logged_in === "boolean") {
         chatgptLoggedIn = resp.logged_in;
         chatgptAdapterReady = true;
+        break;
       }
     } catch (e) {
       if (chrome.scripting) {
         try {
           await chrome.scripting.executeScript({
-            target: { tabId: chatgptTabs[0].id },
+            target: { tabId: t.id },
             files: ["content/chatgptAdapter.js"],
           });
-          const retry = await chrome.tabs.sendMessage(chatgptTabs[0].id, {
+          const retry = await chrome.tabs.sendMessage(t.id, {
             action: "CHECK_CHATGPT_STATUS",
           });
           if (retry && typeof retry.logged_in === "boolean") {
             chatgptLoggedIn = retry.logged_in;
             chatgptAdapterReady = true;
+            break;
           }
         } catch (e2) {}
       }
     }
   }
 
+  // Heuristic: If ChatGPT tab is open and URL is not login page, assume logged in
+  if (!chatgptLoggedIn && chatgptTabs.length > 0) {
+    const u = (chatgptTabs[0].url || "").toLowerCase();
+    if (!u.includes("/auth/login") && !u.includes("/login")) {
+      chatgptLoggedIn = true;
+    }
+  }
+
   let vbeeAdapterReady = false;
-  if (vbeeTabs.length > 0 && vbeeTabs[0].id) {
+  for (const t of vbeeTabs) {
+    if (!t.id) continue;
     try {
-      const resp = await chrome.tabs.sendMessage(vbeeTabs[0].id, {
+      const resp = await chrome.tabs.sendMessage(t.id, {
         action: "CHECK_VBEE_STATUS",
       });
       if (resp && typeof resp.logged_in === "boolean") {
         vbeeLoggedIn = resp.logged_in;
         vbeeAdapterReady = true;
+        break;
       }
     } catch (e) {
       if (chrome.scripting) {
         try {
           await chrome.scripting.executeScript({
-            target: { tabId: vbeeTabs[0].id },
+            target: { tabId: t.id },
             files: ["content/vbeeAdapter.js"],
           });
-          const retry = await chrome.tabs.sendMessage(vbeeTabs[0].id, {
+          const retry = await chrome.tabs.sendMessage(t.id, {
             action: "CHECK_VBEE_STATUS",
           });
           if (retry && typeof retry.logged_in === "boolean") {
             vbeeLoggedIn = retry.logged_in;
             vbeeAdapterReady = true;
+            break;
           }
         } catch (e2) {}
       }
+    }
+  }
+
+  // Heuristic: If studio.vbee.vn is open, assume logged in
+  if (!vbeeLoggedIn && vbeeTabs.length > 0) {
+    const u = (vbeeTabs[0].url || "").toLowerCase();
+    if (u.includes("studio.vbee.vn") || (vbeeAuthFromCookie && !u.includes("/login"))) {
+      vbeeLoggedIn = true;
     }
   }
 
@@ -530,16 +572,12 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url) {
-    if (
-      tab.url.includes("chatgpt.com") ||
-      tab.url.includes("openai.com") ||
-      tab.url.includes("vbee.vn")
-    ) {
-      sendStatusReport();
-    }
-  }
+chrome.tabs.onActivated.addListener(() => {
+  sendStatusReport();
+});
+
+chrome.tabs.onUpdated.addListener(() => {
+  sendStatusReport();
 });
 
 chrome.tabs.onRemoved.addListener(() => {
@@ -550,6 +588,6 @@ setInterval(() => {
   if (bridge && bridge.isConnected) {
     sendStatusReport();
   }
-}, 10000);
+}, 3000);
 
 initBridge();
