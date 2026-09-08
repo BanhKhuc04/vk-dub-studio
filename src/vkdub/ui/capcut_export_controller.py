@@ -116,22 +116,28 @@ class CapCutExportController(QObject):
         program_files = os.environ.get("PROGRAMFILES", "")
         prog_x86 = os.environ.get("ProgramFiles(x86)", "")
 
+        # Always prefer the official launcher shortcut / executable
         candidates = [
             Path(local_app_data) / "CapCut" / "Apps" / "CapCut.exe",
             Path(local_app_data) / "CapCut" / "CapCut.exe",
             Path(program_files) / "CapCut" / "CapCut.exe",
             Path(prog_x86) / "CapCut" / "CapCut.exe",
+            Path(local_app_data) / "JianyingPro" / "Apps" / "JianyingPro.exe",
+            Path(local_app_data) / "JianyingPro" / "JianyingPro.exe",
         ]
+
+        # Only check subfolders as a last fallback if the main launcher is missing
         apps_dir = Path(local_app_data) / "CapCut" / "Apps"
         if apps_dir.is_dir():
             for sub in sorted(apps_dir.glob("*/CapCut.exe"), reverse=True):
-                candidates.insert(0, sub)
+                if sub not in candidates:
+                    candidates.append(sub)
 
         for exe in candidates:
             if exe.is_file():
                 try:
                     subprocess.Popen([str(exe)], close_fds=True)
-                    self.window.log(f"🚀 Đang khởi chạy CapCut ({exe.name})…")
+                    self.window.log(f"🚀 Đang mở CapCut ({exe.name})…")
                     return
                 except Exception as exc:
                     self.window.log(f"Không mở trực tiếp được {exe}: {exc}")

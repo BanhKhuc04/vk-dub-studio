@@ -990,6 +990,57 @@ class SettingsDialog(QDialog):
         btn_act_row.addStretch()
         layout.addLayout(btn_act_row)
 
+        layout.addWidget(section_label("PHIÊN BẢN CAPCUT (TRÁNH LỖI BẮT CẬP NHẬT CAPCUT)"))
+        layout.addWidget(
+            info_label(
+                "Để CapCut không hiện bảng 'Dự án này được tạo trên phiên bản mới hơn', "
+                "VKDub sẽ xuất dự án khớp đúng với phiên bản CapCut máy bạn đang dùng (ví dụ: 7.7.0)."
+            )
+        )
+
+        ver_form = QFormLayout()
+        ver_form.setSpacing(10)
+
+        ver_row = QHBoxLayout()
+        self.capcut_ver_combo = QComboBox()
+        self.capcut_ver_combo.setEditable(True)
+        self.capcut_ver_combo.addItem("Tự động nhận diện theo máy (Khuyến nghị)", "")
+        self.capcut_ver_combo.addItem("7.7.0 (Phổ biến / Máy nhẹ / Rất ổn định)", "7.7.0")
+        self.capcut_ver_combo.addItem("8.5.0", "8.5.0")
+        self.capcut_ver_combo.addItem("8.7.0", "8.7.0")
+        self.capcut_ver_combo.addItem("9.0.0", "9.0.0")
+        self.capcut_ver_combo.addItem("9.2.0", "9.2.0")
+        self.capcut_ver_combo.addItem("9.3.0", "9.3.0")
+
+        curr_ver = self.app_settings.capcut_version.strip()
+        idx = self.capcut_ver_combo.findData(curr_ver)
+        if idx >= 0:
+            self.capcut_ver_combo.setCurrentIndex(idx)
+        elif curr_ver:
+            self.capcut_ver_combo.setEditText(curr_ver)
+        else:
+            self.capcut_ver_combo.setCurrentIndex(0)
+
+        btn_scan_ver = QPushButton("🔍 Quét phiên bản máy")
+        btn_scan_ver.clicked.connect(self._scan_capcut_version)
+        ver_row.addWidget(self.capcut_ver_combo, 1)
+        ver_row.addWidget(btn_scan_ver)
+        ver_form.addRow("Phiên bản CapCut xuất ra:", ver_row)
+
+        self.capcut_ver_status_lbl = QLabel()
+        ver_form.addRow("Kết quả nhận diện:", self.capcut_ver_status_lbl)
+        layout.addLayout(ver_form)
+
+        btn_patch_row = QHBoxLayout()
+        self.btn_patch_old = QPushButton("⚡ Đồng bộ & Sửa toàn bộ dự án cũ trong CapCut")
+        self.btn_patch_old.setStyleSheet(
+            "background: #0284c7; color: white; font-weight: 600; padding: 6px 14px;"
+        )
+        self.btn_patch_old.clicked.connect(self._patch_old_drafts)
+        btn_patch_row.addWidget(self.btn_patch_old)
+        btn_patch_row.addStretch()
+        layout.addLayout(btn_patch_row)
+
         btn_save_capcut = QPushButton("Lưu cấu hình CapCut")
         btn_save_capcut.clicked.connect(self._save_capcut_settings)
         layout.addWidget(btn_save_capcut)
@@ -1036,6 +1087,55 @@ class SettingsDialog(QDialog):
         else:
             QMessageBox.warning(self, "Chưa sẵn sàng", res.message)
 
+    def _scan_capcut_version(self) -> None:
+        from vkdub.services.capcut_export import get_target_capcut_version
+
+        root_str = self.capcut_root_input.text().strip()
+        root = Path(root_str) if root_str else None
+        detected = get_target_capcut_version(root)
+        self.capcut_ver_status_lbl.setText(f"✓ Phát hiện CapCut trên máy: phiên bản {detected}")
+        self.capcut_ver_status_lbl.setStyleSheet("color: #34d399; font-weight: bold;")
+        idx = self.capcut_ver_combo.findData(detected)
+        if idx >= 0:
+            self.capcut_ver_combo.setCurrentIndex(idx)
+        else:
+            self.capcut_ver_combo.setEditText(detected)
+        QMessageBox.information(
+            self,
+            "Nhận diện CapCut",
+            f"Đã phát hiện phiên bản CapCut trên máy là: {detected}\n\n"
+            f"Các dự án xuất ra sẽ tự động khớp theo phiên bản {detected} để không bị hỏi cập nhật!",
+        )
+
+    def _patch_old_drafts(self) -> None:
+        from vkdub.services.capcut_export import patch_existing_vkdub_drafts
+
+        root_str = self.capcut_root_input.text().strip()
+        if not root_str or not Path(root_str).is_dir():
+            QMessageBox.warning(self, "Lỗi", "Vui lòng chọn thư mục CapCut Draft Root hợp lệ trước.")
+            return
+
+        ver = self.capcut_ver_combo.currentData()
+        if not ver:
+            ver = self.capcut_ver_combo.currentText().strip()
+            if "Tự động" in ver:
+                ver = ""
+
+        count = patch_existing_vkdub_drafts(Path(root_str), ver or None)
+        if count > 0:
+            QMessageBox.information(
+                self,
+                "Đồng bộ thành công",
+                f"Đã tự động cập nhật và sửa {count} dự án VKDub cũ trong CapCut về phiên bản tương thích!\n\n"
+                "Bây giờ bạn có thể mở các dự án này trong CapCut mà không bị hiện bảng bắt cập nhật.",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Hoàn tất",
+                "Tất cả dự án VKDub trong thư mục CapCut đều đã tương thích tốt, không cần sửa đổi thêm.",
+            )
+
     def _update_capcut_status(self) -> None:
         res = check_capcut_root(self.capcut_root_input.text().strip())
         if res.ok:
@@ -1048,11 +1148,24 @@ class SettingsDialog(QDialog):
     def _save_capcut_settings(self) -> None:
         self.app_settings = load_app_settings()
         self.app_settings.capcut_draft_root = self.capcut_root_input.text().strip()
+        ver = self.capcut_ver_combo.currentData()
+        if not ver:
+            text = self.capcut_ver_combo.currentText().strip()
+            if "Tự động" not in text:
+                ver = text
+            else:
+                ver = ""
+        self.app_settings.capcut_version = ver or ""
         if not self._persist_settings():
             return
         if hasattr(self.main_window, "left"):
             self.main_window.left.refresh_capcut_destination()
-        QMessageBox.information(self, "Thành công", "Đã lưu đường dẫn CapCut Draft.")
+        root_str = self.app_settings.capcut_draft_root
+        if root_str and Path(root_str).is_dir():
+            from vkdub.services.capcut_export import patch_existing_vkdub_drafts
+
+            patch_existing_vkdub_drafts(Path(root_str), self.app_settings.capcut_version or None)
+        QMessageBox.information(self, "Thành công", "Đã lưu cấu hình và đồng bộ phiên bản CapCut!")
 
     # -------------------------------------------------------------
     # 5. TAB CẬP NHẬT (Update)
@@ -1226,3 +1339,12 @@ class SettingsDialog(QDialog):
         self.chk_auto_update.setChecked(self.app_settings.auto_update)
         self.chk_auto_update.blockSignals(False)
         self.gemini_status_lbl.setText("Nhấn Kiểm tra kết nối để xác minh khóa và model.")
+        if hasattr(self, "capcut_ver_combo"):
+            curr_ver = self.app_settings.capcut_version.strip()
+            idx = self.capcut_ver_combo.findData(curr_ver)
+            if idx >= 0:
+                self.capcut_ver_combo.setCurrentIndex(idx)
+            elif curr_ver:
+                self.capcut_ver_combo.setEditText(curr_ver)
+            else:
+                self.capcut_ver_combo.setCurrentIndex(0)

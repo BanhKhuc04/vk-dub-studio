@@ -48,15 +48,95 @@ def _template_path() -> Path:
     return path
 
 
-def _detect_local_capcut_profile(draft_root: Path) -> dict[str, Any]:
-    """Detect the actual CapCut version running on the host machine.
+def capcut_app_to_new_version(app_version: str) -> str:
+    """Map CapCut application version (e.g. '7.7.0') to internal schema new_version (e.g. '151.0.0')."""
+    try:
+        nums = [int(x) for x in re.findall(r"\d+", app_version)]
+        major = nums[0] if len(nums) > 0 else 7
+        minor = nums[1] if len(nums) > 1 else 0
+        schema = max(10, major * 20 + minor * 2 - 3)
+        return f"{schema}.0.0"
+    except Exception:
+        return "151.0.0"
 
-    Prevents CapCut from displaying the 'Cần cập nhật: Dự án này được tạo trên phiên bản CapCut mới hơn'
-    popup by ensuring the exported draft matches or is lower than the local CapCut installation.
+
+def detect_installed_capcut_version() -> str:
+    """Detect the version of CapCut installed or currently running on this computer."""
+    # 1. From running CapCut.exe process
+    if os.name == "nt":
+        try:
+            cmd = "Get-Process CapCut -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -First 1"
+            res = subprocess.run(
+                ["powershell", "-Command", cmd],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                creationflags=0x08000000,
+            )
+            exe_path = res.stdout.strip()
+            if exe_path and Path(exe_path).is_file():
+                parent_name = Path(exe_path).parent.name
+                match = re.search(r"(\d+\.\d+\.\d+)", parent_name)
+                if match:
+                    return match.group(1)
+                v_cmd = f'(Get-Item "{exe_path}").VersionInfo.ProductVersion'
+                v_res = subprocess.run(
+                    ["powershell", "-Command", v_cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                    creationflags=0x08000000,
+                )
+                match = re.search(r"(\d+\.\d+\.\d+)", v_res.stdout)
+                if match:
+                    return match.group(1)
+        except Exception:
+            pass
+
+    # 2. From ProductInfo.xml or Apps directory
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        for folder in ("CapCut", "JianyingPro"):
+            p_xml = Path(local_appdata) / folder / "Apps" / "ProductInfo.xml"
+            if p_xml.is_file():
+                try:
+                    text = p_xml.read_text(encoding="utf-8", errors="replace")
+                    match = re.search(r'<appver\s+value="([^"]+)"', text)
+                    if match:
+                        return match.group(1).strip()
+                except Exception:
+                    pass
+
+            apps_dir = Path(local_appdata) / folder / "Apps"
+            if apps_dir.is_dir():
+                found_vers: list[str] = []
+                for sub in apps_dir.iterdir():
+                    if sub.is_dir():
+                        m = re.match(r"^(\d+\.\d+\.\d+)", sub.name)
+                        if m:
+                            found_vers.append(m.group(1))
+                if found_vers:
+                    def _key(v: str) -> list[int]:
+                        return [int(x) for x in re.findall(r"\d+", v)]
+
+                    found_vers.sort(key=_key, reverse=True)
+                    return found_vers[0]
+
+    return "7.7.0"
+
+
+def get_target_capcut_version(draft_root: Path | None = None) -> str:
+    """Get the target CapCut version to use for project generation and patching.
+
+    Priority:
+    1. Direct evidence from existing user drafts in draft_root (if any non-VKDub projects exist)
+    2. User setting from AppSettings (if explicitly configured)
+    3. Auto-detected from local machine (running process, ProductInfo.xml, or installed Apps)
+    4. Default: '7.7.0'
     """
-    # 1. Inspect existing non-VKDub user drafts (most authentic reflection of local CapCut)
-    candidates: list[tuple[float, Path]] = []
-    if draft_root.is_dir():
+    # 1. Check existing drafts in draft_root (direct evidence of local CapCut version)
+    if draft_root and draft_root.is_dir():
+        candidates: list[tuple[float, Path]] = []
         for d in draft_root.iterdir():
             if d.is_dir() and not d.name.startswith(".") and not d.name.startswith("VKDub"):
                 cf = d / "draft_content.json"
@@ -65,95 +145,137 @@ def _detect_local_capcut_profile(draft_root: Path) -> dict[str, Any]:
                         candidates.append((cf.stat().st_mtime, cf))
                     except OSError:
                         pass
-
-    if candidates:
-        candidates.sort(reverse=True)
-        for _, cf in candidates:
-            try:
-                data = json.loads(cf.read_text(encoding="utf-8"))
-                new_ver = data.get("new_version")
-                platform_info = data.get("platform")
-                if new_ver or (isinstance(platform_info, dict) and platform_info.get("app_version")):
-                    return {
-                        "version": data.get("version", 360000),
-                        "new_version": new_ver or "100.0.0",
-                        "platform": copy.deepcopy(platform_info) if isinstance(platform_info, dict) else {},
-                        "last_modified_platform": copy.deepcopy(data.get("last_modified_platform"))
-                        if isinstance(data.get("last_modified_platform"), dict)
-                        else {},
-                    }
-            except Exception as e:
-                logger.debug("Error reading draft profile from %s: %s", cf, e)
-
-    # 2. Inspect CapCut installed application metadata (ProductInfo.xml)
-    local_appdata = os.environ.get("LOCALAPPDATA")
-    if local_appdata:
-        for app_folder in ("CapCut", "JianyingPro"):
-            prod_xml = Path(local_appdata) / app_folder / "Apps" / "ProductInfo.xml"
-            if prod_xml.is_file():
+        if candidates:
+            candidates.sort(reverse=True)
+            for _, cf in candidates:
                 try:
-                    xml_text = prod_xml.read_text(encoding="utf-8", errors="replace")
-                    match = re.search(r'<appver\s+value="([^"]+)"', xml_text)
-                    if match:
-                        appver = match.group(1).strip()
-                        return {
-                            "version": 360000,
-                            "new_version": "100.0.0",
-                            "platform": {"os": "windows", "app_version": appver},
-                            "last_modified_platform": {"os": "windows", "app_version": appver},
-                        }
-                except Exception as e:
-                    logger.debug("Error reading ProductInfo.xml: %s", e)
+                    data = json.loads(cf.read_text(encoding="utf-8"))
+                    plat = data.get("platform")
+                    if isinstance(plat, dict) and plat.get("app_version"):
+                        return str(plat["app_version"]).strip()
+                except Exception:
+                    pass
 
-    # 3. Safe fallback: Baseline version compatible with all CapCut versions (CapCut 3.0+)
+    # 2. User setting from AppSettings
+    try:
+        from vkdub.services.app_settings import load_app_settings
+
+        configured = load_app_settings().capcut_version.strip()
+        if configured:
+            match = re.search(r"\d+\.\d+(?:\.\d+)?", configured)
+            if match:
+                return match.group(0)
+    except Exception:
+        pass
+
+    # 3. Installed CapCut / Running process
+    return detect_installed_capcut_version()
+
+
+def _detect_local_capcut_profile(draft_root: Path) -> dict[str, Any]:
+    """Build the exact CapCut profile for project export matching the local version."""
+    target_ver = get_target_capcut_version(draft_root)
+    new_ver = capcut_app_to_new_version(target_ver)
+
+    base_platform = {
+        "os": "windows",
+        "os_version": "10.0.26200",
+        "app_id": 359289,
+        "app_version": target_ver,
+        "app_source": "cc",
+    }
+    if draft_root.is_dir():
+        for d in draft_root.iterdir():
+            if d.is_dir() and not d.name.startswith(".") and not d.name.startswith("VKDub"):
+                cf = d / "draft_content.json"
+                if cf.is_file():
+                    try:
+                        data = json.loads(cf.read_text(encoding="utf-8"))
+                        plat = data.get("platform")
+                        if isinstance(plat, dict):
+                            base_platform.update(plat)
+                            base_platform["app_version"] = target_ver
+                            break
+                    except Exception:
+                        pass
+
+    last_mod_platform = copy.deepcopy(base_platform)
+    last_mod_platform["app_version"] = target_ver
+
     return {
         "version": 360000,
-        "new_version": "100.0.0",
-        "platform": {"os": "windows", "app_version": "3.0.0"},
-        "last_modified_platform": {"os": "windows", "app_version": "3.0.0"},
+        "new_version": new_ver,
+        "platform": base_platform,
+        "last_modified_platform": last_mod_platform,
     }
 
 
-def patch_existing_vkdub_drafts(draft_root: Path, profile: dict[str, Any] | None = None) -> int:
+def patch_existing_vkdub_drafts(
+    draft_root: Path, target_version: str | dict[str, Any] | None = None
+) -> int:
     """Retroactively patch existing VKDub drafts in CapCut so they open immediately without update popups."""
     if not draft_root.is_dir():
         return 0
-    if profile is None:
-        profile = _detect_local_capcut_profile(draft_root)
-    if not profile:
-        return 0
 
-    target_ver = profile.get("version", 360000)
-    target_new_ver = profile.get("new_version")
-    target_platform = profile.get("platform")
-    target_last_mod = profile.get("last_modified_platform")
+    if isinstance(target_version, dict):
+        target_new_ver = str(target_version.get("new_version") or "151.0.0")
+        plat = target_version.get("platform") or target_version.get("last_modified_platform") or {}
+        target_version = str(plat.get("app_version") or "7.7.0") if isinstance(plat, dict) else "7.7.0"
+    elif isinstance(target_version, str) and target_version.strip():
+        target_version = target_version.strip()
+        target_new_ver = capcut_app_to_new_version(target_version)
+    else:
+        target_version = get_target_capcut_version(draft_root)
+        target_new_ver = capcut_app_to_new_version(target_version)
 
     patched_count = 0
+
     try:
         for folder in draft_root.iterdir():
-            if not folder.is_dir() or not folder.name.startswith("VKDub"):
+            if not folder.is_dir() or folder.name.startswith("."):
                 continue
             cf = folder / "draft_content.json"
             if not cf.is_file():
                 continue
+
             try:
                 content = json.loads(cf.read_text(encoding="utf-8"))
+                # Check if this draft was generated by VKDub
+                is_vkdub = folder.name.startswith("VKDub") or str(content.get("name", "")).startswith("VKDub")
+                if not is_vkdub:
+                    tracks = content.get("tracks", [])
+                    if isinstance(tracks, list):
+                        for tr in tracks:
+                            tname = str(tr.get("name", ""))
+                            if "TIẾNG VIỆT" in tname or "ÂM THANH GỐC" in tname:
+                                is_vkdub = True
+                                break
+                if not is_vkdub:
+                    audios = content.get("materials", {}).get("audios", [])
+                    if isinstance(audios, list):
+                        for a in audios:
+                            aname = str(a.get("name", ""))
+                            if aname.startswith("VI — ") or "Voice Tiếng Việt" in aname:
+                                is_vkdub = True
+                                break
+
+                if not is_vkdub:
+                    continue
+
                 changed = False
-                if target_ver and content.get("version") != target_ver:
-                    content["version"] = target_ver
+                if content.get("version") != 360000:
+                    content["version"] = 360000
                     changed = True
-                if target_new_ver and content.get("new_version") != target_new_ver:
+                if content.get("new_version") != target_new_ver:
                     content["new_version"] = target_new_ver
                     changed = True
-                if target_platform and isinstance(target_platform, dict):
-                    cur_plat = content.get("platform", {})
-                    if not isinstance(cur_plat, dict) or cur_plat.get("app_version") != target_platform.get("app_version"):
-                        content["platform"] = copy.deepcopy(target_platform)
+                if isinstance(content.get("platform"), dict):
+                    if content["platform"].get("app_version") != target_version:
+                        content["platform"]["app_version"] = target_version
                         changed = True
-                if target_last_mod and isinstance(target_last_mod, dict):
-                    cur_last = content.get("last_modified_platform", {})
-                    if not isinstance(cur_last, dict) or cur_last.get("app_version") != target_last_mod.get("app_version"):
-                        content["last_modified_platform"] = copy.deepcopy(target_last_mod)
+                if isinstance(content.get("last_modified_platform"), dict):
+                    if content["last_modified_platform"].get("app_version") != target_version:
+                        content["last_modified_platform"]["app_version"] = target_version
                         changed = True
 
                 if changed:
@@ -165,7 +287,7 @@ def patch_existing_vkdub_drafts(draft_root: Path, profile: dict[str, Any] | None
         logger.debug("Error iterating draft_root for patching: %s", exc)
 
     if patched_count > 0:
-        logger.info("Đã tự động đồng bộ %d dự án VKDub cũ tương thích với CapCut hiện tại.", patched_count)
+        logger.info("Đã tự động đồng bộ %d dự án VKDub cũ sang CapCut %s.", patched_count, target_version)
     return patched_count
 
 

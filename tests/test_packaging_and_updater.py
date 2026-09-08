@@ -14,7 +14,10 @@ def test_version_is_semantic():
     parts = __version__.split(".")
     assert len(parts) >= 3
     assert all(p.isdigit() for p in parts[:3])
-    assert __version__ == "2.1.8"
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    if pyproject.is_file():
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        assert __version__ == data["project"]["version"]
 
 
 def test_resource_path_resolution(tmp_path):

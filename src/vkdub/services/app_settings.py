@@ -48,6 +48,7 @@ class AppSettings:
     default_output: str = ""
     autosave: bool = True
     vbee_mode: str = "browser"  # "browser" | "api"
+    capcut_version: str = ""  # e.g. "7.7.0" or "" for auto-detect
 
     def __post_init__(self) -> None:
         if self.schema_version != 2:
@@ -70,6 +71,7 @@ class AppSettings:
             self.vieneu_model,
             self.vieneu_runtime,
             self.default_output,
+            self.capcut_version,
         ):
             if not isinstance(value, str) or "\0" in value:
                 raise ValueError("Cài đặt đường dẫn/giọng không hợp lệ.")

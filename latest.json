@@ -1,11 +1,11 @@
 {
-  "version": "2.1.10",
-  "published_at": "2026-09-08T17:05:09Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.10/VKDubStudio-Setup-2.1.10.exe",
-  "sha256": "e667b25effc1329f06fa43f7943fc07ffdf2be232244bc96442cb7a8c839cd93",
-  "file_size_bytes": 301860123,
+  "version": "2.1.11",
+  "published_at": "2026-09-08T17:54:45Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.11/VKDubStudio-Setup-2.1.11.exe",
+  "sha256": "d99fb913d2b537c8811485cfa5c6bd32192fca8a0422bb57274d97eb599f3422",
+  "file_size_bytes": 301734803,
   "changelog": [
-    "VK Dub Studio v2.1.10 — Khắc phục triệt để lỗi 'Cần cập nhật CapCut' khi mở dự án",
+    "VK Dub Studio v2.1.11 — Khắc phục triệt để lỗi 'Cần cập nhật CapCut' khi mở dự án",
     "Tự động nhận diện phiên bản CapCut thực tế trên máy tính để tạo dự án tương thích 100%, không bao giờ bị hỏi cập nhật",
     "Tự động đồng bộ và sửa toàn bộ các dự án VKDub cũ trong CapCut để mở được ngay lập tức",
     "Hạ phiên bản template cơ sở xuống CapCut 3.0+ đảm bảo tương thích mọi bản CapCut cũ và mới",
