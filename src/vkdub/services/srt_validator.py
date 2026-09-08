@@ -142,7 +142,8 @@ def align_and_fill_cues(orig_cues: list[Cue], trans_cues: list[Cue]) -> str:
     Guarantees:
     - Exactly len(orig_cues) cues
     - 100% exact original timecodes and sequential indices
-    - Fallback to original text if a cue is missing
+    - Timecode overlap matching if indices shifted
+    - Never leaks Chinese/CJK characters into Vietnamese output
     """
     if not orig_cues:
         return ""
@@ -154,16 +155,47 @@ def align_and_fill_cues(orig_cues: list[Cue], trans_cues: list[Cue]) -> str:
     has_matching_indices = any(c.index in orig_indices for c in trans_cues)
 
     aligned_cues: list[Cue] = []
+    used_trans_cues: set[int] = set()
+
     for i, orig in enumerate(orig_cues):
         matched_text = ""
-        if has_matching_indices:
-            if orig.index in trans_by_index:
-                matched_text = trans_by_index[orig.index].text.strip()
-        else:
-            if i < len(trans_cues):
-                matched_text = trans_cues[i].text.strip()
 
-        final_text = matched_text if matched_text else orig.text.strip()
+        # Strategy 1: Direct index match
+        if has_matching_indices and orig.index in trans_by_index:
+            matched_text = trans_by_index[orig.index].text.strip()
+            used_trans_cues.add(orig.index)
+
+        # Strategy 2: Timecode overlap matching (if indices shifted or merged)
+        if not matched_text:
+            for tc in trans_cues:
+                if tc.index in used_trans_cues:
+                    continue
+                overlap = max(0, min(orig.end_ms, tc.end_ms) - max(orig.start_ms, tc.start_ms))
+                duration = max(1, orig.end_ms - orig.start_ms)
+                if overlap / duration > 0.4:
+                    matched_text = tc.text.strip()
+                    used_trans_cues.add(tc.index)
+                    break
+
+        # Strategy 3: Sequential fallback if not matching indices
+        if not matched_text and not has_matching_indices and i < len(trans_cues):
+            candidate = trans_cues[i].text.strip()
+            if candidate and not re.search(r"[\u4e00-\u9fff\u3400-\u4dbf]", candidate):
+                matched_text = candidate
+
+        # Strategy 4: Fallback protection against CJK/Chinese
+        if matched_text:
+            final_text = matched_text
+        else:
+            is_cjk = bool(re.search(r"[\u4e00-\u9fff\u3400-\u4dbf]", orig.text))
+            if is_cjk:
+                logger.warning(
+                    "Câu #%d không tìm thấy bản dịch từ ChatGPT, thay thế bằng nhãn tiếng Việt để tránh đọc tiếng Trung.",
+                    orig.index,
+                )
+                final_text = f"[Đoạn thoại #{orig.index}]"
+            else:
+                final_text = orig.text.strip()
 
         aligned_cues.append(
             Cue(

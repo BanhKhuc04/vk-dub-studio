@@ -143,3 +143,33 @@ def test_align_and_fill_cues():
     assert final_cues[2].text == "Automating video dubbing."
     assert final_cues[2].start_raw == "00:00:08,100"
 
+
+def test_align_and_fill_cues_blocks_chinese_leakage():
+    """Verify that if original cues contain Chinese and translation misses a cue, Chinese never leaks."""
+    from vkdub.services.srt_validator import align_and_fill_cues, parse_cues
+
+    chinese_orig = (
+        "1\n00:00:01,000 --> 00:00:03,000\n你好世界\n\n"
+        "2\n00:00:04,000 --> 00:00:06,000\n这是一个测试视频\n\n"
+        "3\n00:00:07,000 --> 00:00:09,000\n再见朋友\n"
+    )
+    # Translation only translated cue 1 and cue 3
+    viet_trans = (
+        "1\n00:00:01,000 --> 00:00:03,000\nXin chào thế giới\n\n"
+        "3\n00:00:07,000 --> 00:00:09,000\nTạm biệt bạn bè\n"
+    )
+    orig_cues = parse_cues(chinese_orig)
+    trans_cues = parse_cues(viet_trans)
+
+    result_srt = align_and_fill_cues(orig_cues, trans_cues)
+    cues = parse_cues(result_srt)
+
+    assert len(cues) == 3
+    assert cues[0].text == "Xin chào thế giới"
+    # Cue 2 must NOT contain Chinese characters
+    import re
+    assert not re.search(r"[\u4e00-\u9fff\u3400-\u4dbf]", cues[1].text)
+    assert "[Đoạn thoại #2]" in cues[1].text
+    assert cues[2].text == "Tạm biệt bạn bè"
+
+

@@ -323,11 +323,23 @@ class PipelineRunner(QThread):
                         "- Xuất toàn bộ nội dung file phụ đề SRT tiếng Việt hoàn chỉnh trong khối mã ```srt."
                     )
 
+                    def on_chatgpt_progress(pct: int, msg: str) -> None:
+                        self._update_substep(
+                            "4.2",
+                            SubstepStatus.RUNNING,
+                            pct,
+                            msg or f"ChatGPT đang dịch ({pct}%)...",
+                        )
+
                     raw_translated_srt = self.local_agent.translate_srt_sync(
                         raw_original_srt,
                         prompt_instruction=prompt_instr,
                         filename="original.srt",
+                        total_cues=total_cues,
                         timeout_s=600.0,
+                        check_cancel=self._check_cancel,
+                        cancel_event=self.cancel_event,
+                        progress_callback=on_chatgpt_progress,
                     )
 
                     if self.cancel_event.is_set():
@@ -638,8 +650,11 @@ class PipelineRunner(QThread):
                 self.state, "Xử lý tự động hoàn tất! Sẵn sàng duyệt và xuất CapCut."
             )
             self._save_current_checkpoint()
-            self.pipeline_completed.emit(self.artifacts)
-
+        except InterruptedError:
+            logger.info("Pipeline cancelled by user.")
+            self.log_emitted.emit("⏹ Quy trình tự động đã được dừng lại theo yêu cầu.")
+            self.pipeline_cancelled.emit()
+            return
         except Exception as exc:
             logger.exception("Pipeline execution failed: %s", exc)
             self.state = PipelineState.FAILED

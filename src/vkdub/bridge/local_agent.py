@@ -149,6 +149,7 @@ class LocalAgent(QObject):
     status_updated = Signal(object)  # BridgeStatus
     message_received = Signal(dict)
     chatgpt_result_received = Signal(dict)
+    chatgpt_progress_updated = Signal(int, int, int, str)  # cue_count, total_cues, pct, message
     vbee_result_received = Signal(dict)
     log_emitted = Signal(str)
 
@@ -358,6 +359,20 @@ class LocalAgent(QObject):
                     container["vbee_progress_msg"] = msg_text
             if msg_text:
                 self.log_emitted.emit(f"🌐 [Vbee] {msg_text}")
+        elif action == "CHATGPT_PROGRESS":
+            payload = msg.get("payload", {})
+            req_id = payload.get("request_id")
+            cue_count = int(payload.get("cue_count") or 0)
+            total_cues = int(payload.get("total_cues") or 0)
+            pct = int(payload.get("progress") or 0)
+            msg_text = payload.get("message") or ""
+            if req_id and req_id in self._pending_requests:
+                _, container = self._pending_requests[req_id]
+                container["chatgpt_progress"] = pct
+                container["chatgpt_cue_count"] = cue_count
+                container["chatgpt_total_cues"] = total_cues
+                container["chatgpt_msg"] = msg_text
+            self.chatgpt_progress_updated.emit(cue_count, total_cues, pct, msg_text)
         elif action == Actions.LOG_EVENT:
             payload = msg.get("payload", {})
             log_msg = payload.get("message") if isinstance(payload, dict) else None
@@ -374,11 +389,16 @@ class LocalAgent(QObject):
         srt_content: str,
         prompt_instruction: str = "",
         filename: str = "original.srt",
+        total_cues: int = 0,
         timeout_s: float = 600.0,
+        check_cancel: Any | None = None,
+        cancel_event: threading.Event | None = None,
+        progress_callback: Any | None = None,
     ) -> str:
         """Execute ChatGPT translation through the browser extension synchronously.
 
         Returns the extracted translated SRT string. Raises RuntimeError on failure or timeout.
+        Immediately cancels when cancel_event is set.
         """
         import uuid
 
@@ -400,6 +420,7 @@ class LocalAgent(QObject):
                     "srt_content": srt_content,
                     "prompt_instruction": prompt_instruction,
                     "filename": filename,
+                    "total_cues": total_cues,
                     "request_id": req_id,
                 },
             )
@@ -410,14 +431,32 @@ class LocalAgent(QObject):
             self.log_emitted.emit(f"Đã gửi file {filename} sang ChatGPT qua Edge. Đang chờ phản hồi...")
             t_start = time.monotonic()
             completed = False
+            last_log = 0.0
             while True:
-                if event.wait(timeout=3.0):
+                if check_cancel:
+                    check_cancel()
+                if cancel_event and cancel_event.is_set():
+                    logger.info("Yêu cầu dịch ChatGPT bị hủy bởi người dùng (request_id=%s).", req_id)
+                    raise InterruptedError("Tiến trình dịch đã bị người dùng dừng lại.")
+
+                if event.wait(timeout=0.5):
                     completed = True
                     break
+
                 elapsed = int(time.monotonic() - t_start)
                 if elapsed >= timeout_s:
                     break
-                self.log_emitted.emit(f"⏳ Đang chờ ChatGPT dịch ngữ cảnh ({elapsed}s)...")
+
+                # Dispatch progress callback if received from ChatGPTAdapter
+                if progress_callback and "chatgpt_progress" in container:
+                    p_pct = container.get("chatgpt_progress", 25)
+                    p_msg = container.get("chatgpt_msg", "")
+                    progress_callback(p_pct, p_msg)
+
+                now = time.monotonic()
+                if now - last_log >= 3.0:
+                    last_log = now
+                    self.log_emitted.emit(f"⏳ Đang chờ ChatGPT dịch ngữ cảnh ({elapsed}s)...")
 
             if not completed:
                 raise TimeoutError(f"Quá thời gian chờ phản hồi dịch từ ChatGPT ({timeout_s}s).")

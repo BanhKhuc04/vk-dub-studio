@@ -940,12 +940,15 @@ class MainWindow(QMainWindow):
         self._refresh()
 
     def _cancel_pipeline_runner(self) -> None:
-        if self.pipeline_runner and self.pipeline_runner.isRunning():
+        if self.pipeline_runner:
             self.log("⏹ Đang yêu cầu dừng quy trình xử lý tự động...")
             self.pipeline_runner.cancel()
+            self.busy = False
+            self.left.step4_pipeline.set_running_state(False)
             if hasattr(self, "step4_panel"):
                 self.step4_panel.set_running_state(False)
                 self.step4_panel.update_overall("⏹ Đã dừng", "#d29922")
+            self._refresh()
 
     def _retry_pipeline_step(self, step_id: str) -> None:
         if self.busy:

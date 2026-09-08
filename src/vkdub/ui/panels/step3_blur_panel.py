@@ -215,45 +215,31 @@ class Step3BlurPanel(QFrame):
         header_col.addWidget(subtitle)
         layout.addLayout(header_col)
 
-        # 2. Add Actions (Sub Region vs Blur Mask)
+        # 2. Add Actions - Đơn giản hóa thành 3 nút trực quan, dễ bấm
         add_buttons_row = QHBoxLayout()
         add_buttons_row.setSpacing(8)
 
-        self.btn_add_sub = QPushButton("🔴 + Thêm vùng lấy Sub")
-        self.btn_add_sub.setProperty("class", "redBtn")
-        self.btn_add_sub.setToolTip("Thêm vùng xác định phụ đề trên video (viền đỏ, không làm mờ video)")
-        self.btn_add_sub.clicked.connect(lambda: self.add_sub_region_requested.emit("bottom"))
-        add_buttons_row.addWidget(self.btn_add_sub, 1)
+        self.btn_preset_bottom = QPushButton("🔴 Sub ở dưới")
+        self.btn_preset_bottom.setProperty("class", "redBtn")
+        self.btn_preset_bottom.setToolTip("Thêm khung lấy phụ đề viền đỏ ở cạnh dưới (mặc định)")
+        self.btn_preset_bottom.clicked.connect(lambda: self.add_sub_region_requested.emit("bottom"))
+        add_buttons_row.addWidget(self.btn_preset_bottom, 1)
 
-        self.btn_add_region = QPushButton("🌫 + Thêm vùng làm mờ")
+        self.btn_preset_top = QPushButton("🔴 Sub ở trên")
+        self.btn_preset_top.setProperty("class", "redBtn")
+        self.btn_preset_top.setToolTip("Thêm khung lấy phụ đề viền đỏ ở cạnh trên (video sub trên)")
+        self.btn_preset_top.clicked.connect(lambda: self.add_sub_region_requested.emit("top"))
+        add_buttons_row.addWidget(self.btn_preset_top, 1)
+
+        self.btn_add_region = QPushButton("🌫 Thêm làm mờ")
         self.btn_add_region.setProperty("class", "actionBtn")
-        self.btn_add_region.setToolTip("Thêm vùng làm mờ mới (che watermark hoặc chữ cũ)")
+        self.btn_add_region.setToolTip("Thêm vùng làm mờ mới để che watermark hoặc phụ đề cũ")
         self.btn_add_region.clicked.connect(self.add_region_requested.emit)
         add_buttons_row.addWidget(self.btn_add_region, 1)
 
+        self.btn_add_sub = self.btn_preset_bottom  # alias for compatibility
+
         layout.addLayout(add_buttons_row)
-
-        # Quick preset buttons row for Sub region position
-        preset_row = QHBoxLayout()
-        preset_row.setSpacing(6)
-        lbl_preset = QLabel("Gợi ý Sub:")
-        lbl_preset.setStyleSheet("font-size: 10px; color: #94a3b8; font-weight: 700;")
-        preset_row.addWidget(lbl_preset)
-
-        self.btn_preset_bottom = QPushButton("📌 Sub ở dưới (Mặc định)")
-        self.btn_preset_bottom.setProperty("class", "subPresetBtn")
-        self.btn_preset_bottom.setToolTip("Thêm vùng lấy phụ đề ở cạnh dưới màn hình")
-        self.btn_preset_bottom.clicked.connect(lambda: self.add_sub_region_requested.emit("bottom"))
-        preset_row.addWidget(self.btn_preset_bottom)
-
-        self.btn_preset_top = QPushButton("📌 Sub ở trên")
-        self.btn_preset_top.setProperty("class", "subPresetBtn")
-        self.btn_preset_top.setToolTip("Thêm vùng lấy phụ đề ở cạnh trên màn hình (dành cho video có sub phía trên)")
-        self.btn_preset_top.clicked.connect(lambda: self.add_sub_region_requested.emit("top"))
-        preset_row.addWidget(self.btn_preset_top)
-
-        preset_row.addStretch(1)
-        layout.addLayout(preset_row)
 
         # 3. Region List
         lbl_list = QLabel("DANH SÁCH CÁC VÙNG:")

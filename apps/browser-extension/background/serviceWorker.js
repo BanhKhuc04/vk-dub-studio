@@ -454,29 +454,14 @@ async function handleVbeeGenerate(payload) {
       throw new Error("Vbee adapter không xác nhận đã bắt đầu xử lý.");
     }
 
-    // Keep tab awake and unthrottled during generation
-    if (payload?.request_id && tab?.id) {
-      const intervalId = setInterval(() => {
-        chrome.tabs.get(tab.id).then((t) => {
-          if (t && !t.active) {
-            chrome.tabs.update(tab.id, { active: true }).catch(() => {});
-          }
-        }).catch(() => {
-          clearInterval(intervalId);
-        });
-      }, 4000);
-      vbeeWakeIntervals.set(payload.request_id, intervalId);
-    }
+    // Không ép giật active tab liên tục để người dùng yên tâm làm việc khác.
+    // VbeeAdapter truy vấn trực tiếp qua API nền nên không cần tab phải active.
     // Kết quả thật sự tới sau (có thể tới 10 phút) qua message "VBEE_GENERATE_DONE"
     // được xử lý trong listener chrome.runtime.onMessage ở cuối file.
   } catch (err) {
     console.error("[SW] Error in handleVbeeGenerate:", err);
     if (payload?.request_id) {
       vbeeStartedAt.delete(payload.request_id);
-      if (vbeeWakeIntervals.has(payload.request_id)) {
-        clearInterval(vbeeWakeIntervals.get(payload.request_id));
-        vbeeWakeIntervals.delete(payload.request_id);
-      }
     }
     bridge.send({
       action: Actions.VBEE_VOICE_RESULT,
@@ -593,14 +578,26 @@ chrome.runtime.onMessage.addListener((message) => {
     return;
   }
 
+  if (message?.action === "CHATGPT_PROGRESS" && bridge && bridge.isConnected) {
+    bridge.send({
+      action: "CHATGPT_PROGRESS",
+      payload: {
+        cue_count: message.cue_count,
+        total_cues: message.total_cues,
+        progress: message.progress,
+        message: message.message,
+        request_id: message.request_id,
+      },
+    });
+    return;
+  }
+
   if (message?.action === "WAKE_VBEE_TAB") {
+    // Không ép cửa sổ nhảy lên đè màn hình người dùng
     chrome.tabs.query({}).then((allTabs) => {
       const vbeeTab = allTabs.find(isVbeeTab);
       if (vbeeTab && vbeeTab.id) {
         chrome.tabs.update(vbeeTab.id, { active: true }).catch(() => {});
-        if (vbeeTab.windowId && vbeeTab.windowId !== chrome.windows.WINDOW_ID_NONE) {
-          chrome.windows.update(vbeeTab.windowId, { focused: true }).catch(() => {});
-        }
       }
     }).catch(() => {});
     return;

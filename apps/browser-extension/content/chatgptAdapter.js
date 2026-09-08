@@ -137,8 +137,12 @@
     if (!assistantMessages.length) return null;
     const lastMessage = assistantMessages[assistantMessages.length - 1];
 
-    // Priority 1: Check code blocks (pre code, pre)
-    const codeBlocks = Array.from(lastMessage.querySelectorAll("pre code, pre"));
+    // Priority 1: Check code blocks (pre code) - DO NOT include 'pre' to avoid duplicate selection!
+    let codeBlocks = Array.from(lastMessage.querySelectorAll("pre code"));
+    if (codeBlocks.length === 0) {
+      codeBlocks = Array.from(lastMessage.querySelectorAll("pre"));
+    }
+
     const validSrtParts = [];
     for (const block of codeBlocks) {
       const codeText = block.innerText || block.textContent || "";
@@ -178,12 +182,42 @@
     return cleaned;
   }
 
+  async function ensureFreshChat() {
+    // Check if we already have assistant messages in the current conversation
+    const assistantMessages = document.querySelectorAll(
+      "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
+    );
+    if (assistantMessages.length === 0) {
+      return; // Already a fresh clean chat
+    }
+
+    try {
+      chrome.runtime.sendMessage({
+        action: "LOG_EVENT",
+        message: "ChatGPT: Đang mở đoạn chat mới để bắt đầu phiên dịch sạch...",
+      });
+    } catch (e) {}
+
+    const newChatBtn = (
+      document.querySelector("a[data-testid='create-new-chat-button']") ||
+      document.querySelector("a[href='/']") ||
+      document.querySelector("button[aria-label*='New chat']") ||
+      document.querySelector("button[aria-label*='Đoạn chat mới']") ||
+      document.querySelector("a[aria-label*='New chat']") ||
+      document.querySelector("a[aria-label*='Đoạn chat mới']") ||
+      document.querySelector("nav a[href='/']")
+    );
+
+    if (newChatBtn) {
+      newChatBtn.click();
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+  }
+
   async function findChatGPTFileInput() {
-    // Check if input[type='file'] already exists in DOM
     let fileInput = document.querySelector("input[type='file']");
     if (fileInput) return fileInput;
 
-    // Try finding the attach button (plus / paperclip / upload)
     const attachBtn = (
       document.querySelector("button[data-testid='attach-button']") ||
       document.querySelector("button[aria-label*='Attach']") ||
@@ -202,7 +236,6 @@
         fileInput = document.querySelector("input[type='file']");
         if (fileInput) return fileInput;
 
-        // Check for menu item 'Upload from computer' / 'Tải lên từ máy tính'
         const menuItems = Array.from(
           document.querySelectorAll("[role='menuitem'], button, div[role='button']")
         );
@@ -236,9 +269,35 @@
     );
   }
 
-  async function executeTranslation({ srt_content, prompt_instruction, filename, request_id }) {
+  function isSendButtonEnabled(btn) {
+    if (!btn) return false;
+    if (btn.disabled) return false;
+    if (btn.hasAttribute("disabled")) return false;
+    if (btn.getAttribute("aria-disabled") === "true") return false;
+    return true;
+  }
+
+  function triggerSendClick(sendBtn) {
+    if (!sendBtn) return;
+    try {
+      sendBtn.focus();
+      sendBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+      sendBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+      sendBtn.click();
+    } catch (e) {
+      try {
+        sendBtn.click();
+      } catch (e2) {}
+    }
+  }
+
+  async function executeTranslation({ srt_content, prompt_instruction, filename, total_cues, request_id }) {
     console.log("[ChatGPTAdapter] Executing translation for request:", request_id);
     const targetFilename = filename || "original.srt";
+    const targetTotalCues = total_cues || (srt_content.match(/-->/g) || []).length || 0;
+
+    // 0. Ensure a clean fresh chat
+    await ensureFreshChat();
 
     try {
       chrome.runtime.sendMessage({
@@ -289,15 +348,16 @@
       fileAttached = false;
     }
 
-    // 3. Build appropriate prompt
+    // 3. Build appropriate prompt (STRICT VIETNAMESE, NO CHINESE)
     let promptText = "";
     if (fileAttached) {
       const defaultFileInstruction =
         `Dịch toàn bộ nội dung file phụ đề ${targetFilename} đính kèm sang tiếng Việt:\n` +
-        "- Sát nghĩa, tự nhiên, đúng bối cảnh và cảm xúc câu chuyện.\n" +
-        "- Giữ nguyên 100% định dạng SRT, số thứ tự từng câu và mốc thời gian (timecode).\n" +
-        "- Không gộp câu, không tách câu, không bỏ sót bất kỳ câu nào.\n" +
-        "- Xuất toàn bộ nội dung file phụ đề SRT tiếng Việt hoàn chỉnh trong khối mã ```srt.";
+        "- Dịch 100% sang tiếng Việt tự nhiên, truyền cảm, đúng bối cảnh câu chuyện.\n" +
+        "- TUYỆT ĐỐI KHÔNG để sót bất kỳ câu nào bằng tiếng Trung hoặc ngôn ngữ gốc.\n" +
+        "- Giữ nguyên 100% định dạng SRT, số thứ tự từng câu (từ 1 đến hết) và toàn bộ mốc thời gian (timecode).\n" +
+        "- Không gộp câu, không tách câu, không bỏ sót câu nào.\n" +
+        "- Xuất toàn bộ nội dung file phụ đề SRT tiếng Việt hoàn chỉnh trong một khối mã ```srt duy nhất.";
 
       promptText = prompt_instruction || defaultFileInstruction;
     } else {
@@ -309,7 +369,7 @@
       } catch (e) {}
       const defaultInstruction =
         "Dịch lại toàn bộ file phụ đề SRT này sang tiếng Việt:\n" +
-        "- Sát nghĩa, đúng bối cảnh và cảm xúc nhân vật, văn phong tự nhiên.\n" +
+        "- Dịch 100% sang tiếng Việt tự nhiên, đúng bối cảnh, tuyệt đối không giữ lại tiếng Trung.\n" +
         "- Giữ nguyên 100% định dạng SRT, số thứ tự từng câu và mốc thời gian (timecode).\n" +
         "- Không gộp câu, không tách câu, không bỏ sót bất kỳ dòng nào.\n" +
         "- Tuyệt đối không thay đổi hay làm lệch bất kỳ mốc thời gian nào.\n" +
@@ -332,40 +392,25 @@
     insertPromptText(inputEl, promptText);
     await new Promise((r) => setTimeout(r, 800));
 
-    // 5. Click send button (wait up to 12s if file is still uploading)
+    // 5. Wait for file upload to complete and click Send (wait up to 45s, retry until generating)
     let sendBtn = null;
-    for (let i = 0; i < 40; i++) {
-      sendBtn = findSendButton();
-      if (sendBtn && !sendBtn.disabled) break;
-      inputEl.dispatchEvent(new Event("input", { bubbles: true }));
-      await new Promise((r) => setTimeout(r, 300));
-    }
-
-    if (sendBtn && !sendBtn.disabled) {
-      sendBtn.click();
-    } else {
-      inputEl.focus();
-      inputEl.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "Enter",
-          code: "Enter",
-          keyCode: 13,
-          bubbles: true,
-        })
-      );
-      inputEl.dispatchEvent(
-        new KeyboardEvent("keyup", {
-          key: "Enter",
-          code: "Enter",
-          keyCode: 13,
-          bubbles: true,
-        })
-      );
-      if (sendBtn) {
-        try {
-          sendBtn.click();
-        } catch (e) {}
+    const sendWaitStart = Date.now();
+    while (Date.now() - sendWaitStart < 45000) {
+      if (isGenerating()) {
+        break;
       }
+      sendBtn = findSendButton();
+      if (isSendButtonEnabled(sendBtn)) {
+        console.log("[ChatGPTAdapter] Send button is enabled. Triggering click...");
+        triggerSendClick(sendBtn);
+        await new Promise((r) => setTimeout(r, 1200));
+        if (isGenerating()) {
+          break;
+        }
+      } else {
+        inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      await new Promise((r) => setTimeout(r, 600));
     }
 
     console.log("[ChatGPTAdapter] Prompt submitted. Waiting for generation to begin...");
@@ -376,10 +421,10 @@
       });
     } catch (e) {}
 
-    // 6. Wait for streaming to begin
+    // 6. Wait for streaming to begin (or user manual click)
     let hasStarted = false;
     const waitStart = Date.now();
-    while (Date.now() - waitStart < 20000) {
+    while (Date.now() - waitStart < 60000) {
       const currentAssistantCount = document.querySelectorAll(
         "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
       ).length;
@@ -387,7 +432,12 @@
         hasStarted = true;
         break;
       }
-      await new Promise((r) => setTimeout(r, 400));
+      const fastSRT = extractSRTFromResponses();
+      if (fastSRT && fastSRT.includes("-->")) {
+        hasStarted = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
     }
 
     const startTime = Date.now();
@@ -426,15 +476,22 @@
         }
       }
 
-      if (now - lastLogTime > 3000) {
+      // Periodically update progress percentage
+      if (now - lastLogTime > 2000) {
         lastLogTime = now;
         try {
           const srtCurrent = extractSRTFromResponses();
           const cueCount = srtCurrent ? (srtCurrent.match(/-->/g) || []).length : 0;
           if (cueCount > 0) {
+            const estimatedTotal = targetTotalCues > 0 ? targetTotalCues : cueCount;
+            const pct = Math.min(90, Math.max(25, Math.round(25 + (cueCount / estimatedTotal) * 65)));
             chrome.runtime.sendMessage({
-              action: "LOG_EVENT",
-              message: `ChatGPT: Đang sinh bản dịch (đã dịch ${cueCount} câu)...`,
+              action: "CHATGPT_PROGRESS",
+              cue_count: cueCount,
+              total_cues: estimatedTotal,
+              progress: pct,
+              message: `ChatGPT đang dịch: ${cueCount}/${estimatedTotal} câu (${pct}%)...`,
+              request_id: request_id,
             });
           } else {
             chrome.runtime.sendMessage({
@@ -445,6 +502,7 @@
         } catch (e) {}
       }
 
+      // Check if generation finished OR valid full SRT ready
       if (!generating && (hasStarted || Date.now() - startTime > 4000)) {
         await new Promise((r) => setTimeout(r, 1500));
         if (!isGenerating()) {
@@ -456,28 +514,21 @@
             continue;
           }
 
-          const assistantMessages = Array.from(
-            document.querySelectorAll(
-              "div[data-message-author-role='assistant'], article[data-testid*='conversation-turn']"
-            )
-          );
-          if (assistantMessages.length > initialAssistantCount || initialAssistantCount === 0) {
-            const srtResult = extractSRTFromResponses();
-            if (srtResult && srtResult.includes("-->")) {
-              console.log("[ChatGPTAdapter] Translation extracted successfully!");
-              const totalCues = (srtResult.match(/-->/g) || []).length;
-              try {
-                chrome.runtime.sendMessage({
-                  action: "LOG_EVENT",
-                  message: `ChatGPT: Đã hoàn tất tạo bản dịch (${totalCues} câu)! Đang gửi dữ liệu về VK Dub Studio...`,
-                });
-              } catch (e) {}
-              return {
-                success: true,
-                translated_srt: srtResult,
-                request_id: request_id,
-              };
-            }
+          const srtResult = extractSRTFromResponses();
+          if (srtResult && srtResult.includes("-->")) {
+            console.log("[ChatGPTAdapter] Translation extracted successfully!");
+            const totalCues = (srtResult.match(/-->/g) || []).length;
+            try {
+              chrome.runtime.sendMessage({
+                action: "LOG_EVENT",
+                message: `ChatGPT: Đã hoàn tất tạo bản dịch (${totalCues} câu)! Đang gửi dữ liệu về VK Dub Studio...`,
+              });
+            } catch (e) {}
+            return {
+              success: true,
+              translated_srt: srtResult,
+              request_id: request_id,
+            };
           }
         }
       }

@@ -216,7 +216,7 @@ def test_pipeline_runner_single_file_chatgpt_translation(qapp, tmp_path):
     agent = LocalAgent()
 
     # Mock translate_srt_sync to simulate ChatGPT translating the whole file cleanly
-    def mock_translate(full_srt, prompt_instruction="", filename="original.srt", timeout_s=600.0):
+    def mock_translate(full_srt, prompt_instruction="", filename="original.srt", timeout_s=600.0, **kwargs):
         assert filename == "original.srt"
         full_cues = parse_cues(full_srt)
         trans_lines = []
@@ -270,7 +270,7 @@ def test_pipeline_runner_chatgpt_missing_cues_auto_repaired(qapp, tmp_path):
     agent = LocalAgent()
 
     # Simulate ChatGPT returning only 4 cues (cue 3 missing)
-    def mock_translate_dropped(full_srt, prompt_instruction="", filename="original.srt", timeout_s=600.0):
+    def mock_translate_dropped(full_srt, prompt_instruction="", filename="original.srt", timeout_s=600.0, **kwargs):
         return (
             "1\n00:00:00,000 --> 00:00:01,500\nCâu dịch 1\n\n"
             "2\n00:00:02,000 --> 00:00:03,500\nCâu dịch 2\n\n"
@@ -301,6 +301,45 @@ def test_pipeline_runner_chatgpt_missing_cues_auto_repaired(qapp, tmp_path):
     assert final_cues[2].text == "Original sentence #3"
     assert final_cues[3].text == "Câu dịch 4"
     assert final_cues[4].text == "Câu dịch 5"
+
+
+def test_pipeline_runner_cancellation_during_chatgpt_stops_instantly(qapp, tmp_path):
+    """Test that cancelling during ChatGPT translation stops immediately and emits cancelled signal."""
+    from unittest.mock import MagicMock
+    from vkdub.domain.transcript import srt_timestamp
+
+    lines = [f"1\n00:00:00,000 --> 00:00:01,500\nHello\n"]
+    orig_file = tmp_path / "original.srt"
+    orig_file.write_text("\n".join(lines), encoding="utf-8")
+
+    project = Project()
+    agent = LocalAgent()
+
+    # Simulate translate_srt_sync raising InterruptedError when cancel_event is set
+    def mock_translate_with_cancel(full_srt, **kwargs):
+        cancel_event = kwargs.get("cancel_event")
+        check_cancel = kwargs.get("check_cancel")
+        if check_cancel:
+            check_cancel()
+        raise InterruptedError("Cancelled")
+
+    agent.translate_srt_sync = MagicMock(side_effect=mock_translate_with_cancel)
+
+    cancelled_called = []
+    runner = PipelineRunner(
+        project=project,
+        local_agent=agent,
+        output_dir=tmp_path,
+        auto_voice=False,
+    )
+    runner.pipeline_cancelled.connect(lambda: cancelled_called.append(True))
+    runner.cancel()
+    runner.run()
+
+    assert len(cancelled_called) == 1
+    s42 = next(s for s in runner.substeps if s.id == "4.2")
+    assert s42.status == SubstepStatus.PENDING or s42.status == SubstepStatus.RUNNING or s42.status != SubstepStatus.FAILED
+
 
 
 

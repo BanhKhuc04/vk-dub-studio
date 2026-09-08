@@ -1,15 +1,15 @@
 {
-  "version": "2.1.13",
-  "published_at": "2026-09-08T19:34:51Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.13/VKDubStudio-Setup-2.1.13.exe",
-  "sha256": "162834b2f25c54f1841378a43e14406b8705f878b9877e9af6ab067914fba0ee",
-  "file_size_bytes": 301870509,
+  "version": "2.1.14",
+  "published_at": "2026-09-08T20:33:40Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.14/VKDubStudio-Setup-2.1.14.exe",
+  "sha256": "eb21d82f059d1b84341a7d29a3ce9ba29a56ec8d19a4d3f5ac3955745fa8f2f3",
+  "file_size_bytes": 301828992,
   "changelog": [
-    "VK Dub Studio v2.1.13 — Dịch ChatGPT 1 lần duy nhất bằng file .srt đính kèm & Tự động tiếp tục tạo",
-    "Loại bỏ hoàn toàn cơ chế chia nhỏ 6 phần: Gửi toàn bộ file phụ đề 1 lần duy nhất để giữ trọn ngữ cảnh câu chuyện",
-    "Tự động nạp file .srt đính kèm vào ChatGPT qua DataTransfer, tránh lỗi lag ô chat và tránh AI phản hồi tự do",
-    "Tự động bấm 'Tiếp tục tạo' (Continue generating) nếu phụ đề dài bị ngắt quãng giữa chừng",
-    "Nâng cấp bộ phân tích SRT và đối soát tự động bù đắp câu, chuẩn hóa 100% timecode theo file gốc",
-    "Ghép nối thông minh các khối mã code block SRT khi AI sinh phản hồi qua nhiều lượt"
+    "VK Dub Studio v2.1.14 — Nâng cấp toàn diện ChatGPT Bridge, Quản lý tiến trình & Giao diện tối giản",
+    "ChatGPT: Tự động làm mới chat, chờ nút gửi mở khóa (kiểm tra aria-disabled/upload file), hỗ trợ bấm tay không bị mất kết quả, cập nhật % tiến độ",
+    "Dừng tức thì: Sửa lỗi bấm Dừng không dừng, hủy tiến trình trong < 0.5s và kích hoạt lại ngay nút 'Bắt đầu xử lý toàn bộ'",
+    "Giao diện Bước 3: Tối giản thành 3 nút trực quan: '🔴 Sub ở dưới', '🔴 Sub ở trên', '🌫 Thêm làm mờ'",
+    "Trình duyệt: Chặn hoàn toàn hiện tượng tự động giật focus hoặc nhảy tab trình duyệt làm phiền khi người dùng đang làm việc khác",
+    "Bảo vệ ngôn ngữ: Chặn triệt để tiếng Trung lọt vào phụ đề dịch và giọng đọc Vbee bằng cơ chế đối soát timecode thông minh"
   ]
 }

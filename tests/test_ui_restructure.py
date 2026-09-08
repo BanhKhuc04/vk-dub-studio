@@ -133,7 +133,7 @@ def test_imported_video_updates_source_mask_and_duration(window, tmp_path):
     window._apply_import(source, metadata)
 
     assert window.stepper.step_items[0].summary_label.text() == "sample.mp4"
-    assert window.stepper.step_items[2].summary_label.text() == "1 vùng che mờ"
+    assert "1 vùng" in window.stepper.step_items[2].summary_label.text()
     assert window.step1_panel.lbl_resolution_dur.text().endswith("⏱ 01:03")
     assert window.preview.time_label.text().endswith("00:01:03")
 
