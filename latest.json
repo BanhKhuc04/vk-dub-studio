@@ -1,14 +1,15 @@
 {
   "version": "2.1.6",
-  "published_at": "2026-09-08T04:25:00Z",
+  "published_at": "2026-09-08T04:39:20Z",
   "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.6/VKDubStudio-Setup-2.1.6.exe",
-  "sha256": "395c0dbef56cab1b06c9f29a0a35726342c08439c0e3c398240f5a0790cd4b1f",
-  "file_size_bytes": 309999241,
+  "sha256": "5a30b1e90769afe9889acaaa17790757a39e92e410e5cce721a5260b180063dd",
+  "file_size_bytes": 301812496,
   "changelog": [
-    "VK Dub Studio v2.1.6 — Nâng cấp giao diện Cyber Obsidian Pro Studio & Vbee Extension",
-    "Đại tu giao diện toàn diện: Stepper Sidebar chuyên nghiệp, Media Inspector hiển thị chi tiết video, Floating Player Dock",
-    "Tối ưu Bước 1: Loại bỏ tải link web, tập trung hoàn toàn vào kéo thả & chọn file MP4 trực tiếp",
-    "Tích hợp Chromium Browser Extension: Dubbing tự động trên Vbee qua extension mượt mà, không mở cửa sổ riêng",
+    "VK Dub Studio v2.1.6 — Giao diện Cyber Obsidian Pro Studio & Vbee Extension",
+    "Đại tu giao diện toàn diện theo phong cách Studio chuyên nghiệp, gọn gàng, hiện đại",
+    "Tối ưu Bước 1: Loại bỏ lấy video từ link, tập trung hoàn toàn kéo thả & chọn file MP4",
+    "Bổ sung nhận diện thương hiệu vanhkhuc.dev & Dành tặng em bé Trang Vũ <3 trên thanh tiêu đề",
+    "Tích hợp Chromium Browser Extension điều khiển Vbee Studio trực tiếp",
     "Cập nhật an toàn qua HTTPS với xác thực SHA-256"
   ]
 }
