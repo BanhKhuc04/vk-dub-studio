@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from vkdub.bridge.protocol import BridgeStatus
-from vkdub.version import __version__
+from vkdub.version import APP_CREDIT, __version__
 
 
 class TopBar(QFrame):
@@ -126,6 +126,21 @@ class TopBar(QFrame):
         brand_box.addWidget(self.btn_open)
 
         layout.addLayout(brand_box)
+        layout.addStretch(1)
+
+        # Center branding credit
+        self.lbl_credit = QLabel(APP_CREDIT)
+        self.lbl_credit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_credit.setStyleSheet("""
+            color: #72d7c1;
+            font-size: 10px;
+            font-style: italic;
+            font-weight: 600;
+            line-height: 1.25;
+            background: transparent;
+        """)
+        layout.addWidget(self.lbl_credit)
+
         layout.addStretch(1)
 
         # ---------------------------------------------------------
