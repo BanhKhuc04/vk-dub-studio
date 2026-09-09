@@ -237,6 +237,36 @@ class ReviewController(QObject):
             self.window.tts.player.stop()
             self.window.tts.errors.clear()
             self.window.tts.force_retry_ids.clear()
+
+        # Invalidate old Vbee audio files on disk since script changed
+        if self.window.project.video_path:
+            from vkdub.utils.paths import workspace_root
+            out_name = self.window.project.video_path.stem or "dubbing"
+            export_dir = workspace_root() / "export" / out_name
+            if export_dir.is_dir():
+                (export_dir / ".vbee_script_hash").unlink(missing_ok=True)
+                (export_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+                (export_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+
+        from vkdub.orchestrator.pipeline_state import SubstepStatus
+        if hasattr(self.window, "left") and hasattr(self.window.left, "step4_pipeline"):
+            self.window.left.step4_pipeline.update_substep(
+                "4.4",
+                SubstepStatus.PENDING,
+                0,
+                "Kịch bản đã thay đổi. Chờ chốt và tạo lại giọng Vbee.",
+            )
+        if hasattr(self.window, "step4_panel"):
+            self.window.step4_panel.update_substep(
+                "4.4",
+                SubstepStatus.PENDING,
+                0,
+                "Kịch bản đã thay đổi. Chờ chốt và tạo lại giọng Vbee.",
+            )
+        if hasattr(self.window, "stepper"):
+            self.window.stepper.update_step_summary(3, "●", "Cần tạo lại voice", "#d29922")
+            self.window.stepper.update_step_summary(4, "●", "Kịch bản đã đổi", "#d29922")
+
         self._check(False)
         self.window.dirty = True
         self.window.review.show_project(self.window.project, rebuild, selected)
@@ -478,6 +508,9 @@ class ReviewController(QObject):
             output_dir.mkdir(parents=True, exist_ok=True)
             import shutil
             shutil.copy2(path, output_dir / "translated.srt")
+            (output_dir / ".vbee_script_hash").unlink(missing_ok=True)
+            (output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+            (output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
 
             self.window.log(f"✓ Đã nạp thành công phụ đề dịch: {path.name} ({len(result.lines)} câu)")
             if hasattr(self.window, "notify_success"):

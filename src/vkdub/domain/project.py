@@ -30,8 +30,14 @@ class Project:
     )
     voice_assets: dict[str, VoiceAsset] = field(default_factory=dict)
     master_voice_path: Path | None = None
+    master_voice_script_hash: str | None = None
     subtitle_style: SubtitleStyle = field(default_factory=SubtitleStyle)
     masks: list[MaskItem] = field(default_factory=list)
+
+    def invalidate_voice(self) -> None:
+        self.master_voice_path = None
+        self.master_voice_script_hash = None
+        self.voice_assets.clear()
 
     def current_voice(self, line_id: str) -> VoiceAsset | None:
         return self.current_voices().get(line_id)
@@ -39,6 +45,9 @@ class Project:
     def current_voices(self) -> dict[str, VoiceAsset]:
         if self.script is None or not self.is_approved:
             return {}
+        if self.master_voice_script_hash and self.revision_hash:
+            if self.master_voice_script_hash != self.revision_hash:
+                return {}
         res = {
             line.id: asset
             for line in self.script.lines
@@ -69,6 +78,10 @@ class Project:
 
     def _probe_master_voice(self) -> Path | None:
         if self.master_voice_path and self.master_voice_path.is_file():
+            if self.master_voice_script_hash and self.revision_hash:
+                if self.master_voice_script_hash != self.revision_hash:
+                    self.master_voice_path = None
+                    return None
             return self.master_voice_path
         candidates: list[Path] = []
         if self.output_directory:
@@ -83,7 +96,17 @@ class Project:
             candidates.append(export_dir / "vbee_master_raw.mp3")
         for c in candidates:
             if c.is_file():
+                hash_file = c.parent / ".vbee_script_hash"
+                if hash_file.is_file() and self.revision_hash:
+                    try:
+                        saved_hash = hash_file.read_text(encoding="utf-8").strip()
+                        if saved_hash and saved_hash != self.revision_hash:
+                            continue
+                    except OSError:
+                        pass
                 self.master_voice_path = c
+                if self.revision_hash:
+                    self.master_voice_script_hash = self.revision_hash
                 return c
         return None
 
@@ -92,6 +115,9 @@ class Project:
         if not (self.is_approved and self.script and self.script.lines):
             return False
         if self.master_voice_path and self.master_voice_path.is_file():
+            if self.master_voice_script_hash and self.revision_hash:
+                if self.master_voice_script_hash != self.revision_hash:
+                    return False
             return True
         if self._probe_master_voice():
             return True
@@ -153,6 +179,7 @@ class Project:
         if script != self.script:
             self.script = script
             self.approved_revision_hash = None
+            self.invalidate_voice()
 
     def approve(self, confirmed: bool) -> str:
         if confirmed is not True or not self.script_valid:

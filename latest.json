@@ -1,15 +1,14 @@
 {
-  "version": "2.1.16",
-  "published_at": "2026-09-09T03:12:18Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.16/VKDubStudio-Setup-2.1.16.exe",
-  "sha256": "20f2362a3e1310169bb1c45161fe6cd542c5fa174dfd49a40f875380e7e146a8",
-  "file_size_bytes": 301832675,
+  "version": "2.1.17",
+  "published_at": "2026-09-09T11:20:00Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.17/VKDubStudio-Setup-2.1.17.exe",
+  "sha256": "",
+  "file_size_bytes": 0,
   "changelog": [
-    "VK Dub Studio v2.1.16 — Tự động chuyển bước xuất CapCut/MP4 & Vá lỗi nạp/tải SRT khi duyệt kịch bản",
-    "Tự động chuyển bước: Sửa triệt để lỗi không tự chuyển sang Bước 5 sau khi hoàn thành 4.4, tự động mở khóa trạng thái bận và kích hoạt nút Xuất CapCut/MP4",
-    "Khắc phục phê duyệt: Thêm setter an toàn cho is_approved và lưu revision hash chính xác, ngăn chặn lỗi crash ngầm",
-    "Nạp/Tải kịch bản linh hoạt: Cho phép nạp và tải SRT dịch cũng như SRT gốc mọi lúc, kể cả khi đã duyệt kịch bản, không bị khóa trạng thái",
-    "Ngăn xung đột TTS cũ: Chặn triệt để luồng Edge-TTS cũ chạy đè khi âm thanh Vbee đã sẵn sàng",
-    "Giao diện TopBar: Tinh chỉnh nút '✨ Tạo dự án mới' và nhãn dự án riêng biệt, tránh nhầm lẫn"
+    "VK Dub Studio v2.1.17 — Tự động quay lại Bước 04 tạo lại Vbee khi sửa / nạp lại kịch bản",
+    "Tự động quay lại Bước 04: Chuyển ngay về màn hình Automation Console khi chốt kịch bản để theo dõi tiến trình tạo giọng Vbee trực tiếp",
+    "Hủy cache voice triệt để: Xóa bỏ liên kết audio cũ và dọn dẹp các file audio stale khi câu thoại bị sửa, dịch lại hoặc nạp file SRT mới",
+    "Bắt buộc tạo mới 100% Vbee: Kiểm tra hash kịch bản (force_regen), ngăn chặn tình trạng tái sử dụng audio cũ của bản dịch trước",
+    "Đồng bộ quy trình hoàn hảo: Tự động chuyển tiếp sang Bước 05 sau khi Vbee hoàn thành để người dùng xuất CapCut ngay"
   ]
 }

@@ -915,6 +915,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "stepper"):
             self.stepper.update_step_summary(3, "●", "Đang tạo giọng...", "#58a6ff")
 
+        # Tự động quay lại Bước 04 (bước trước đó) để người dùng theo dõi trực tiếp tiến trình Vbee
+        if hasattr(self, "switch_to_step"):
+            self.switch_to_step(3)
+
         if hasattr(self, "diagnostics_drawer"):
             self.diagnostics_drawer.set_expanded(True)
 
@@ -922,6 +926,11 @@ class MainWindow(QMainWindow):
 
         out_name = self.project.video_path.stem if self.project.video_path else "dubbing"
         output_dir = workspace_root() / "export" / out_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / ".vbee_script_hash").unlink(missing_ok=True)
+        (output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+        (output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+        self.project.invalidate_voice()
 
         import importlib
         import vkdub.orchestrator.pipeline_runner as pr_mod
@@ -965,23 +974,20 @@ class MainWindow(QMainWindow):
         if self.busy:
             return
         self.log(f"🔄 Đang thực hiện lại bước {step_id}...")
-        if self.pipeline_runner:
-            out_dir = self.pipeline_runner.output_dir
-            if step_id == "4.1":
-                orig = out_dir / "original.srt"
-                if orig.exists():
-                    orig.unlink()
-            elif step_id == "4.2":
-                trans = out_dir / "translated.srt"
-                if trans.exists():
-                    trans.unlink()
-            elif step_id in ("4.3", "4.4"):
-                m_raw = out_dir / "vbee_master_raw.mp3"
-                m_tl = out_dir / "master_narration_timeline.mp3"
-                if m_raw.exists():
-                    m_raw.unlink()
-                if m_tl.exists():
-                    m_tl.unlink()
+        out_name = self.project.video_path.stem if self.project.video_path else "dubbing"
+        out_dir = workspace_root() / "export" / out_name
+        if step_id == "4.1":
+            for f in ("original.srt", "translated.srt", "voice_script.txt", "vbee_master_raw.mp3", "master_narration_timeline.mp3", ".vbee_script_hash", ".pipeline_checkpoint.json"):
+                (out_dir / f).unlink(missing_ok=True)
+            self.project.invalidate_voice()
+        elif step_id == "4.2":
+            for f in ("translated.srt", "voice_script.txt", "vbee_master_raw.mp3", "master_narration_timeline.mp3", ".vbee_script_hash", ".pipeline_checkpoint.json"):
+                (out_dir / f).unlink(missing_ok=True)
+            self.project.invalidate_voice()
+        elif step_id in ("4.3", "4.4"):
+            for f in ("vbee_master_raw.mp3", "master_narration_timeline.mp3", ".vbee_script_hash"):
+                (out_dir / f).unlink(missing_ok=True)
+            self.project.invalidate_voice()
         self._start_pipeline_runner()
 
     def _on_import_chatgpt_srt_clicked(self) -> None:
@@ -1041,6 +1047,12 @@ class MainWindow(QMainWindow):
             dest_trans_path = output_dir / "translated.srt"
             dest_trans_path.write_text(final_content, encoding="utf-8")
 
+            # Invalidate old voice audio & checkpoint since translated subtitles changed
+            (output_dir / ".vbee_script_hash").unlink(missing_ok=True)
+            (output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+            (output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+            self.project.invalidate_voice()
+
             self.log(
                 f"✓ Đã nạp thành công file phụ đề dịch: {chosen_path.name} ({val_res.cue_count} câu)"
             )
@@ -1057,6 +1069,20 @@ class MainWindow(QMainWindow):
                     f"Đã nạp file dịch ({val_res.cue_count} câu)",
                     artifact=dest_trans_path,
                 )
+                self.step4_panel.update_substep(
+                    "4.4",
+                    SubstepStatus.PENDING,
+                    0,
+                    "Đã nạp bản dịch mới. Chờ tạo giọng đọc Vbee.",
+                )
+            self.left.step4_pipeline.update_substep(
+                "4.4",
+                SubstepStatus.PENDING,
+                0,
+                "Đã nạp bản dịch mới. Chờ tạo giọng đọc Vbee.",
+            )
+            if hasattr(self, "stepper"):
+                self.stepper.update_step_summary(3, "●", "Đã nạp SRT · Chờ tạo voice", "#58a6ff")
             self._on_pipeline_artifact_ready("translated_srt", dest_trans_path)
 
         except Exception as exc:

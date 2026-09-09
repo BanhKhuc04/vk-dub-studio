@@ -199,6 +199,33 @@ class TranslationController(QObject):
                 draft_from_source(self.window.project.transcript, result)
             )
             self.window.project.approved_revision_hash = None
+
+            if self.window.project.video_path:
+                out_name = self.window.project.video_path.stem or "dubbing"
+                export_dir = workspace_root() / "export" / out_name
+                if export_dir.is_dir():
+                    (export_dir / ".vbee_script_hash").unlink(missing_ok=True)
+                    (export_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+                    (export_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+
+            from vkdub.orchestrator.pipeline_state import SubstepStatus
+            if hasattr(self.window, "left") and hasattr(self.window.left, "step4_pipeline"):
+                self.window.left.step4_pipeline.update_substep(
+                    "4.4",
+                    SubstepStatus.PENDING,
+                    0,
+                    "Kịch bản vừa được dịch mới. Chờ tạo giọng đọc Vbee.",
+                )
+            if hasattr(self.window, "step4_panel"):
+                self.window.step4_panel.update_substep(
+                    "4.4",
+                    SubstepStatus.PENDING,
+                    0,
+                    "Kịch bản vừa được dịch mới. Chờ tạo giọng đọc Vbee.",
+                )
+            if hasattr(self.window, "stepper"):
+                self.window.stepper.update_step_summary(3, "●", "Đã dịch mới · Chờ tạo voice", "#58a6ff")
+
             self.window.dirty = True
             self.window.review_controller.bind_project()
             self.window.log("Đã dịch. Bản gốc được giữ nguyên; kịch bản chưa duyệt.")

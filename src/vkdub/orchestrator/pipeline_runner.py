@@ -140,6 +140,15 @@ class PipelineRunner(QThread):
         if loaded:
             old_state, old_artifacts, _ = loaded
             self.artifacts = old_artifacts
+            if self.target_step == "4.4":
+                self.artifacts.timeline_master_audio = None
+                self.artifacts.vbee_master_audio = None
+                for s in self.substeps:
+                    if s.id == "4.4":
+                        s.status = SubstepStatus.RUNNING
+                        s.progress = 10
+                        s.artifact_path = None
+                        s.message = "Đang chuẩn bị tạo giọng Vbee..."
             logger.info(
                 "Found checkpoint with state=%s. Resuming existing artifacts...",
                 old_state.value,
@@ -381,6 +390,13 @@ class PipelineRunner(QThread):
                         f"✓ Phụ đề dịch hợp lệ 100%: Khớp toàn bộ {total_cues} câu thoại ({range_str})."
                     )
 
+                    # Invalidate downstream 4.4 audio artifacts since translation is fresh
+                    self.artifacts.vbee_master_audio = None
+                    self.artifacts.timeline_master_audio = None
+                    (self.output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+                    (self.output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+                    (self.output_dir / ".vbee_script_hash").unlink(missing_ok=True)
+
                     duration = time.monotonic() - t0
                     self.artifacts.translated_srt = trans_srt_path
                     self.artifact_ready.emit("translated_srt", trans_srt_path)
@@ -532,19 +548,43 @@ class PipelineRunner(QThread):
                     script_content = trans_srt_path.read_text(encoding="utf-8", errors="replace")
                 else:
                     raise ValueError("Không tìm thấy kịch bản để tạo giọng đọc Vbee.")
-            master_audio_path = self.artifacts.vbee_master_audio or (
-                self.output_dir / "vbee_master_raw.mp3"
-            )
-            timeline_audio_path = self.artifacts.timeline_master_audio or (
-                self.output_dir / "master_narration_timeline.mp3"
+            import hashlib
+            curr_voice_digest = hashlib.sha256(
+                f"{self.voice_name}\0{self.speed}\0{script_content}".encode("utf-8")
+            ).hexdigest()
+
+            hash_file = self.output_dir / ".vbee_script_hash"
+            saved_hash = hash_file.read_text(encoding="utf-8").strip() if hash_file.is_file() else None
+
+            force_regen = (
+                self.target_step == "4.4"
+                or not saved_hash
+                or saved_hash != curr_voice_digest
             )
 
-            timeline_ready = bool(
-                timeline_audio_path
-                and _timeline_audio_is_usable(
-                    timeline_audio_path, self.project.duration_ms
+            if force_regen:
+                self.artifacts.vbee_master_audio = None
+                self.artifacts.timeline_master_audio = None
+                (self.output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+                (self.output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+                hash_file.unlink(missing_ok=True)
+                master_audio_path = None
+                timeline_audio_path = None
+                timeline_ready = False
+            else:
+                master_audio_path = self.artifacts.vbee_master_audio or (
+                    self.output_dir / "vbee_master_raw.mp3"
                 )
-            )
+                timeline_audio_path = self.artifacts.timeline_master_audio or (
+                    self.output_dir / "master_narration_timeline.mp3"
+                )
+                timeline_ready = bool(
+                    timeline_audio_path
+                    and _timeline_audio_is_usable(
+                        timeline_audio_path, self.project.duration_ms
+                    )
+                )
+
             if not timeline_ready:
                 self.state = PipelineState.VOICE_GENERATING
                 self.state_changed.emit(
@@ -610,6 +650,10 @@ class PipelineRunner(QThread):
                     total_duration_ms=self.project.duration_ms,
                     ffmpeg_exe=ffmpeg_exe,
                 )
+
+                hash_file.write_text(curr_voice_digest, encoding="utf-8")
+                if hasattr(self.project, "master_voice_script_hash"):
+                    self.project.master_voice_script_hash = self.project.revision_hash or curr_voice_digest
 
                 duration = time.monotonic() - t0
                 self.artifacts.timeline_master_audio = timeline_audio_path
