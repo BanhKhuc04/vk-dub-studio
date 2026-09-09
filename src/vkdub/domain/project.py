@@ -48,7 +48,7 @@ class Project:
         }
         if not res and not self.master_voice_path:
             self._probe_master_voice()
-        if not res and self.master_voice_path and self.master_voice_path.is_file():
+        if (not res or len(res) < len(self.script.lines)) and self.master_voice_path and self.master_voice_path.is_file():
             from datetime import datetime
             now_iso = datetime.now().astimezone().isoformat()
             fake_hash = "0" * 64
@@ -73,11 +73,14 @@ class Project:
         candidates: list[Path] = []
         if self.output_directory:
             candidates.append(self.output_directory / "master_narration_timeline.mp3")
+            candidates.append(self.output_directory / "vbee_master_audio.mp3")
+            candidates.append(self.output_directory / "vbee_master_raw.mp3")
         if self.video_path:
             from vkdub.utils.paths import workspace_root
-            candidates.append(
-                workspace_root() / "export" / self.video_path.stem / "master_narration_timeline.mp3"
-            )
+            export_dir = workspace_root() / "export" / self.video_path.stem
+            candidates.append(export_dir / "master_narration_timeline.mp3")
+            candidates.append(export_dir / "vbee_master_audio.mp3")
+            candidates.append(export_dir / "vbee_master_raw.mp3")
         for c in candidates:
             if c.is_file():
                 self.master_voice_path = c
@@ -137,6 +140,14 @@ class Project:
             and self.approved_revision_hash
             and self.approved_revision_hash == self.revision_hash
         )
+
+    @is_approved.setter
+    def is_approved(self, value: bool) -> None:
+        if value:
+            if self.script_valid:
+                self.approved_revision_hash = self.revision_hash
+        else:
+            self.approved_revision_hash = None
 
     def set_script(self, script: ScriptDocument | None) -> None:
         if script != self.script:

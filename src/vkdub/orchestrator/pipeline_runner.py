@@ -270,6 +270,8 @@ class PipelineRunner(QThread):
                     except Exception:
                         self.log_emitted.emit(f"ℹ Tái sử dụng phụ đề gốc có sẵn ({orig_srt_path.name}).")
 
+                    self.artifacts.original_srt = orig_srt_path
+                    self.artifact_ready.emit("original_srt", orig_srt_path)
                     self._update_substep(
                         "4.1",
                         SubstepStatus.SUCCESS,
@@ -634,6 +636,8 @@ class PipelineRunner(QThread):
                 self.log_emitted.emit(
                     f"ℹ Tái sử dụng master narration timeline có sẵn: {timeline_audio_path.name}"
                 )
+                self.artifacts.timeline_master_audio = timeline_audio_path
+                self.artifact_ready.emit("master_audio", timeline_audio_path)
                 self._update_substep(
                     "4.4",
                     SubstepStatus.SUCCESS,
@@ -641,6 +645,8 @@ class PipelineRunner(QThread):
                     "Đã có sẵn master audio",
                     artifact=timeline_audio_path,
                 )
+                self.state = PipelineState.VOICE_READY
+                self.state_changed.emit(self.state, "Tạo voice Vbee hoàn tất.")
 
             # =======================================================
             # FINAL REVIEW READY

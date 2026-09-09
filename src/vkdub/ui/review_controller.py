@@ -126,10 +126,20 @@ class ReviewController(QObject):
         selected = panel.rows.currentRow()
         exists = script is not None
         selected_ok = bool(script and 0 <= selected < len(script.lines))
+        from vkdub.utils.paths import workspace_root
+        out_name = project.video_path.stem if project.video_path else "dubbing"
+        export_dir = workspace_root() / "export" / out_name
+        orig_file_exists = (export_dir / "original.srt").is_file()
+        trans_file_exists = (export_dir / "translated.srt").is_file()
+
         for name, button in panel.buttons.items():
             ready = exists
-            if name == "load":
+            if name in ("load", "load_source"):
                 ready = project.video_path is not None
+            elif name == "save_source":
+                ready = (project.transcript is not None) or orig_file_exists
+            elif name == "save":
+                ready = exists or trans_file_exists
             elif name == "prepare":
                 ready = project.video_path is not None and script is None
             elif name == "undo":
@@ -306,14 +316,21 @@ class ReviewController(QObject):
         self.window.log(f"Đã duyệt kịch bản {revision[:12]}.")
         self.window._refresh()
         self.refresh()
-        if hasattr(self.window, "_start_vbee_generation") and not project.voice_ready:
-            self.window._start_vbee_generation()
-        elif getattr(self.window, "legacy_tts_enabled", False) or self.window.tts.can_generate():
-            self.window.tts.start()
-        else:
-            self.window.log("Đã lưu phê duyệt kịch bản. Sẵn sàng xuất MP4 hoặc CapCut.")
+        if project.voice_ready:
+            self.window.log("✓ Kịch bản và âm thanh đã sẵn sàng. Sẵn sàng xuất MP4 hoặc CapCut.")
             if hasattr(self.window, "statusBar") and self.window.statusBar():
                 self.window.statusBar().showMessage("✓ Kịch bản đã duyệt! Sẵn sàng xuất MP4 hoặc CapCut.", 5000)
+            if hasattr(self.window, "notify_success"):
+                self.window.notify_success(
+                    "Sẵn sàng xuất",
+                    "Kịch bản và audio timeline đã sẵn sàng. Bạn có thể xuất video MP4 hoặc CapCut ngay."
+                )
+        elif hasattr(self.window, "_start_vbee_generation"):
+            self.window._start_vbee_generation()
+        elif getattr(self.window, "legacy_tts_enabled", False):
+            self.window.tts.start()
+        else:
+            self.window.log("Đã lưu phê duyệt kịch bản.")
         return True
 
     def confirm_replace(self) -> bool:
@@ -450,50 +467,85 @@ class ReviewController(QObject):
         if self.window.busy or self.window.project.video_path is None:
             return False
         try:
+            from vkdub.utils.paths import workspace_root
             transcript = self.window.project.transcript
             result = read_srt(path, source_digest(transcript) if transcript else None)
-            if self.confirm_replace():
-                self.commit(result, "Mở SRT", selected=0)
-                self.window.log("Đã mở SRT tiếng Việt. Bản gốc được giữ nguyên; cần duyệt lại.")
-                return True
-        except (ValueError, OSError) as exc:
-            self.window._error(str(exc))
+            self.commit(result, "Mở SRT", selected=0)
+
+            # Copy to export folder as translated.srt
+            out_name = self.window.project.video_path.stem or "dubbing"
+            output_dir = workspace_root() / "export" / out_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(path, output_dir / "translated.srt")
+
+            self.window.log(f"✓ Đã nạp thành công phụ đề dịch: {path.name} ({len(result.lines)} câu)")
+            if hasattr(self.window, "notify_success"):
+                self.window.notify_success("Nạp SRT dịch thành công", f"Đã nạp {len(result.lines)} câu thoại từ {path.name}.")
+            self.window._refresh()
+            self.refresh()
+            return True
+        except Exception as exc:
+            self.window._error(f"Không thể nạp file SRT dịch: {exc}")
         return False
 
     def save_srt_dialog(self) -> None:
+        from vkdub.utils.paths import workspace_root
         script = self.window.project.script
-        if script is None:
+        out_name = self.window.project.video_path.stem if self.window.project.video_path else "dubbing"
+        trans_file = workspace_root() / "export" / out_name / "translated.srt"
+
+        if script is None and not trans_file.is_file():
+            self.window._error("Chưa có kịch bản dịch để tải về.")
             return
+
         path, _ = QFileDialog.getSaveFileName(
-            self.window, "Lưu SRT tiếng Việt", "script.srt", "SRT (*.srt)"
+            self.window, "Lưu SRT dịch (Tiếng Việt)", "translated.srt", "SRT (*.srt);;Tất cả tệp (*.*)"
         )
         if path:
             target = Path(path)
             if target.suffix.lower() != ".srt":
                 target = Path(f"{target}.srt")
-                if (
-                    target.exists()
-                    and QMessageBox.question(
-                        self.window, "Ghi đè SRT?", f"{target.name} đã tồn tại. Ghi đè?"
-                    )
-                    != QMessageBox.StandardButton.Yes
-                ):
-                    return
-            write_srt(target, script, self.window.project.duration_ms)
-            self.window.log("Đã lưu SRT tiếng Việt.")
+            try:
+                if script is not None:
+                    write_srt(target, script, self.window.project.duration_ms)
+                elif trans_file.is_file():
+                    import shutil
+                    shutil.copy2(trans_file, target)
+                self.window.log(f"Đã lưu SRT tiếng Việt: {target.name}")
+                if hasattr(self.window, "notify_success"):
+                    self.window.notify_success("Tải SRT dịch thành công", f"Đã lưu: {target.name}")
+            except Exception as exc:
+                self.window._error(f"Không thể lưu SRT dịch: {exc}")
 
     def save_source_srt_dialog(self) -> None:
-        if self.window.project.transcript is None:
-            self.window.log("Chưa có kịch bản gốc để xuất SRT.")
+        from vkdub.utils.paths import workspace_root
+        transcript = self.window.project.transcript
+        out_name = self.window.project.video_path.stem if self.window.project.video_path else "dubbing"
+        orig_file = workspace_root() / "export" / out_name / "original.srt"
+
+        if transcript is None and not orig_file.is_file():
+            self.window._error("Chưa có kịch bản gốc (original.srt) để tải về.")
             return
+
         path, _ = QFileDialog.getSaveFileName(
-            self.window, "Lưu SRT chưa dịch", "script-goc.srt", "SRT (*.srt)"
+            self.window, "Lưu SRT chưa dịch (gốc)", "original.srt", "SRT (*.srt);;Tất cả tệp (*.*)"
         )
         if path:
             target = Path(path)
             if target.suffix.lower() != ".srt":
                 target = Path(f"{target}.srt")
-            self.save_source_srt(target)
+            try:
+                if transcript is not None:
+                    self.save_source_srt(target)
+                elif orig_file.is_file():
+                    import shutil
+                    shutil.copy2(orig_file, target)
+                    self.window.log(f"Đã lưu SRT chưa dịch: {target.name}")
+                if hasattr(self.window, "notify_success"):
+                    self.window.notify_success("Tải SRT gốc thành công", f"Đã lưu: {target.name}")
+            except Exception as exc:
+                self.window._error(f"Không thể lưu SRT gốc: {exc}")
 
     def save_source_srt(self, path: Path) -> None:
         transcript = self.window.project.transcript

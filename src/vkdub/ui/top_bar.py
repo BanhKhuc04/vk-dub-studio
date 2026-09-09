@@ -105,7 +105,7 @@ class TopBar(QFrame):
         brand_box.addWidget(sep)
 
         # Nút Project mới
-        self.btn_new = QPushButton("✨ Project mới")
+        self.btn_new = QPushButton("✨ Tạo dự án mới")
         self.btn_new.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #b45309, stop:1 #d97706);
@@ -128,14 +128,14 @@ class TopBar(QFrame):
         self.btn_new.clicked.connect(self.new_requested.emit)
         brand_box.addWidget(self.btn_new)
 
-        self.lbl_project_name = QLabel("📄 Project mới")
+        self.lbl_project_name = QLabel("📁 Dự án: Mới")
         self.lbl_project_name.setStyleSheet("""
             font-size: 11px;
             font-weight: 600;
             color: #38bdf8;
-            background-color: #0c1424;
-            border: 1px solid #16263f;
-            padding: 3px 8px;
+            background-color: #081220;
+            border: 1px solid #0c2646;
+            padding: 3px 10px;
             border-radius: 4px;
         """)
         brand_box.addWidget(self.lbl_project_name)
@@ -390,16 +390,16 @@ class TopBar(QFrame):
             self.update_bridge_status(self._last_status)
 
     def set_project_name(self, name: str, dirty: bool = False) -> None:
-        dirty_flag = " *" if dirty else ""
-        self.lbl_project_name.setText(f"📄 {name}{dirty_flag}")
+        dirty_flag = " ●" if dirty else ""
+        self.lbl_project_name.setText(f"📁 Dự án: {name}{dirty_flag}")
         if dirty:
             self.lbl_project_name.setStyleSheet("""
                 font-size: 11px;
                 font-weight: 700;
                 color: #fbbf24;
-                background-color: #451a03;
-                border: 1px solid #b45309;
-                padding: 3px 8px;
+                background-color: #1a1710;
+                border: 1px solid #78350f;
+                padding: 3px 10px;
                 border-radius: 4px;
             """)
         else:
@@ -407,9 +407,9 @@ class TopBar(QFrame):
                 font-size: 11px;
                 font-weight: 600;
                 color: #38bdf8;
-                background-color: #0c1424;
-                border: 1px solid #16263f;
-                padding: 3px 8px;
+                background-color: #081220;
+                border: 1px solid #0c2646;
+                padding: 3px 10px;
                 border-radius: 4px;
             """)
 

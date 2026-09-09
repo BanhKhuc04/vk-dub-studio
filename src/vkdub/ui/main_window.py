@@ -1122,7 +1122,29 @@ class MainWindow(QMainWindow):
 
     def _on_pipeline_artifact_ready(self, key: str, path: Path) -> None:
         self.log(f"✓ Đã tạo artifact [{key}]: {path.name}")
-        if key == "translated_srt":
+        if key == "original_srt":
+            try:
+                from vkdub.services.srt_validator import parse_cues
+                from vkdub.domain.transcript import SubtitleSegment, Transcript
+                raw = path.read_text(encoding="utf-8", errors="replace")
+                cues = parse_cues(raw)
+                if cues:
+                    self.project.transcript = Transcript(
+                        segments=tuple(
+                            SubtitleSegment(id=c.index, start=c.start_ms / 1000.0, end=c.end_ms / 1000.0, text=c.text)
+                            for c in cues
+                        ),
+                        language=self.project.source_language or "zh",
+                        requested_language="auto",
+                        duration=(cues[-1].end_ms / 1000.0),
+                        model="base",
+                        device="cpu",
+                        fingerprint="0" * 64,
+                        cache_key="0" * 64,
+                    )
+            except Exception as exc:
+                logger.warning("Không thể nạp transcript từ original_srt: %s", exc)
+        elif key == "translated_srt":
             self.review_controller.bind_project()
         elif key == "master_audio":
             self.project.master_voice_path = path
@@ -1133,14 +1155,22 @@ class MainWindow(QMainWindow):
         if hasattr(self, "step4_panel"):
             self.step4_panel.set_running_state(False)
 
+        # Ensure timeline_master_audio is probed if None
+        timeline_audio = getattr(artifacts, "timeline_master_audio", None)
+        if not timeline_audio and self.project.video_path:
+            cand = workspace_root() / "export" / self.project.video_path.stem / "master_narration_timeline.mp3"
+            if cand.is_file():
+                timeline_audio = cand
+                artifacts.timeline_master_audio = cand
+
         has_voice = bool(
-            artifacts.timeline_master_audio and Path(artifacts.timeline_master_audio).is_file()
+            timeline_audio and Path(timeline_audio).is_file()
         )
         if has_voice:
-            self.project.master_voice_path = artifacts.timeline_master_audio
+            self.project.master_voice_path = Path(timeline_audio)
             if self.project.script:
-                self.project.is_approved = True
                 self.project.approved_revision_hash = self.project.revision_hash
+                self.project.is_approved = True
             self.left.step4_pipeline.overall_badge.setText("✔ Hoàn thành (4/4)")
             self.left.step4_pipeline.overall_badge.setStyleSheet("color: #3fb950; font-weight: bold;")
             self.left.lbl_review_status.setText(
