@@ -109,6 +109,37 @@ def download_media(
     output_dir.mkdir(parents=True, exist_ok=True)
     platform = detect_platform(url)
 
+    # 1. Pre-check: Deduplication by source_url if file still exists on disk
+    with db_session() as conn:
+        existing = conn.execute(
+            """
+            SELECT id, project_id, name, local_path, source_url, platform,
+                   creator, duration_sec, resolution, file_size, sha256_hash,
+                   category, status, created_at, updated_at
+            FROM assets WHERE source_url = ?
+            """,
+            (url,),
+        ).fetchone()
+        if existing and existing["local_path"] and Path(existing["local_path"]).is_file():
+            logger.info("URL already downloaded: %s -> Reusing %s", url, existing["local_path"])
+            if progress_callback:
+                progress_callback(100.0, "Phát hiện video đã có trong thư viện, tái sử dụng tài nguyên...")
+            return Asset(
+                id=existing["id"],
+                name=existing["name"],
+                local_path=Path(existing["local_path"]),
+                project_id=project_id or existing["project_id"],
+                source_url=existing["source_url"],
+                platform=existing["platform"],
+                creator=existing["creator"],
+                duration_sec=existing["duration_sec"],
+                resolution=existing["resolution"],
+                file_size=existing["file_size"],
+                sha256_hash=existing["sha256_hash"],
+                category=existing["category"],
+                status=existing["status"],
+            )
+
     # Format selector
     if "Audio" in quality_choice or "MP3" in quality_choice:
         ydl_format = "bestaudio/best"
@@ -182,6 +213,30 @@ def download_media(
     duration_sec = float(meta.get("duration") or 0.0)
     resolution = f"{meta.get('width', 0)}x{meta.get('height', 0)}"
 
+    # 2. Post-check: If identical SHA-256 already exists in DB from another download, reuse it
+    with db_session() as conn:
+        dup = conn.execute(
+            """
+            SELECT id, project_id, name, local_path, source_url, platform,
+                   creator, duration_sec, resolution, file_size, sha256_hash,
+                   category, status
+            FROM assets WHERE sha256_hash = ? AND local_path != ?
+            """,
+            (sha256, str(final_file)),
+        ).fetchone()
+        if dup and dup["local_path"] and Path(dup["local_path"]).is_file():
+            logger.info(
+                "Duplicate file content detected by SHA-256 (%s). Reusing original %s",
+                sha256[:8],
+                dup["name"],
+            )
+            # Remove redundant duplicate file to save disk space
+            try:
+                final_file.unlink(missing_ok=True)
+            except Exception:
+                pass
+            final_file = Path(dup["local_path"])
+
     # Create Asset Entity
     asset = Asset(
         name=final_file.name,
@@ -223,8 +278,8 @@ def download_media(
                 "",
                 asset.category,
                 asset.status,
-                asset.created_at,
-                asset.updated_at,
+                asset.created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(asset.created_at, "strftime") else str(asset.created_at),
+                asset.updated_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(asset.updated_at, "strftime") else str(asset.updated_at),
             ),
         )
 
