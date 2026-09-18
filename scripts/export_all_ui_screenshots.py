@@ -32,7 +32,7 @@ def capture_all():
     app = QApplication.instance() or QApplication(sys.argv)
     app.setStyle("Fusion")
     set_application_theme(app, "light")
-    output_dir = repo_root / "ui_screenshots"
+    output_dir = repo_root / "docs" / "screenshots"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     real_video = repo_root / "docs" / "evidence" / "media" / "sample.mp4"

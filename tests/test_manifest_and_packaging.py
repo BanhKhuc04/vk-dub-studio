@@ -7,7 +7,7 @@ Verifies:
 4. Side Panel HTML/CSS/JS file integrity and Apple design system.
 5. Service Worker dual hybrid routing and 100% preservation of ChatGPT/Vbee automation.
 6. Native Messaging Host registration for Microsoft Edge and Google Chrome.
-7. Developer extension reload tooling (tools/reload_extension.bat).
+7. Developer extension reload tooling (scripts/reload_extension.bat).
 8. Node.js execution of sidepanel.js validation engine and timecode parsing.
 """
 
@@ -378,8 +378,8 @@ def test_register_host_check_and_register():
 
 
 def test_reload_extension_batch_exists_and_runs():
-    """Verify tools/reload_extension.bat exists and exits with code 0."""
-    bat_path = PROJECT_ROOT / "tools" / "reload_extension.bat"
+    """Verify scripts/reload_extension.bat exists and exits with code 0."""
+    bat_path = PROJECT_ROOT / "scripts" / "reload_extension.bat"
     assert bat_path.is_file()
 
     res = subprocess.run(

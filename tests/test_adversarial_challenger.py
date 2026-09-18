@@ -495,7 +495,9 @@ def test_production_assets_serving_and_branding(client: TestClient):
 
 def test_run_app_bat_script_configuration():
     """Verify run_app.bat has valid paths, UTF-8 codepage, and environment setup."""
-    bat_path = Path("run_app.bat")
+    bat_path = Path("scripts/run_app.bat")
+    if not bat_path.is_file():
+        bat_path = Path("run_app.bat")
     assert bat_path.is_file()
     bat_content = bat_path.read_text(encoding="utf-8", errors="replace")
 

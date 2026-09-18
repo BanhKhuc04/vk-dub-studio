@@ -1,7 +1,7 @@
 # VK Dub Studio — by vanhkhuc
 
 > **Current checkpoint: VK Dub Studio 2.0 — Gemini, VieNeu, CapCut TTS and draft export verified.**
-> `VK_DUB_STUDIO_V2_SPEC.md` is the source of truth. See
+> [docs/specs/VK_DUB_STUDIO_V2_SPEC.md](docs/specs/VK_DUB_STUDIO_V2_SPEC.md) is the source of truth. See
 > [docs/VOICE_TRANSLATION_REPORT.md](docs/VOICE_TRANSLATION_REPORT.md) for current commands,
 > evidence and limitations; [docs/V2_PROGRESS.md](docs/V2_PROGRESS.md) records earlier checkpoints.
 > VieNeu and CapCut TTS have real preview, approval-gated synthesis and cache. CapCut v360000
@@ -11,7 +11,7 @@
 
 Version **0.4.0**. A Windows desktop workspace for Vietnamese video dubbing.
 This implementation covers **PHASE 0 through PHASE 4** of
-`CODEX_MASTER_PROMPT_VK_DUB_STUDIO.md` (all 1,238 lines reviewed).
+[docs/specs/CODEX_MASTER_PROMPT_VK_DUB_STUDIO.md](docs/specs/CODEX_MASTER_PROMPT_VK_DUB_STUDIO.md) (all 1,238 lines reviewed).
 
 ## Completed
 
