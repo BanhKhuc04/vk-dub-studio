@@ -1,31 +1,65 @@
-.venv/
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
+*.pyc
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Testing & linting caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.runtime/
+.coverage
+htmlcov/
+
+# Build artifacts & package info
 build/
 dist/
+*.egg-info/
+.runtime/
+
+# Binary tools & external dependencies (except native_host)
 tools/*
 !tools/native_host/
+
+# Models, diagnostics & scratch
 models/
 diagnostics/
 scratch/
+
+# Archives & Releases
 *.zip
+
+# Environment & Secrets
 .env
+.env.local
+
+# Project data, runtime workspace & caches
 *.vkdub
 browser_profiles/
 downloads/
 cache/
+workspace/cache/
+workspace/*.db
+workspace/*.sqlite*
+
+# Audio & Video media temp
 *.wav
 *.mp3
 *.mp4
 !resources/**
+
+# Logs
+*.log
+app_launch.log
+
+# IDE / Extension artifacts
 .serena/
 frontend/node_modules/
 frontend/dist/
-ui_screenshots/
-*.log
 test_icon.ico
