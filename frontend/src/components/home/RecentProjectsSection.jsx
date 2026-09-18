@@ -1,32 +1,27 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ClockIcon, ArrowRightIcon, MoreIcon } from "../../icons.jsx";
 
-const SAMPLE_PROJECTS = [
-  {
-    id: "proj_1",
-    title: "Hành trình Đà Lạt",
-    duration: "02:14",
-    updated: "16/09/2025",
-    thumb: "/kappak/thumb_sample_1.png"
-  },
-  {
-    id: "proj_2",
-    title: "Giới thiệu sản phẩm",
-    duration: "00:38",
-    updated: "15/09/2025",
-    thumb: "/kappak/thumb_sample_2.png"
-  },
-  {
-    id: "proj_3",
-    title: "Apple Minimalist Video",
-    duration: "01:27",
-    updated: "14/09/2025",
-    thumb: "/kappak/thumb_sample_3.png"
-  }
-];
-
 export default function RecentProjectsSection({ onOpenProject, onShowAll }) {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/projects/recent")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data) => {
+        if (data && Array.isArray(data.projects)) {
+          setProjects(data.projects);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch real projects, fallback to empty:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
   return (
     <div className="bottom-card recent-projects-card">
       {/* Header Row */}
@@ -41,9 +36,14 @@ export default function RecentProjectsSection({ onOpenProject, onShowAll }) {
         </button>
       </div>
 
-      {/* 3 Projects Grid */}
+      {/* Projects Grid */}
       <div className="projects-grid">
-        {SAMPLE_PROJECTS.map((proj) => (
+        {loading ? (
+          <div style={{ color: "var(--text-2)", fontSize: 13, padding: "16px 0" }}>Đang tải danh sách dự án...</div>
+        ) : projects.length === 0 ? (
+          <div style={{ color: "var(--text-2)", fontSize: 13, padding: "16px 0" }}>Chưa có dự án nào gần đây.</div>
+        ) : (
+          projects.slice(0, 3).map((proj) => (
           <motion.div
             key={proj.id}
             whileHover={{ y: -3 }}
@@ -82,7 +82,8 @@ export default function RecentProjectsSection({ onOpenProject, onShowAll }) {
               </button>
             </div>
           </motion.div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

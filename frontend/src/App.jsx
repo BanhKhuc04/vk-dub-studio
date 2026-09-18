@@ -7,6 +7,7 @@ import IconRail from "./components/IconRail.jsx";
 import Topbar from "./components/Topbar.jsx";
 import HomeView from "./components/home/HomeView.jsx";
 import AskKappakDrawer from "./components/AskKappakDrawer.jsx";
+import DownloaderView from "./components/downloader/DownloaderView.jsx";
 import {
   PlayIcon, MicIcon, BlurIcon, GearIcon, ReviewIcon, FolderIcon, UploadIcon,
   DownloadIcon, MoonIcon, SunIcon, BellIcon, SparkIcon, BotIcon, CheckIcon,
@@ -2102,7 +2103,25 @@ export default function App() {
               }}
               onOpenAsk={() => setIsAskOpen(true)}
               onOpenProject={(proj) => {
-                setActiveTab("auto-dub");
+                if (proj && proj.path) {
+                  fetch("/api/projects/load", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ path: proj.path })
+                  })
+                    .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+                    .then((res) => {
+                      if (res && res.metadata) {
+                        setMetadata(res.metadata);
+                        setVideoUrl(res.video_url);
+                        setStep(1);
+                      }
+                    })
+                    .catch((err) => console.error("Error loading project media:", err))
+                    .finally(() => setActiveTab("auto-dub"));
+                } else {
+                  setActiveTab("auto-dub");
+                }
               }}
               onNewProject={() => {
                 setActiveTab("auto-dub");
@@ -2216,6 +2235,32 @@ export default function App() {
               </AnimatePresence>
             </section>
           </main>
+        ) : activeTab === "downloader" ? (
+          <DownloaderView
+            onOpenInDubStudio={(asset) => {
+              if (asset && (asset.local_path || asset.path)) {
+                const targetPath = asset.local_path || asset.path;
+                fetch("/api/projects/load", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ path: targetPath }),
+                })
+                  .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+                  .then((res) => {
+                    if (res && res.metadata) {
+                      setMetadata(res.metadata);
+                      setVideoUrl(res.video_url);
+                      setStep(1);
+                    }
+                  })
+                  .catch((err) => console.error("Error loading downloaded video into Dub Studio:", err))
+                  .finally(() => setActiveTab("auto-dub"));
+              } else {
+                setActiveTab("auto-dub");
+              }
+            }}
+            onBackHome={() => setActiveTab("home")}
+          />
         ) : (
           <div className="kappak-scroll-area">
             <div className="kappak-home-container" style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -2224,7 +2269,6 @@ export default function App() {
                   <SparkIcon size={28} />
                 </div>
                 <h2 style={{ fontSize: 24, fontWeight: 700, margin: "16px 0 8px 0" }}>
-                  {activeTab === "downloader" && "Downloader Module"}
                   {activeTab === "data-studio" && "Data Studio Module"}
                   {activeTab === "projects" && "Quản lý Dự án & Tài nguyên"}
                   {activeTab === "auto-video" && "Tạo Video Tự động"}
@@ -2254,6 +2298,7 @@ export default function App() {
           </div>
         )}
       </div>
+
 
       {/* 3. Right Slide-over Ask KAPPAK Drawer */}
       <AskKappakDrawer

@@ -276,6 +276,15 @@ class ExportRequest(BaseModel):
     voice_volume: float = 1.0
 
 
+class DownloaderInspectRequest(BaseModel):
+    url: str
+
+
+class DownloaderDownloadRequest(BaseModel):
+    url: str
+    quality: str = "best"
+
+
 # REST Endpoints
 @app.get("/api/health")
 def get_health():
@@ -518,6 +527,195 @@ def select_media(req: SelectMediaRequest):
     return {"status": "ok", "metadata": meta}
 
 
+@app.get("/api/projects/recent")
+def get_recent_projects():
+    """Fetch real recent projects and downloaded media assets for the Web Home View."""
+    results = []
+    try:
+        from kappak.core.db import db_session
+        from kappak.modules.downloader.service import format_duration
+        with db_session() as conn:
+            # 1. Fetch from projects table
+            proj_rows = conn.execute(
+                "SELECT id, name, description, root_path, updated_at FROM projects ORDER BY updated_at DESC LIMIT 6"
+            ).fetchall()
+            for r in proj_rows:
+                results.append({
+                    "id": r["id"],
+                    "title": r["name"],
+                    "duration": "Dự án",
+                    "updated": str(r["updated_at"])[:10] if r["updated_at"] else "",
+                    "thumb": "/kappak/thumb_sample_1.png",
+                    "type": "project",
+                    "path": r["root_path"],
+                })
+
+            # 2. Fetch from assets table (video files downloaded)
+            asset_rows = conn.execute(
+                """
+                SELECT id, name, local_path, platform, duration_sec, file_size, updated_at
+                FROM assets
+                WHERE local_path LIKE '%.mp4' OR local_path LIKE '%.mov' OR local_path LIKE '%.mkv'
+                ORDER BY updated_at DESC LIMIT 6
+                """
+            ).fetchall()
+            for a in asset_rows:
+                dur_str = format_duration(a["duration_sec"])
+                results.append({
+                    "id": a["id"],
+                    "title": a["name"],
+                    "duration": dur_str,
+                    "updated": str(a["updated_at"])[:10] if a["updated_at"] else "",
+                    "thumb": "/kappak/thumb_sample_2.png",
+                    "type": "video_asset",
+                    "path": a["local_path"],
+                })
+    except Exception as e:
+        logger.warning("Error fetching recent projects from database: %s", e)
+
+    # 3. If empty, check evidence/media sample files so UI is immediately useful
+    if not results:
+        sample_path = root_dir / "docs" / "evidence" / "media" / "sample.mp4"
+        if sample_path.is_file():
+            results.append({
+                "id": "sample_bundled_1",
+                "title": "Video mẫu tiếng Anh (sample.mp4)",
+                "duration": "00:07",
+                "updated": "Có sẵn",
+                "thumb": "/kappak/thumb_sample_3.png",
+                "type": "sample",
+                "path": str(sample_path),
+            })
+
+    return {"projects": results}
+
+
+@app.post("/api/projects/load")
+def load_project_or_asset(payload: dict):
+    path_str = payload.get("path")
+    if not path_str:
+        raise HTTPException(status_code=400, detail="Thiếu đường dẫn tệp.")
+    p = Path(path_str)
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="Tệp không tồn tại.")
+    meta = probe_file(p)
+    state.project.video_path = p
+    state.project.video_duration_ms = int(meta["duration"] * 1000)
+    state.project.target_language = "vi"
+    state.video_metadata = meta
+    return {"status": "ok", "metadata": meta, "video_url": f"/api/media/stream?path={p.name}"}
+
+
+@app.post("/api/downloader/inspect")
+def inspect_download_url(req: DownloaderInspectRequest):
+    """Fetch video metadata from URL without downloading."""
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập đường link video.")
+    try:
+        from kappak.modules.downloader.service import fetch_video_metadata
+        meta = fetch_video_metadata(url)
+        return {
+            "status": "ok",
+            "metadata": {
+                "url": meta.url,
+                "title": meta.title,
+                "creator": meta.creator,
+                "duration_sec": meta.duration_sec,
+                "duration_str": meta.duration_str,
+                "thumbnail_url": meta.thumbnail_url,
+                "platform": meta.platform,
+                "formats": meta.formats,
+                "description": meta.description,
+            },
+        }
+    except Exception as e:
+        logger.warning("Downloader inspect failed for %s: %s", url, e)
+        raise HTTPException(status_code=400, detail=f"Không thể đọc thông tin video: {str(e)[:200]}")
+
+
+@app.post("/api/downloader/download")
+def download_video_api(req: DownloaderDownloadRequest):
+    """Download video with yt-dlp, compute SHA-256 deduplication, and store in assets."""
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập đường link video.")
+
+    download_dir = workspace_root() / "downloads"
+    download_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from kappak.modules.downloader.service import download_media, format_duration
+        asset = download_media(
+            url=url,
+            output_dir=download_dir,
+            quality_choice=req.quality,
+        )
+        dur_str = format_duration(asset.duration_sec)
+        return {
+            "status": "ok",
+            "asset": {
+                "id": asset.id,
+                "name": asset.name,
+                "local_path": str(asset.local_path),
+                "sha256_hash": asset.sha256_hash,
+                "platform": asset.platform,
+                "creator": asset.creator,
+                "duration_sec": asset.duration_sec,
+                "duration_str": dur_str,
+                "resolution": asset.resolution,
+                "file_size": asset.file_size,
+                "video_url": f"/api/media/stream?path={asset.local_path.name}",
+            },
+        }
+    except Exception as e:
+        logger.exception("Download failed for %s: %s", url, e)
+        raise HTTPException(status_code=500, detail=f"Tải video thất bại: {str(e)[:200]}")
+
+
+@app.get("/api/downloader/history")
+def get_download_history():
+    """Retrieve history of downloaded video assets from SQLite."""
+    items = []
+    try:
+        from kappak.core.db import db_session
+        from kappak.modules.downloader.service import format_duration
+        with db_session() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, name, local_path, source_url, platform, creator,
+                       duration_sec, resolution, file_size, sha256_hash, updated_at
+                FROM assets
+                WHERE local_path LIKE '%.mp4' OR local_path LIKE '%.mov' OR local_path LIKE '%.mkv' OR local_path LIKE '%.mp3'
+                ORDER BY updated_at DESC LIMIT 20
+                """
+            ).fetchall()
+            for r in rows:
+                p = Path(r["local_path"])
+                exists = p.is_file()
+                dur_str = format_duration(r["duration_sec"])
+                items.append({
+                    "id": r["id"],
+                    "name": r["name"],
+                    "local_path": r["local_path"],
+                    "filename": p.name,
+                    "source_url": r["source_url"],
+                    "platform": r["platform"],
+                    "creator": r["creator"],
+                    "duration_sec": r["duration_sec"],
+                    "duration_str": dur_str,
+                    "resolution": r["resolution"],
+                    "file_size": r["file_size"],
+                    "sha256_hash": r["sha256_hash"],
+                    "file_exists": exists,
+                    "updated_at": str(r["updated_at"])[:19] if r["updated_at"] else "",
+                    "video_url": f"/api/media/stream?path={p.name}" if exists else "",
+                })
+    except Exception as e:
+        logger.warning("Error fetching download history: %s", e)
+    return {"assets": items}
+
+
 @app.post("/api/media/sample")
 def select_sample_media(orientation: str = Query("vertical")):
     """Load bundled sample video (vertical 9:16 or horizontal 16:9)."""
@@ -597,6 +795,8 @@ def stream_media(path: str | None = None):
                 workspace_root() / path,
                 workspace_root() / "docs" / "evidence" / "media" / path,
                 workspace_root() / "uploads" / path,
+                workspace_root() / "downloads" / path,
+                Path(path),
             ]
             p = next((c for c in candidates if c.is_file()), None)
         if not p or not p.is_file():
@@ -1196,8 +1396,8 @@ if frontend_dist.is_dir():
             raise HTTPException(status_code=404)
         file_path = frontend_dist / full_path
         if file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(frontend_dist / "index.html")
+            return FileResponse(file_path, headers={"Cache-Control": "no-cache"})
+        return FileResponse(frontend_dist / "index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = True):

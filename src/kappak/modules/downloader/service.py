@@ -236,6 +236,23 @@ def download_media(
             except Exception:
                 pass
             final_file = Path(dup["local_path"])
+            if progress_callback:
+                progress_callback(100.0, f"Phát hiện nội dung trùng khớp SHA-256 ({sha256[:8]}), tái sử dụng tài nguyên...")
+            return Asset(
+                id=dup["id"],
+                name=dup["name"],
+                local_path=final_file,
+                project_id=project_id or dup["project_id"],
+                source_url=url,
+                platform=dup["platform"] or platform,
+                creator=dup["creator"] or creator,
+                duration_sec=dup["duration_sec"] or duration_sec,
+                resolution=dup["resolution"] or resolution,
+                file_size=dup["file_size"] or file_size,
+                sha256_hash=dup["sha256_hash"],
+                category=dup["category"],
+                status=dup["status"],
+            )
 
     # Create Asset Entity
     asset = Asset(

@@ -102,13 +102,17 @@ def test_downloader_deduplication_workflow(tmp_path, monkeypatch):
             return {"title": "Duplicate Video", "uploader": "Creator2", "duration": 15.0, "width": 1920, "height": 1080}
 
     monkeypatch.setattr("yt_dlp.YoutubeDL", MockYoutubeDLDup)
+    progress_msgs_post = []
     asset3 = download_media(
         url="https://www.youtube.com/watch?v=diff_url_same_content",
         output_dir=tmp_path,
         quality_choice="best",
+        progress_callback=lambda pct, msg: progress_msgs_post.append(msg),
     )
     # Post-check should detect identical SHA-256, delete dup_video and point to original file
     assert asset3.sha256_hash == expected_hash
     assert asset3.local_path == dummy_video
     assert not dup_video.is_file(), "Duplicate file should be cleaned up by SHA-256 post-check!"
+    assert any("trùng khớp SHA-256" in m for m in progress_msgs_post)
+
 

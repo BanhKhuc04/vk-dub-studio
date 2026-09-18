@@ -272,18 +272,14 @@ Kết quả build được tạo tại `frontend/dist/` và được FastAPI ser
 - [x] **Chuẩn hóa cấu trúc Repository**: DONE (100%) — Đã phân tách `docs/`, `scripts/`, `archive/releases/`, `tests/`, `src/`, loại bỏ hoàn toàn cache/log, .gitignore chuẩn mực, 833 tests pass.
 - [ ] **Tự động hóa lồng tiếng 5 bước**: PARTIAL — Whisper STT, Edge TTS và CapCut Draft Export đã kiểm chứng chạy thật 100% (tạo draft hợp lệ trong CapCut PC). Bước dịch tự động và Vbee TTS phụ thuộc vào tài khoản/tab ChatGPT & Vbee của người dùng (fallback về kịch bản gốc nếu chưa mở tab).
 - [ ] **Cầu nối Browser Bridge**: OPERATIONAL (Chờ tab) — Native Host và Local Agent kết nối TCP cổng 49814 hoạt động tốt, tự động reconnect. Cần người dùng mở/đăng nhập tab ChatGPT/Vbee trên trình duyệt để kích hoạt trạng thái sẵn sàng.
-- [ ] **Giao diện Web Studio Apple Glass V2**: UI SHELL ONLY (PENDING) — Bố cục HomeView đạt 100% chuẩn Apple Glass Female Hero V2. Tuy nhiên `RecentProjectsSection` vẫn dùng mock data và 5/6 module cards khi click mới chỉ là view placeholder.
-- [ ] **Universal Downloader (Phase 1)**: PARTIAL (PENDING) — Động cơ `yt-dlp` và bảng SQLite `assets` hoạt động trên desktop, nhưng chưa cài đặt logic kiểm tra trùng SHA-256 để chặn/tái sử dụng khi tải trùng và chưa có giao diện Downloader trên Web Studio.
+- [x] **Universal Downloader (Phase 1)**: DONE (100%) — Động cơ `yt-dlp` và bảng SQLite `assets` hoạt động đầy đủ trên cả Desktop và Web Studio, đã hoàn thiện cơ chế kiểm tra và chặn trùng lặp SHA-256 thực sự (tái sử dụng asset, dọn file trùng, báo tiến độ), cùng giao diện Apple Glass Downloader tích hợp chuyển 1-chạm sang Auto Dub Studio.
+- [x] **Dữ liệu thật RecentProjectsSection**: DONE (100%) — Đã kết nối SQLite `projects` và `assets` vào `RecentProjectsSection.jsx` trên Web Studio qua API `/api/projects/recent` và nạp media trực tiếp qua `/api/projects/load`.
 
-### 7.2 Lộ Trình Ưu Tiên Vá Lỗ Hổng & Phát Triển Kế Tiếp (Roadmap)
-1. **Ưu tiên 1 (Vá Gap Audit)**:
-   - Cài đặt cơ chế kiểm tra và chặn trùng lặp SHA-256 thực sự trong `src/kappak/modules/downloader/service.py`.
-   - Kết nối dữ liệu thật từ SQLite vào `RecentProjectsSection.jsx` trên Web Studio.
-   - Xây dựng giao diện Downloader thật trên Web Studio thay thế cho placeholder.
-2. **Ưu tiên 2 (Phase 2)**: **Data Studio Module** — Quản lý kho tài nguyên, phân tích số liệu video, từ khóa SEO.
-3. **Ưu tiên 3 (Phase 3)**: **Auto Video Generator** — Ghép cảnh, tạo video tự động từ văn bản.
-4. **Ưu tiên 4 (Phase 4)**: **Social Publisher** — Lập lịch và tự động đăng tải đa kênh.
-5. **Ưu tiên 5**: **CapCut Advanced Visual Effects** — Schema hình chữ nhật làm mờ động trực tiếp trong file `draft_content.json`.
+### 7.2 Lộ Trình Phát Triển Kế Tiếp (Roadmap)
+1. **Ưu tiên 1 (Phase 2)**: **Data Studio Module** — Quản lý kho tài nguyên, phân tích số liệu video, từ khóa SEO.
+2. **Ưu tiên 2 (Phase 3)**: **Auto Video Generator** — Ghép cảnh, tạo video tự động từ văn bản.
+3. **Ưu tiên 3 (Phase 4)**: **Social Publisher** — Lập lịch và tự động đăng tải đa kênh.
+4. **Ưu tiên 4 (Phase 5)**: **CapCut Advanced Visual Effects** — Schema hình chữ nhật làm mờ động trực tiếp trong file `draft_content.json`.
 
 ---
 *Tài liệu được cập nhật ngày 19/09/2026 bởi Antigravity AI Pair Programmer.*
