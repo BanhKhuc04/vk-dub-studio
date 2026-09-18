@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import "./styles.css";
 import InteractiveCanvas from "./components/InteractiveCanvas.jsx";
+import IconRail from "./components/IconRail.jsx";
+import Topbar from "./components/Topbar.jsx";
+import HomeView from "./components/home/HomeView.jsx";
+import AskKappakDrawer from "./components/AskKappakDrawer.jsx";
 import {
   PlayIcon, MicIcon, BlurIcon, GearIcon, ReviewIcon, FolderIcon, UploadIcon,
   DownloadIcon, MoonIcon, SunIcon, BellIcon, SparkIcon, BotIcon, CheckIcon,
@@ -77,7 +81,7 @@ const DEFAULT_VOICES = [
 /* ========================================================
    HEADER & BRANDING
    ======================================================== */
-function Topbar({ dark, setDark, onSettings, bridgeStatus, islandState }) {
+function LegacyTopbar({ dark, setDark, onSettings, bridgeStatus, islandState }) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -1393,6 +1397,9 @@ export default function App() {
   const [dark, setDark] = useState(false);
   const [step, setStep] = useState(1);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("home");
+  const [isAskOpen, setIsAskOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const videoPlayerRef = useRef(null);
 
@@ -2061,129 +2068,202 @@ export default function App() {
   };
 
   return (
-    <div className={`app ${dark ? "dark" : ""}`}>
-      {/* Apple Minimalist Topbar with Dynamic Island on Right */}
-      <Topbar
+    <div className={`kappak-app-shell ${dark ? "dark" : ""}`}>
+      {/* 1. Left Icon Rail (74px) */}
+      <IconRail
+        activeTab={activeTab}
+        onSelectTab={(tabId) => setActiveTab(tabId)}
         dark={dark}
         setDark={setDark}
-        onSettings={() => setSettingsOpen(true)}
-        bridgeStatus={bridgeStatus}
-        islandState={islandState}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {/* Main 3-Column Workspace */}
-      <main className="workspace">
-        <Sidebar step={step} setStep={setStep} />
-
-        <Preview
-          step={step}
-          metadata={metadata}
-          videoUrl={videoUrl}
-          masks={masks}
-          activeMaskId={activeMaskId}
-          setActiveMaskId={setActiveMaskId}
-          onMasksChange={handleMasksChange}
-          aspectMode={aspectMode}
-          setAspectMode={setAspectMode}
-          videoRef={videoPlayerRef}
+      {/* 2. Main Viewport */}
+      <div className="kappak-main-viewport">
+        {/* Topbar Apple Glass with Large Search Pill & Ask KAPPAK Trigger */}
+        <Topbar
+          onOpenAsk={() => setIsAskOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          aiStatus="Sẵn sàng"
         />
 
-        <section className="right-panel">
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <Step1
-                key="step1"
-                next={() => setStep(2)}
-                metadata={metadata}
-                onUpload={handleUpload}
-                uploading={uploading}
-                onLoadSample={handleLoadSample}
-              />
-            )}
-            {step === 2 && (
-              <Step2
-                key="step2"
-                next={() => setStep(3)}
-                voices={voices}
-                selectedVoice={selectedVoice}
-                setSelectedVoice={setSelectedVoice}
-                voiceSpeed={voiceSpeed}
-                setVoiceSpeed={setVoiceSpeed}
-                onPreviewVoice={handlePreviewVoice}
-                isPlayingVoice={isPlayingVoice}
-              />
-            )}
-            {step === 3 && (
-              <Step3
-                key="step3"
-                next={() => setStep(4)}
-                masks={masks}
-                activeMaskId={activeMaskId}
-                setActiveMaskId={setActiveMaskId}
-                onMasksChange={handleMasksChange}
-                applyPreset={applyPreset}
-                deleteActiveMask={deleteActiveMask}
-                centerActiveMaskHorizontally={centerActiveMaskHorizontally}
-                updateActiveMaskBlur={updateActiveMaskBlur}
-              />
-            )}
-            {step === 4 && (
-              <Step4
-                key="step4"
-                next={() => setStep(5)}
-                pipelineStatus={pipelineStatus}
-                startPipeline={startPipeline}
-                cancelPipeline={cancelPipeline}
-              />
-            )}
-            {step === 5 && (
-              <Step5
-                key="step5"
-                subtitles={subtitles}
-                setSubtitles={setSubtitles}
-                onApprove={handleApprove}
-                onExportMP4={handleExportMP4}
-                onExportCapCut={handleExportCapCut}
-                exporting={exporting}
-                approved={approved}
-                onSeekSubtitle={(timeStr) => {
-                  if (!videoPlayerRef.current || !timeStr) return;
-                  const clean = timeStr.replace(",", ".");
-                  const parts = clean.split(":");
-                  let sec = 0;
-                  if (parts.length === 3) {
-                    sec = parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
-                  } else if (parts.length === 2) {
-                    sec = parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
-                  } else {
-                    sec = parseFloat(clean) || 0;
-                  }
-                  videoPlayerRef.current.currentTime = Math.max(0, sec);
-                  videoPlayerRef.current.play().catch(() => {});
-                  setTemporaryIsland({ type: "running", message: `Nhảy video đến ${timeStr}` }, 1800);
-                }}
-                selectedVoice={selectedVoice}
-                onPreviewVoice={handlePreviewVoice}
-              />
-            )}
-          </AnimatePresence>
-        </section>
-      </main>
+        {/* View Router */}
+        {activeTab === "home" ? (
+          <div className="kappak-scroll-area">
+            <HomeView
+              onSelectModule={(modId) => {
+                if (modId === "auto-dub") {
+                  setActiveTab("auto-dub");
+                } else {
+                  setActiveTab(modId);
+                }
+              }}
+              onOpenAsk={() => setIsAskOpen(true)}
+              onOpenProject={(proj) => {
+                setActiveTab("auto-dub");
+              }}
+              onNewProject={() => {
+                setActiveTab("auto-dub");
+              }}
+              activeSession={
+                videoUrl
+                  ? {
+                      name: metadata?.filename || "Dự án hiện tại",
+                      step,
+                      onResume: () => setActiveTab("auto-dub")
+                    }
+                  : null
+              }
+            />
+          </div>
+        ) : activeTab === "auto-dub" ? (
+          <main className="workspace">
+            <Sidebar step={step} setStep={setStep} />
 
-      {/* Apple Minimalist Statusbar */}
-      <footer className="statusbar">
-        <div>
-          <span>Trạng thái: </span>
-          <b>{pipelineStatus.running ? "Đang xử lý tự động…" : "Sẵn sàng"}</b>
-        </div>
-        <div>
-          KAPPAK Studio Web v2 · by <b>vanhkhuc.dev</b>
-        </div>
-        <div>
-          <span>Video: </span>
-          <b>{metadata?.filename || "Chưa chọn tệp"}</b>
-        </div>
-      </footer>
+            <Preview
+              step={step}
+              metadata={metadata}
+              videoUrl={videoUrl}
+              masks={masks}
+              activeMaskId={activeMaskId}
+              setActiveMaskId={setActiveMaskId}
+              onMasksChange={handleMasksChange}
+              aspectMode={aspectMode}
+              setAspectMode={setAspectMode}
+              videoRef={videoPlayerRef}
+            />
+
+            <section className="right-panel">
+              <AnimatePresence mode="wait">
+                {step === 1 && (
+                  <Step1
+                    key="step1"
+                    next={() => setStep(2)}
+                    metadata={metadata}
+                    onUpload={handleUpload}
+                    uploading={uploading}
+                    onLoadSample={handleLoadSample}
+                  />
+                )}
+                {step === 2 && (
+                  <Step2
+                    key="step2"
+                    next={() => setStep(3)}
+                    voices={voices}
+                    selectedVoice={selectedVoice}
+                    setSelectedVoice={setSelectedVoice}
+                    voiceSpeed={voiceSpeed}
+                    setVoiceSpeed={setVoiceSpeed}
+                    onPreviewVoice={handlePreviewVoice}
+                    isPlayingVoice={isPlayingVoice}
+                  />
+                )}
+                {step === 3 && (
+                  <Step3
+                    key="step3"
+                    next={() => setStep(4)}
+                    masks={masks}
+                    activeMaskId={activeMaskId}
+                    setActiveMaskId={setActiveMaskId}
+                    onMasksChange={handleMasksChange}
+                    applyPreset={applyPreset}
+                    deleteActiveMask={deleteActiveMask}
+                    centerActiveMaskHorizontally={centerActiveMaskHorizontally}
+                    updateActiveMaskBlur={updateActiveMaskBlur}
+                  />
+                )}
+                {step === 4 && (
+                  <Step4
+                    key="step4"
+                    next={() => setStep(5)}
+                    pipelineStatus={pipelineStatus}
+                    startPipeline={startPipeline}
+                    cancelPipeline={cancelPipeline}
+                  />
+                )}
+                {step === 5 && (
+                  <Step5
+                    key="step5"
+                    subtitles={subtitles}
+                    setSubtitles={setSubtitles}
+                    onApprove={handleApprove}
+                    onExportMP4={handleExportMP4}
+                    onExportCapCut={handleExportCapCut}
+                    exporting={exporting}
+                    approved={approved}
+                    onSeekSubtitle={(timeStr) => {
+                      if (!videoPlayerRef.current || !timeStr) return;
+                      const clean = timeStr.replace(",", ".");
+                      const parts = clean.split(":");
+                      let sec = 0;
+                      if (parts.length === 3) {
+                        sec = parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+                      } else if (parts.length === 2) {
+                        sec = parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+                      } else {
+                        sec = parseFloat(clean) || 0;
+                      }
+                      videoPlayerRef.current.currentTime = Math.max(0, sec);
+                      videoPlayerRef.current.play().catch(() => {});
+                      setTemporaryIsland({ type: "running", message: `Nhảy video đến ${timeStr}` }, 1800);
+                    }}
+                    selectedVoice={selectedVoice}
+                    onPreviewVoice={handlePreviewVoice}
+                  />
+                )}
+              </AnimatePresence>
+            </section>
+          </main>
+        ) : (
+          <div className="kappak-scroll-area">
+            <div className="kappak-home-container" style={{ textAlign: "center", padding: "60px 20px" }}>
+              <div className="bottom-card" style={{ maxWidth: "600px", margin: "0 auto", padding: "40px", alignItems: "center" }}>
+                <div className="empty-icon-capsule" style={{ width: 56, height: 56, borderRadius: 16 }}>
+                  <SparkIcon size={28} />
+                </div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, margin: "16px 0 8px 0" }}>
+                  {activeTab === "downloader" && "Downloader Module"}
+                  {activeTab === "data-studio" && "Data Studio Module"}
+                  {activeTab === "projects" && "Quản lý Dự án & Tài nguyên"}
+                  {activeTab === "auto-video" && "Tạo Video Tự động"}
+                  {activeTab === "social" && "Social Media Module"}
+                  {activeTab === "today" && "Today Dashboard"}
+                </h2>
+                <p style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.5, marginBottom: 24 }}>
+                  Tính năng đang được kích hoạt kết nối với Core KAPPAK Engine. Bạn có thể quay lại Trang chủ hoặc trải nghiệm ngay bộ công cụ Auto Dub Studio.
+                </p>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button
+                    className="continue-primary-btn"
+                    style={{ background: "#FFFFFF", color: "var(--text)", border: "1px solid rgba(76,104,153,0.18)" }}
+                    onClick={() => setActiveTab("home")}
+                  >
+                    ← Về Trang chủ
+                  </button>
+                  <button
+                    className="continue-primary-btn"
+                    onClick={() => setActiveTab("auto-dub")}
+                  >
+                    Mở Auto Dub Studio ›
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 3. Right Slide-over Ask KAPPAK Drawer */}
+      <AskKappakDrawer
+        isOpen={isAskOpen}
+        onClose={() => setIsAskOpen(false)}
+        onExecuteAction={(action) => {
+          setIsAskOpen(false);
+          setActiveTab("auto-dub");
+        }}
+      />
 
       {/* Settings Modal */}
       <SettingsModal
