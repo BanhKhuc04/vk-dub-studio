@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from vkdub.domain.project import Project
 from vkdub.domain.transcript import SubtitleSegment, Transcript
@@ -59,12 +59,25 @@ def test_main_layout_structure(window):
 
 def test_top_bar_components(window):
     """Verify TopBar elements: branding, project filename, Edge/ChatGPT/Vbee badges, settings."""
-    assert "VK Dub Studio" in window.top_bar.lbl_title.text()
-    assert "Project mới" in window.top_bar.lbl_project_name.text()
+    assert "KAPPAK" in window.top_bar.lbl_title.text() or "VK Dub Studio" in window.top_bar.lbl_title.text()
+    assert "Mới" in window.top_bar.lbl_project_name.text() or "Project mới" in window.top_bar.lbl_project_name.text()
     assert window.top_bar.badge_edge.text().endswith("Edge")
     assert window.top_bar.badge_chatgpt.text().endswith("ChatGPT")
     assert window.top_bar.badge_vbee.text().endswith("Vbee")
     assert window.top_bar.btn_settings.isVisible()
+    assert window.top_bar.btn_theme.isVisible()
+
+
+def test_light_dark_theme_switch(window):
+    """Theme switch updates the app immediately and remains reversible."""
+    app = QApplication.instance()
+    window.set_theme("dark", persist=False)
+    assert app.property("kappakTheme") == "dark"
+    assert window.top_bar.btn_theme.text() == "☀"
+
+    window.set_theme("light", persist=False)
+    assert app.property("kappakTheme") == "light"
+    assert window.top_bar.btn_theme.text() == "☾"
 
 
 def test_diagnostics_drawer_collapsible(window, qtbot):

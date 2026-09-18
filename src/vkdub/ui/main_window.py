@@ -29,6 +29,7 @@ from vkdub.orchestrator.pipeline_runner import PipelineRunner
 from vkdub.orchestrator.pipeline_state import PipelineState, SubstepStatus
 from vkdub.providers.tts_provider import HealthResult
 from vkdub.services.app_settings import load_app_settings
+from vkdub.services.clip_export_service import ClipExportService
 from vkdub.services.credential_service import redact
 from vkdub.services.health_service import run_startup_health_checks
 from vkdub.services.project_service import load_project, save_project
@@ -64,7 +65,7 @@ from vkdub.ui.tts_controller import TTSController
 from vkdub.ui.vbee_controller import VbeeController
 from vkdub.ui.video_preview import VideoPreview
 from vkdub.utils.paths import workspace_root
-from vkdub.version import APP_BRANDING, __version__
+from vkdub.version import APP_BRANDING, APP_NAME, __version__
 
 
 class MainWindow(QMainWindow):
@@ -147,6 +148,12 @@ class MainWindow(QMainWindow):
         # Controllers and Subsystems
         self.tools = MediaTools(self)
         self.local_agent = LocalAgent(parent=self)
+        self.clip_export_service = ClipExportService(
+            local_agent=self.local_agent,
+            project=self.project,
+            workspace_dir=workspace_root(),
+            import_handler=self.import_video,
+        )
         self.transcription = TranscriptionController(self)
         self.translation = TranslationController(self)
         self.review_controller = ReviewController(self)
@@ -184,6 +191,7 @@ class MainWindow(QMainWindow):
             lambda: self.local_agent.open_browser("https://chatgpt.com")
         )
         self.top_bar.refresh_bridge_requested.connect(self.local_agent.request_status)
+        self.top_bar.theme_requested.connect(self.set_theme)
 
         # Stepper connection
         self.stepper.step_selected.connect(self.switch_to_step)
@@ -276,6 +284,8 @@ class MainWindow(QMainWindow):
         self.left.pipeline_cancel_requested.connect(self._cancel_pipeline_runner)
         self.left.pipeline_retry_step_requested.connect(self._retry_pipeline_step)
         self.left.step4_pipeline.view_log_requested.connect(self.open_log_viewer)
+        # BUG-01 FIX: stop_button "⏹ DỪNG" was visible but had no .clicked connection
+        self.left.stop_button.clicked.connect(self._cancel_pipeline_runner)
 
         self._shortcut("Project mới", QKeySequence.StandardKey.New, self.new_project)
         self._shortcut("Lưu project", QKeySequence.StandardKey.Save, self.save)
@@ -289,7 +299,7 @@ class MainWindow(QMainWindow):
         self.autosave_timer.start()
 
         self._refresh()
-        self.log("Sẵn sàng — VK Dub Studio 2.1.")
+        self.log(f"Sẵn sàng — {APP_BRANDING} (v{__version__}).")
         QTimer.singleShot(0, self.detect_tools)
         self.recovery_timer = QTimer(self)
         self.recovery_timer.setSingleShot(True)
@@ -378,7 +388,7 @@ class MainWindow(QMainWindow):
         )
         ret = QMessageBox.question(
             self,
-            "Cập nhật sẵn sàng — VK Dub Studio",
+            f"Cập nhật sẵn sàng — {APP_NAME}",
             msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
@@ -1420,10 +1430,23 @@ class MainWindow(QMainWindow):
         if hasattr(self, "toast_manager"):
             self.toast_manager.show_toast(title, message, ToastType.ERROR)
 
+    def set_theme(self, theme: str, persist: bool = True) -> None:
+        from vkdub.ui.theme import set_application_theme
+        app = QApplication.instance()
+        if app:
+            set_application_theme(app, theme)
+        if hasattr(self, "top_bar") and hasattr(self.top_bar, "set_theme"):
+            self.top_bar.set_theme(theme)
+        if persist:
+            from vkdub.services.app_settings import load_app_settings, save_app_settings
+            cfg = load_app_settings()
+            cfg.theme = theme
+            save_app_settings(cfg)
+
     def _error(self, message: str) -> None:
         self.log(message)
         self.notify_error("Lỗi", message)
-        QMessageBox.warning(self, "VK Dub Studio", message)
+        QMessageBox.warning(self, APP_NAME, message)
 
     def _refresh(self) -> None:
         filename = self.project_file.name if self.project_file else "Project mới"
@@ -1885,8 +1908,8 @@ class MainWindow(QMainWindow):
         if self.busy or not self.tools_ready:
             return False
         path = path.resolve()
-        if not path.is_file() or path.suffix.lower() != ".mp4":
-            self._error("Hãy chọn một tệp MP4 cục bộ đang tồn tại.")
+        if not path.is_file() or path.suffix.lower() not in {".mp4", ".mkv", ".webm", ".mov"}:
+            self._error("Hãy chọn một tệp video cục bộ đang tồn tại.")
             return False
         if self.tools.paths["ffprobe"] is None:
             self._apply_import(path, None)

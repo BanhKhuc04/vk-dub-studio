@@ -393,7 +393,7 @@ class StudioVoiceController(TTSController):
         )
 
         async def operation() -> Path:
-            text = "Xin chào, đây là giọng đọc của VK Dub Studio. Chúc bạn một ngày tốt lành."
+            text = "Xin chào, đây là giọng đọc của KAPPAK. Chúc bạn một ngày sáng tạo tuyệt vời."
             folder = workspace_root() / "cache" / "voice-preview"
             folder.mkdir(parents=True, exist_ok=True)
             path = folder / f"{audio_key(text, settings)}.wav"

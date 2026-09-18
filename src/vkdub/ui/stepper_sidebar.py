@@ -20,9 +20,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vkdub.ui.theme import apply_brutalist_shadow
+
 
 class StepItemWidget(QFrame):
-    """Modern workflow step card with glowing state indicators."""
+    """Modern Neo Brutalism workflow step card with high contrast indicators."""
 
     clicked = Signal(int)
 
@@ -38,20 +40,22 @@ class StepItemWidget(QFrame):
         self._is_complete = False
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(10)
+        self.setMinimumHeight(70)
+        layout.setContentsMargins(12, 11, 10, 11)
+        layout.setSpacing(11)
+
 
         # Status / Step Icon pill
         self.icon_label = QLabel(self._status_icon)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.icon_label.setFixedSize(28, 28)
+        self.icon_label.setFixedSize(34, 34)
         self.icon_label.setStyleSheet("""
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 800;
-            color: #475569;
-            background-color: #0c111c;
-            border: 2px solid #1e293b;
-            border-radius: 14px;
+            color: #0f172a;
+            background-color: #ffffff;
+            border: 2px solid #0f172a;
+            border-radius: 17px;
         """)
         layout.addWidget(self.icon_label)
 
@@ -60,36 +64,43 @@ class StepItemWidget(QFrame):
         content_col.setSpacing(2)
         content_col.setContentsMargins(0, 0, 0, 0)
 
+        title_row = QHBoxLayout()
+        title_row.setSpacing(6)
+        title_row.setContentsMargins(0, 0, 0, 0)
+
         self.title_label = QLabel(number_title)
-        self.title_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #cbd5e1;")
-        content_col.addWidget(self.title_label)
+        self.title_label.setStyleSheet("font-size: 13px; font-weight: 900; color: #101828;")
+        title_row.addWidget(self.title_label)
+        title_row.addStretch()
+
+        # Active micro-badge
+        self.active_badge = QLabel("ĐANG CHỌN")
+        self.active_badge.setStyleSheet("""
+            color: #0f172a;
+            background-color: #b9f227;
+            border: 2px solid #101828;
+            padding: 1px 5px;
+            border-radius: 5px;
+            font-size: 8px;
+            font-weight: 900;
+            letter-spacing: 0.4px;
+        """)
+        self.active_badge.hide()
+        title_row.addWidget(self.active_badge)
+        content_col.addLayout(title_row)
 
         self.summary_label = QLabel(default_summary)
-        self.summary_label.setStyleSheet("font-size: 11px; color: #64748b;")
+        self.summary_label.setStyleSheet("font-size: 12px; color: #667085; font-weight: 600;")
         self.summary_label.setWordWrap(True)
         content_col.addWidget(self.summary_label)
 
         layout.addLayout(content_col, 1)
 
-        # Active micro-badge
-        self.active_badge = QLabel("CURRENT")
-        self.active_badge.setStyleSheet("""
-            color: #38bdf8;
-            background-color: rgba(2, 132, 199, 0.20);
-            border: 1px solid #0284c7;
-            padding: 1px 4px;
-            border-radius: 3px;
-            font-size: 8px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-        """)
-        self.active_badge.hide()
-        layout.addWidget(self.active_badge)
-
         self.arrow_indicator = QLabel("")
         self.arrow_indicator.hide()
 
         self._update_style()
+        apply_brutalist_shadow(self, offset=3)
 
     def set_active(self, active: bool) -> None:
         self._is_active = active
@@ -104,80 +115,76 @@ class StepItemWidget(QFrame):
             self._summary_text = summary
             self.summary_label.setText(summary)
 
-        if icon_color:
-            self.icon_label.setStyleSheet(f"""
-                font-size: 12px;
-                font-weight: bold;
-                color: {icon_color};
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #101726, stop:1 #0c111c);
-                border: 2px solid {icon_color};
-                border-radius: 14px;
-            """)
-        elif icon == "✓":
+        if icon == "✓":
             self.icon_label.setStyleSheet("""
                 font-size: 13px;
-                font-weight: bold;
-                color: #34d399;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0d2a1f, stop:1 #064e3b);
-                border: 2px solid #059669;
-                border-radius: 14px;
+                font-weight: 900;
+                color: #ffffff;
+                background-color: #22c55e;
+                border: 2px solid #0f172a;
+                border-radius: 17px;
             """)
         elif icon == "●":
             self.icon_label.setStyleSheet("""
                 font-size: 12px;
-                font-weight: bold;
-                color: #38bdf8;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0c2544, stop:1 #082f49);
-                border: 2px solid #0284c7;
-                border-radius: 14px;
+                font-weight: 900;
+                color: #ffffff;
+                background-color: #2563eb;
+                border: 2px solid #0f172a;
+                border-radius: 17px;
             """)
         elif icon == "✖":
             self.icon_label.setStyleSheet("""
                 font-size: 12px;
-                font-weight: bold;
-                color: #f87171;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2a0a0a, stop:1 #450a0a);
-                border: 2px solid #dc2626;
-                border-radius: 14px;
+                font-weight: 900;
+                color: #ffffff;
+                background-color: #ef4444;
+                border: 2px solid #0f172a;
+                border-radius: 17px;
+            """)
+        elif icon_color:
+            self.icon_label.setStyleSheet(f"""
+                font-size: 12px;
+                font-weight: 900;
+                color: {icon_color};
+                background-color: #ffffff;
+                border: 2px solid #0f172a;
+                border-radius: 17px;
             """)
         else:
             self.icon_label.setStyleSheet("""
                 font-size: 11px;
                 font-weight: 800;
-                color: #475569;
-                background-color: #0c111c;
-                border: 2px solid #1e293b;
-                border-radius: 14px;
+                color: #0f172a;
+                background-color: #ffffff;
+                border: 2px solid #0f172a;
+                border-radius: 17px;
             """)
 
     def _update_style(self) -> None:
         if self._is_active:
             self.setStyleSheet("""
                 QFrame#stepItem {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #101d33, stop:0.4 #0d1627, stop:1 #090f1a);
-                    border: 1px solid #0284c7;
-                    border-left: 3.5px solid #06b6d4;
-                    border-radius: 8px;
+                    background-color: #eef4ff;
+                    border: 3px solid #101828;
+                    border-radius: 14px;
                 }
             """)
-            self.title_label.setStyleSheet("font-size: 12px; font-weight: 800; color: #f8fafc;")
-            self.summary_label.setStyleSheet("font-size: 11px; color: #38bdf8; font-weight: 600;")
+            self.title_label.setStyleSheet("font-size: 13px; font-weight: 900; color: #173fb8;")
+            self.summary_label.setStyleSheet("font-size: 12px; color: #344054; font-weight: 700;")
         else:
             self.setStyleSheet("""
                 QFrame#stepItem {
-                    background-color: #080d17;
-                    border: 1px solid #141f32;
-                    border-left: 3.5px solid transparent;
-                    border-radius: 8px;
+                    background-color: #ffffff;
+                    border: 2px solid #101828;
+                    border-radius: 14px;
                 }
                 QFrame#stepItem:hover {
-                    background-color: #0e1626;
-                    border-color: #1e2f4a;
-                    border-left: 3.5px solid #243b5e;
+                    background-color: #f8fafc;
                 }
             """)
-            self.title_label.setStyleSheet("font-size: 12px; font-weight: 600; color: #cbd5e1;")
-            self.summary_label.setStyleSheet("font-size: 11px; color: #64748b;")
+            self.title_label.setStyleSheet("font-size: 13px; font-weight: 850; color: #344054;")
+            self.summary_label.setStyleSheet("font-size: 12px; color: #667085; font-weight: 600;")
 
     def mousePressEvent(self, event) -> None:
         super().mousePressEvent(event)
@@ -189,7 +196,7 @@ class StepConnector(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFixedHeight(10)
+        self.setFixedHeight(13)
         self._completed = False
 
     def set_completed(self, completed: bool) -> None:
@@ -201,15 +208,15 @@ class StepConnector(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         center_x = 26  # Align with icon center (12px margin + 14px half icon)
         if self._completed:
-            pen = QPen(QColor("#059669"), 2)
+            pen = QPen(QColor("#0f172a"), 2)
             painter.setPen(pen)
             painter.drawLine(center_x, 0, center_x, self.height())
-            # Little glowing node
-            painter.setBrush(QColor("#34d399"))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(center_x - 2, self.height() // 2 - 2, 4, 4)
+            # Little glowing green node
+            painter.setBrush(QColor("#22c55e"))
+            painter.setPen(QPen(QColor("#0f172a"), 1.5))
+            painter.drawEllipse(center_x - 3, self.height() // 2 - 3, 6, 6)
         else:
-            pen = QPen(QColor("#1e293b"), 1, Qt.PenStyle.DashLine)
+            pen = QPen(QColor("#94a3b8"), 2, Qt.PenStyle.DashLine)
             painter.setPen(pen)
             painter.drawLine(center_x, 0, center_x, self.height())
         painter.end()
@@ -225,43 +232,56 @@ class WorkflowStepper(QFrame):
         (1, "02 Voice & AI", "Ngọc Huyền · 1.1x"),
         (2, "03 Blur Regions", "Chưa tạo vùng"),
         (3, "04 Automation", "Sẵn sàng chạy"),
-        (4, "05 Review & Export", "Chờ duyệt"),
+        (4, "05 Duyệt & Xuất", "Chờ duyệt"),
     ]
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("stepperSidebar")
-        self.setMinimumWidth(250)
-        self.setMaximumWidth(290)
+        self.setMinimumWidth(290)
+        self.setMaximumWidth(350)
         self.setStyleSheet("""
             QFrame#stepperSidebar {
-                background-color: #050810;
-                border-right: 1px solid #131b2a;
+                background-color: #f5f7fb;
+                border-right: 3px solid #101828;
             }
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 16, 12, 16)
+        layout.setContentsMargins(14, 18, 16, 14)
         layout.setSpacing(0)
 
         # Header section title
         header_row = QHBoxLayout()
         header_row.setSpacing(6)
-        header_row.setContentsMargins(4, 0, 0, 12)
+        header_row.setContentsMargins(4, 0, 0, 10)
 
-        dot = QLabel("●")
-        dot.setStyleSheet("color: #06b6d4; font-size: 9px;")
+        dot = QLabel("🎬")
+        dot.setStyleSheet("font-size: 12px;")
         header_row.addWidget(dot)
 
-        header_label = QLabel("WORKFLOW PIPELINE")
+        header_label = QLabel("QUY TRÌNH 5 BƯỚC")
         header_label.setStyleSheet("""
-            color: #475569;
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: 1.2px;
+            color: #0f172a;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.8px;
             font-family: 'Segoe UI', sans-serif;
         """)
         header_row.addWidget(header_label)
+
+        self.sticker_badge = QLabel("PRO")
+        self.sticker_badge.setStyleSheet("""
+            background-color: #b9f227;
+            color: #0f172a;
+            border: 2px solid #101828;
+            font-size: 10px;
+            font-weight: 900;
+            padding: 1px 5px;
+            border-radius: 4px;
+        """)
+        header_row.addWidget(self.sticker_badge)
+        self.sticker_badge.hide()
         header_row.addStretch(1)
         layout.addLayout(header_row)
 
@@ -283,33 +303,62 @@ class WorkflowStepper(QFrame):
 
         layout.addStretch(1)
 
+        # Creative sticker clapperboard card
+        self.card_clapper = QFrame()
+        self.card_clapper.setObjectName("studioBadgeCard")
+        self.card_clapper.setStyleSheet("""
+            QFrame#studioBadgeCard {
+                background-color: #ffffff;
+                border: 2px solid #101828;
+                border-radius: 14px;
+                padding: 6px;
+            }
+        """)
+        card_layout = QVBoxLayout(self.card_clapper)
+        card_layout.setContentsMargins(6, 6, 6, 6)
+        card_layout.setSpacing(2)
+
+        lbl_c1 = QLabel("🎬 KAPPAK STUDIO")
+        lbl_c1.setStyleSheet("font-size: 12px; font-weight: 900; color: #101828; background: transparent;")
+        lbl_c2 = QLabel("Sáng tạo video nhanh & thông minh")
+        lbl_c2.setStyleSheet("font-size: 11px; color: #667085; font-weight: 600; background: transparent;")
+        card_layout.addWidget(lbl_c1)
+        card_layout.addWidget(lbl_c2)
+        layout.addWidget(self.card_clapper)
+        # Decorative only; keep the widget for compatibility but remove it from
+        # the normal workflow so the progress controls stay visually dominant.
+        self.card_clapper.hide()
+
+        layout.addSpacing(10)
+
         # Bottom: status summary & mini progress bar
         self.overall_progress = QProgressBar()
         self.overall_progress.setRange(0, 5)
         self.overall_progress.setValue(0)
-        self.overall_progress.setFixedHeight(3)
+        self.overall_progress.setFixedHeight(8)
         self.overall_progress.setTextVisible(False)
         self.overall_progress.setStyleSheet("""
             QProgressBar {
-                background-color: #0c111c;
-                border: none;
-                border-radius: 1px;
+                background-color: #e2e8f0;
+                border: 1.5px solid #0f172a;
+                border-radius: 4px;
             }
             QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
-                border-radius: 1px;
+                background-color: #22c55e;
+                border-radius: 2px;
             }
         """)
         layout.addWidget(self.overall_progress)
 
-        self.bottom_status = QLabel("Quy trình: 0/5 bước")
+        self.bottom_status = QLabel("Tiến độ: 0/5 bước hoàn tất")
         self.bottom_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.bottom_status.setStyleSheet("""
-            color: #475569;
+            color: #0f172a;
             font-size: 10px;
-            font-weight: 600;
+            font-weight: 800;
             padding: 6px 0;
-            border-top: 1px solid #131b2a;
+            border-top: 1.5px solid #cbd5e1;
+            margin-top: 6px;
         """)
         layout.addWidget(self.bottom_status)
 
@@ -349,20 +398,20 @@ class WorkflowStepper(QFrame):
         done_count = sum(1 for s in self.step_items if s._is_complete)
         self.overall_progress.setValue(done_count)
         if done_count == 5:
-            self.bottom_status.setText("🎉 Hoàn tất tất cả bước!")
+            self.bottom_status.setText("🎉 Đã hoàn tất tất cả các bước!")
             self.bottom_status.setStyleSheet("""
-                color: #34d399; font-size: 10px; font-weight: 700;
-                padding: 6px 0; border-top: 1px solid #059669;
+                color: #15803d; font-size: 10px; font-weight: 800;
+                padding: 6px 0; border-top: 1.5px solid #0f172a; margin-top: 6px;
             """)
         elif done_count > 0:
-            self.bottom_status.setText(f"Quy trình: {done_count}/5 bước hoàn tất")
+            self.bottom_status.setText(f"Tiến độ: {done_count}/5 bước hoàn tất")
             self.bottom_status.setStyleSheet("""
-                color: #38bdf8; font-size: 10px; font-weight: 600;
-                padding: 6px 0; border-top: 1px solid #131b2a;
+                color: #0f172a; font-size: 10px; font-weight: 800;
+                padding: 6px 0; border-top: 1.5px solid #cbd5e1; margin-top: 6px;
             """)
         else:
-            self.bottom_status.setText("Quy trình: 0/5 bước")
+            self.bottom_status.setText("Tiến độ: 0/5 bước hoàn tất")
             self.bottom_status.setStyleSheet("""
-                color: #475569; font-size: 10px; font-weight: 600;
-                padding: 6px 0; border-top: 1px solid #131b2a;
+                color: #64748b; font-size: 10px; font-weight: 700;
+                padding: 6px 0; border-top: 1.5px solid #cbd5e1; margin-top: 6px;
             """)

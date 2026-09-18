@@ -277,6 +277,11 @@ class VbeeController(QObject):
 
         self.window.busy = True
         self.window.left.stop_button.setEnabled(True)
+        # BUG-02 FIX: disconnect before connect to prevent double-connect on repeated runs
+        try:
+            self.window.left.stop_button.clicked.disconnect(self.stop_workflow)
+        except RuntimeError:
+            pass
         self.window.left.stop_button.clicked.connect(self.stop_workflow)
         self.window.left.job_progress.setValue(0)
         self.window._refresh()
@@ -471,6 +476,11 @@ class VbeeController(QObject):
 
         self.window.busy = True
         self.window.left.stop_button.setEnabled(True)
+        # BUG-02 FIX: disconnect before connect to prevent stacking connections
+        try:
+            self.window.left.stop_button.clicked.disconnect(self.stop_workflow)
+        except RuntimeError:
+            pass
         self.window.left.stop_button.clicked.connect(self.stop_workflow)
         self.window.left.job_progress.setValue(10)
         self.window.log(

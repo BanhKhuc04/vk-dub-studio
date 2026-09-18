@@ -36,7 +36,7 @@
     return {
       available: true,
       logged_in: isLoggedIn,
-      version: "2.2.0",
+      version: "2.3.0",
       has_input: hasPromptInput,
       has_user_menu: hasUserMenu,
       url: window.location.href,

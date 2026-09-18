@@ -40,7 +40,7 @@ class AppSettings:
     source_language: str = "auto"
     target_language: str = "vi"
     auto_update: bool = True
-    theme: str = "dark"
+    theme: str = "light"
     voice_volume: float = 100.0
     original_volume: float = 20.0
     vieneu_model: str = ""
@@ -49,6 +49,7 @@ class AppSettings:
     autosave: bool = True
     vbee_mode: str = "browser"  # "browser" | "api"
     capcut_version: str = ""  # e.g. "7.7.0" or "" for auto-detect
+    update_channel: str = "stable"  # FEAT-03: "stable" | "beta" — persisted channel preference
 
     def __post_init__(self) -> None:
         if self.schema_version != 2:
@@ -90,7 +91,7 @@ class AppSettings:
             raise ValueError("Mã giọng đã lưu không hợp lệ.")
         if self.source_language not in ("auto", "vi", "en", "zh", "ja", "ko"):
             raise ValueError("Ngôn ngữ nguồn không hợp lệ.")
-        if self.target_language != "vi" or self.theme != "dark":
+        if self.target_language != "vi" or self.theme not in ("light", "dark"):
             raise ValueError("Ngôn ngữ đích/giao diện chưa được hỗ trợ.")
         if not self.capcut_draft_root:
             detected = detect_default_capcut_draft_root()

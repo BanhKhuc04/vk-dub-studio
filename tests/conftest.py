@@ -5,7 +5,17 @@ import pytest
 # Unit tests use Qt's offscreen backend to avoid native Windows accessibility/COM
 # re-entrancy while fixtures create and destroy many windows. Smoke tests use the
 # real desktop platform and verify actual media playback separately.
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
+try:
+    from PySide6.QtWidgets import QApplication
+
+    # Ensure a unified headless QApplication singleton is instantiated at session start
+    # so both QWidget dialog tests and backend Qt signal/pipeline tests share the same instance.
+    _session_qapp = QApplication.instance() or QApplication([])
+except Exception:
+    _session_qapp = None
+
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +42,7 @@ def isolate_vbee_credentials(monkeypatch, tmp_path):
     vault = MemoryVault()
     monkeypatch.setattr(CredentialStore, "_get_backend", lambda self: self._backend or vault)
     monkeypatch.setattr("vkdub.services.health_service.fetch_update_info", lambda **kw: None)
+    monkeypatch.setattr("vkdub.services.update_service.fetch_update_info", lambda **kw: None)
 
     monkeypatch.setattr(VbeeAppStore, "get", lambda self: None)
     monkeypatch.setattr(VbeeTokenStore, "get", lambda self: None)

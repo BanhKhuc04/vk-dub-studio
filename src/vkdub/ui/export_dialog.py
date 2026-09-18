@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from vkdub.services.render_service import RenderConfig
+from vkdub.ui.theme import apply_widget_theme
 
 if TYPE_CHECKING:
     from vkdub.domain.project import Project
@@ -34,12 +35,33 @@ class ExportDialog(QDialog):
         super().__init__(parent)
         self._main_window = parent
         self.setWindowTitle("Kiểm tra & Xuất Video (Final Export)")
-        self.setMinimumWidth(560)
+        self.resize(700, 610)
+        self.setMinimumSize(620, 560)
         self.rendering: bool = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(14)
+
+        header_row = QHBoxLayout()
+        header_col = QVBoxLayout()
+        title = QLabel("XUẤT VIDEO HOÀN CHỈNH")
+        title.setObjectName("heading")
+        title.setStyleSheet("font-size:21px;font-weight:900;color:#101828;")
+        header_col.addWidget(title)
+        subtitle = QLabel("Kiểm tra đầu vào, chọn cách hòa âm và xuất một tệp MP4 sẵn sàng đăng.")
+        subtitle.setProperty("role", "muted")
+        subtitle.setWordWrap(True)
+        header_col.addWidget(subtitle)
+        header_row.addLayout(header_col, 1)
+        self.ready_badge = QLabel("ĐANG KIỂM TRA")
+        self.ready_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.ready_badge.setStyleSheet(
+            "background:#eef4ff;color:#173fb8;border:2px solid #101828;border-radius:9px;"
+            "padding:7px 11px;font-size:10px;font-weight:900;"
+        )
+        header_row.addWidget(self.ready_badge)
+        layout.addLayout(header_row)
 
         # 1. Checklist Box
         check_group = QGroupBox("KIỂM TRA TRƯỚC KHI XUẤT")
@@ -61,7 +83,11 @@ class ExportDialog(QDialog):
             self.lbl_mask,
             self.lbl_ffmpeg,
         ):
-            lbl.setStyleSheet("font-size: 12px; font-weight: 500;")
+            lbl.setWordWrap(True)
+            lbl.setStyleSheet(
+                "background:#f5f7fb;color:#667085;border-left:4px solid #cbd5e1;"
+                "padding:6px 9px;font-size:12px;font-weight:700;"
+            )
             check_layout.addWidget(lbl)
 
         layout.addWidget(check_group)
@@ -104,7 +130,7 @@ class ExportDialog(QDialog):
         # Output destination path
         dest_row = QHBoxLayout()
         self.lbl_dest_path = QLabel("Chưa chọn đường dẫn xuất")
-        self.lbl_dest_path.setStyleSheet("font-family: Consolas; font-size: 11px; color: #34d399;")
+        self.lbl_dest_path.setStyleSheet("font-family: Consolas; font-size: 11px; color: #15803d;")
         self.btn_browse = QPushButton("Đổi vị trí lưu…")
         self.btn_browse.clicked.connect(self._browse_output)
         dest_row.addWidget(self.lbl_dest_path, 1)
@@ -122,7 +148,7 @@ class ExportDialog(QDialog):
         layout.addWidget(self.progress_bar)
 
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("font-size: 11px; color: #94a3b8;")
+        self.status_label.setProperty("role", "muted")
         self.status_label.hide()
         layout.addWidget(self.status_label)
 
@@ -136,15 +162,32 @@ class ExportDialog(QDialog):
 
         self.btn_start = QPushButton("BẮT ĐẦU XUẤT VIDEO")
         self.btn_start.setObjectName("primary")
-        self.btn_start.setStyleSheet(
-            "font-weight: bold; padding: 8px 16px; background-color: #0284c7; color: white;"
-        )
+        self.btn_start.setMinimumHeight(40)
+        self.btn_start.setStyleSheet("""
+            QPushButton#primary {
+                font-weight: 900;
+                padding: 8px 16px;
+                background-color: #a3e635;
+                color: #0f172a;
+                border: 2px solid #0f172a;
+                border-radius: 9px;
+            }
+            QPushButton#primary:hover {
+                background-color: #b9f227;
+            }
+            QPushButton#primary:disabled {
+                background-color: #e2e8f0;
+                color: #94a3b8;
+                border-color: #cbd5e1;
+            }
+        """)
         self.btn_start.setEnabled(False)
         self.btn_start.clicked.connect(self._on_start)
         action_row.addWidget(self.btn_start)
 
         layout.addLayout(action_row)
         self.custom_output_path: Path | None = None
+        apply_widget_theme(self)
 
     def _on_orig_vol_changed(self, v: int) -> None:
         if v == 0:
@@ -169,14 +212,14 @@ class ExportDialog(QDialog):
         v_info = f"{meta.width}x{meta.height}" if meta else ""
         v_name = proj.video_path.name if proj.video_path else "Chưa có"
         self.lbl_video.setText(f"{'✓' if v_ok else '✗'} Video nguồn: {v_name} {v_info}")
-        self.lbl_video.setStyleSheet(f"color: {'#34d399' if v_ok else '#ef4444'};")
+        self._set_check_state(self.lbl_video, v_ok)
 
         # Script
         s_ok = proj.is_approved
         n_lines = len(proj.script.lines) if proj.script else 0
         s_tag = "(ĐÃ DUYỆT)" if s_ok else "(CHƯA DUYỆT)"
         self.lbl_script.setText(f"{'✓' if s_ok else '✗'} Kịch bản đã duyệt: {n_lines} câu {s_tag}")
-        self.lbl_script.setStyleSheet(f"color: {'#34d399' if s_ok else '#ef4444'};")
+        self._set_check_state(self.lbl_script, s_ok)
 
         # Voice
         voice_ready = proj.voice_ready
@@ -185,17 +228,17 @@ class ExportDialog(QDialog):
         self.lbl_voice.setText(
             f"{'✓' if voice_ready else '✗'} Voice đã tạo: {v_count}/{n_lines} câu {v_tag}"
         )
-        self.lbl_voice.setStyleSheet(f"color: {'#34d399' if voice_ready else '#ef4444'};")
+        self._set_check_state(self.lbl_voice, voice_ready)
 
         # Subtitle
         sub_name = proj.subtitle_style.name
         self.lbl_sub.setText(f"✓ Phụ đề: Style '{sub_name}' hợp lệ")
-        self.lbl_sub.setStyleSheet("color: #34d399;")
+        self._set_check_state(self.lbl_sub, True)
 
         # Mask
         m_count = len(proj.masks)
         self.lbl_mask.setText(f"✓ Vùng che: {m_count} vùng che được cấu hình")
-        self.lbl_mask.setStyleSheet("color: #34d399;")
+        self._set_check_state(self.lbl_mask, True)
 
         # FFmpeg
         if ffmpeg_available is not None:
@@ -204,14 +247,27 @@ class ExportDialog(QDialog):
             ffmpeg_ok = bool(main_win.tools.paths.get("ffmpeg")) if main_win else False
         ff_tag = "Sẵn sàng" if ffmpeg_ok else "Chưa cài đặt"
         self.lbl_ffmpeg.setText(f"{'✓' if ffmpeg_ok else '✗'} FFmpeg: {ff_tag}")
-        self.lbl_ffmpeg.setStyleSheet(f"color: {'#34d399' if ffmpeg_ok else '#ef4444'};")
+        self._set_check_state(self.lbl_ffmpeg, ffmpeg_ok)
 
         # Ready condition
         all_ready = v_ok and s_ok and voice_ready and ffmpeg_ok
         self.btn_start.setEnabled(all_ready)
         if not all_ready:
-            self.btn_start.setToolTip("Cần thỏa mãn đầy đủ các mục kiểm tra để xuất video.")
+            blockers = sum(not value for value in (v_ok, s_ok, voice_ready, ffmpeg_ok))
+            self.ready_badge.setText(f"CÒN {blockers} MỤC")
+            self.ready_badge.setStyleSheet(
+                "background:#fff0f5;color:#be123c;border:2px solid #101828;border-radius:9px;"
+                "padding:7px 11px;font-size:10px;font-weight:900;"
+            )
+            self.btn_start.setText("CHƯA THỂ XUẤT VIDEO")
+            self.btn_start.setToolTip("Hoàn tất các mục màu hồng trong danh sách kiểm tra.")
         else:
+            self.ready_badge.setText("SẴN SÀNG XUẤT")
+            self.ready_badge.setStyleSheet(
+                "background:#dcfce7;color:#166534;border:2px solid #101828;border-radius:9px;"
+                "padding:7px 11px;font-size:10px;font-weight:900;"
+            )
+            self.btn_start.setText("BẮT ĐẦU XUẤT VIDEO")
             self.btn_start.setToolTip("")
 
         # Default output path
@@ -220,6 +276,16 @@ class ExportDialog(QDialog):
             def_name = f"{proj.video_path.stem}_dubbed.mp4"
             self.custom_output_path = out_dir / def_name
         self.lbl_dest_path.setText(str(self.custom_output_path) if self.custom_output_path else "")
+
+    @staticmethod
+    def _set_check_state(label: QLabel, ok: bool) -> None:
+        bg = "#ecfdf3" if ok else "#fff0f5"
+        color = "#166534" if ok else "#be123c"
+        accent = "#20c96b" if ok else "#ff5c8a"
+        label.setStyleSheet(
+            f"background:{bg};color:{color};border-left:4px solid {accent};"
+            "padding:6px 9px;font-size:12px;font-weight:800;"
+        )
 
     def _browse_output(self) -> None:
         path, _ = QFileDialog.getSaveFileName(

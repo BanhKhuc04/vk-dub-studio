@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VK Dub Studio — Clip Manager</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body class="apple-dark">
+  <div id="app-container" class="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="brand-group">
+        <div class="brand-logo-badge">
+          <svg class="brand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">VK DUB STUDIO</span>
+          <span class="brand-subtitle">CLIP MANAGER · v2.3.0</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="youtube-status-badge" class="status-badge disconnected" title="Chưa nhận diện video YouTube">
+          <span class="status-dot"></span>
+          <span id="youtube-status-text" class="status-label">YouTube: chưa mở video</span>
+        </div>
+        <div id="connection-status-badge" class="status-badge disconnected" title="Trạng thái kết nối Local Agent">
+          <span class="status-dot"></span>
+          <span id="connection-status-text" class="status-label">ToolVideo: chưa kết nối</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dynamic Island Toast Notifications -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- Active Video Card -->
+    <section id="video-card" class="card video-card">
+      <div class="video-thumb-wrapper">
+        <img id="video-thumbnail" class="video-thumbnail" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='90' fill='%23222'%3E%3Crect width='100%25' height='100%25'/%3E%3C/svg%3E" alt="Thumbnail video" />
+        <span id="video-duration-badge" class="duration-badge">00:00:00</span>
+      </div>
+      <div class="video-meta">
+        <h2 id="video-title" class="video-title" title="Chưa phát hiện video">Đang chờ video YouTube...</h2>
+        <div class="video-tags">
+          <span id="video-id-badge" class="badge monospace">v=--------</span>
+          <span id="video-author-badge" class="badge">YouTube</span>
+        </div>
+        <div id="youtube-recovery" class="youtube-recovery hidden">
+          <span id="youtube-error-detail" class="youtube-error-detail"></span>
+          <button id="btn-retry-youtube" class="btn-retry-youtube" type="button">Kích hoạt lại trên YouTube</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Empty State Guidance -->
+    <section id="empty-state" class="empty-state">
+      <div class="empty-icon-circle">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <circle cx="10" cy="13" r="2"></circle>
+          <path d="m20 17-1.5-1.5"></path>
+        </svg>
+      </div>
+      <h3 class="empty-title">Chưa có đoạn cắt nào</h3>
+      <p class="empty-desc">
+        Cách dùng: phát tới điểm đầu → nhấn I; phát tới điểm cuối → nhấn O;
+        nhấn Enter để lưu đoạn. Lặp lại nếu muốn lấy nhiều đoạn.
+      </p>
+      <div class="hotkey-guide-grid">
+        <div class="hotkey-pill"><kbd>I</kbd> <span>1. Chọn điểm đầu</span></div>
+        <div class="hotkey-pill"><kbd>O</kbd> <span>2. Chọn điểm cuối</span></div>
+        <div class="hotkey-pill"><kbd>Enter</kbd> <span>3. Lưu đoạn cắt</span></div>
+        <div class="hotkey-pill"><kbd>Esc</kbd> <span>Hủy và chọn lại</span></div>
+      </div>
+      <button id="btn-add-first-manual" class="btn-manual-fallback" type="button">
+        + Thêm đoạn bằng thời gian thủ công
+      </button>
+    </section>
+
+    <!-- Clips Manager Section -->
+    <section id="clips-section" class="clips-section hidden">
+      <div class="clips-toolbar">
+        <label class="select-all-label">
+          <input type="checkbox" id="select-all-checkbox" checked class="apple-checkbox">
+          <span class="select-all-text" id="selected-summary">0 đoạn đã chọn (00:00)</span>
+        </label>
+        <div class="toolbar-actions">
+          <button id="btn-add-clip-manual" class="btn-icon" title="Thêm đoạn mới thủ công">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <button id="btn-clear-clips" class="btn-icon danger" title="Xóa toàn bộ đoạn cắt">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drag and drop reorderable list -->
+      <div id="clips-list" class="clips-list" role="list"></div>
+    </section>
+
+    <!-- Validation Error Banner -->
+    <div id="validation-banner" class="validation-banner hidden" role="alert">
+      <svg class="warning-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      <span id="validation-banner-text" class="validation-banner-text">Vui lòng sửa các đoạn bị lỗi trước khi xuất.</span>
+    </div>
+
+    <!-- Export Settings Drawer / Card -->
+    <section id="export-card" class="card export-card">
+      <div class="card-header">
+        <h3 class="card-title">Cấu hình xuất video</h3>
+      </div>
+
+      <!-- Export Mode Segmented Control -->
+      <div class="segmented-control" role="radiogroup" aria-label="Chế độ xuất">
+        <label class="segment-option">
+          <input type="radio" name="export-mode" value="SEPARATE" checked>
+          <span class="segment-label">Từng đoạn riêng</span>
+        </label>
+        <label class="segment-option">
+          <input type="radio" name="export-mode" value="MERGED">
+          <span class="segment-label">Ghép thành 1</span>
+        </label>
+        <label class="segment-option">
+          <input type="radio" name="export-mode" value="IMPORT">
+          <span class="segment-label">Vào ToolVideo</span>
+        </label>
+      </div>
+
+      <!-- Destination Output Directory -->
+      <div class="form-group">
+        <div class="form-label-row">
+          <label for="output-dir-input" class="form-label">Thư mục xuất kết quả</label>
+          <button id="btn-open-folder" class="btn-link" type="button" title="Mở thư mục trong Windows Explorer">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Mở thư mục</span>
+          </button>
+        </div>
+        <div class="input-with-action">
+          <input type="text" id="output-dir-input" class="apple-input monospace" placeholder="Để trống để dùng thư mục xuất mặc định của ToolVideo" spellcheck="false" />
+        </div>
+      </div>
+
+      <!-- Grid of container & quality & cut mode -->
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="container-select" class="form-label">Định dạng</label>
+          <select id="container-select" class="apple-select">
+            <option value="mp4" selected>MP4 (.mp4)</option>
+            <option value="mkv">MKV (.mkv)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="quality-select" class="form-label">Chất lượng nguồn</label>
+          <select id="quality-select" class="apple-select">
+            <option value="best" selected>Cao nhất cắt nhanh (khuyên dùng)</option>
+            <option value="source_best">Cao nhất tuyệt đối (có thể rất chậm)</option>
+            <option value="2160p">4K (2160p)</option>
+            <option value="1440p">2K (1440p)</option>
+            <option value="1080p">Full HD (1080p)</option>
+            <option value="720p">HD (720p)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Cut Mode Selector -->
+      <div class="form-group">
+        <label class="form-label">Chế độ cắt</label>
+        <div class="cut-mode-selector">
+          <label class="cut-mode-card">
+            <input type="radio" name="cut-mode" value="STREAM_COPY" checked>
+            <div class="cut-mode-content">
+              <div class="cut-mode-title">
+                <span class="mode-name">Siêu nhanh</span>
+                <span class="mode-tag-fast">Copy gốc</span>
+              </div>
+              <p class="cut-mode-desc">Không re-encode, giữ nguyên chất lượng 100%, snap keyframe gần nhất.</p>
+            </div>
+          </label>
+          <label class="cut-mode-card">
+            <input type="radio" name="cut-mode" value="FRAME_ACCURATE">
+            <div class="cut-mode-content">
+              <div class="cut-mode-title">
+                <span class="mode-name">Chính xác khung hình</span>
+                <span class="mode-tag-acc">Từng Frame</span>
+              </div>
+              <p class="cut-mode-desc">Cắt chuẩn miligiây, tự động kích hoạt tăng tốc phần cứng NVENC / QSV / AMF.</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Cookies Opt-In Toggle -->
+      <div class="form-group cookie-toggle-group">
+        <label class="toggle-control">
+          <input type="checkbox" id="use-cookies-checkbox" class="apple-checkbox">
+          <span class="toggle-text">
+            <strong>Dùng cookie trình duyệt (cookies-from-browser)</strong>
+            <small>Chỉ bật khi tải video giới hạn độ tuổi hoặc hội viên. Video công khai không cần bật.</small>
+          </span>
+        </label>
+      </div>
+
+      <!-- Main Export Action Button -->
+      <button id="btn-export-start" class="btn-primary" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span id="export-button-text">Bắt đầu xuất video</span>
+      </button>
+    </section>
+
+    <!-- Realtime Progress & Telemetry Card -->
+    <section id="progress-card" class="card progress-card hidden">
+      <div class="progress-header">
+        <div class="stage-info">
+          <span class="pulse-indicator"></span>
+          <span id="progress-stage-badge" class="stage-badge">Đang xử lý</span>
+        </div>
+        <span id="progress-percent-label" class="percent-label">0%</span>
+      </div>
+
+      <div class="progress-bar-track">
+        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+      </div>
+
+      <p id="progress-message" class="progress-message">Đang khởi tạo tác vụ...</p>
+
+      <div class="progress-stats-grid">
+        <div class="stat-box">
+          <span class="stat-label">Tốc độ</span>
+          <span id="progress-speed" class="stat-value monospace">-- MB/s</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Đã tải / Tổng</span>
+          <span id="progress-bytes" class="stat-value monospace">-- / --</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Tiến trình clip</span>
+          <span id="progress-clips-counter" class="stat-value monospace">0 / 0</span>
+        </div>
+      </div>
+
+      <div class="progress-actions">
+        <button id="btn-cancel-export" class="btn-secondary danger" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          <span>Hủy xuất</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Result / Completed Card -->
+    <section id="result-card" class="card result-card hidden">
+      <div class="result-header">
+        <div class="result-success-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="result-meta">
+          <h3 class="result-title">Xuất video hoàn tất!</h3>
+          <p id="result-summary" class="result-summary">Đã cắt thành công các đoạn video.</p>
+        </div>
+      </div>
+
+      <div class="result-files-list">
+        <span class="result-files-label">Tệp xuất:</span>
+        <ul id="result-files-ul" class="result-ul monospace"></ul>
+      </div>
+
+      <div class="result-actions">
+        <button id="btn-result-open-folder" class="btn-secondary" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Mở thư mục</span>
+        </button>
+        <button id="btn-result-import-studio" class="btn-secondary primary-outline" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>Đưa vào ToolVideo</span>
+        </button>
+        <button id="btn-result-done" class="btn-primary" type="button">Tiếp tục</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="sidepanel.js" type="module"></script>
+</body>
+</html>

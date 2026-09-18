@@ -19,8 +19,9 @@ from vkdub.services.update_service import (
     apply_update_and_restart,
     download_installer,
 )
+from vkdub.ui.theme import apply_widget_theme
 from vkdub.utils.paths import data_root
-from vkdub.version import __version__
+from vkdub.version import APP_NAME, __version__
 
 
 class UpdateDialog(QDialog):
@@ -35,7 +36,7 @@ class UpdateDialog(QDialog):
         self._cancelled = False
         self._download_thread: threading.Thread | None = None
 
-        self.setWindowTitle("Đã có phiên bản mới — VK Dub Studio")
+        self.setWindowTitle(f"Đã có phiên bản mới v{update_info.version} — {APP_NAME}")
         self.resize(520, 420)
         self.setMinimumSize(480, 360)
 
@@ -102,6 +103,10 @@ class UpdateDialog(QDialog):
         self.download_progress.connect(self._on_progress)
         self.download_finished.connect(self._on_finished)
 
+        # FEAT-04 FIX: apply app theme so dialog matches the rest of the application
+        apply_widget_theme(self)
+
+
     def _start_download(self) -> None:
         self.btn_update.setEnabled(False)
         self.btn_later.setText("Hủy tải")
@@ -153,6 +158,8 @@ class UpdateDialog(QDialog):
 
     def _on_finished(self, success: bool, message: str) -> None:
         self.btn_update.setEnabled(True)
+        # UX-06 FIX: restore btn_later label after download completes (was stuck at "Hủy tải")
+        self.btn_later.setText("Đóng")
         self.lbl_status.setText(message)
         if success:
             self.progress_bar.setValue(100)

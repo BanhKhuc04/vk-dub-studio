@@ -1,17 +1,19 @@
 {
   "manifest_version": 3,
   "name": "VK Dub Studio Bridge",
-  "version": "2.1.17",
-  "description": "Microsoft Edge & Chrome Bridge for VK Dub Studio Automation (ChatGPT & Vbee)",
+  "version": "2.3.0",
+  "description": "Microsoft Edge & Chrome Bridge for VK Dub Studio Automation & YouTube Clip Mode",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0rUwetRNAsoPBo0o0hVtgMJJL0bQfOUs5LiCdDlMg242irjOt4L75Qr3+322+SHDUEA/lYcQglaEHKD3tSlE/pwUIhekHHadAAZnYladqLEApp9Lk1587C82LnfK9K+qmI1PM7jviNJxFdFHtHttF3O00eFYrPWw0P9ygtL92mEFFxcV1qh3lG8zWiJtRe1Ph2oOw5YjWuDFm+5WrtgfFA0xJgn9hK76Y8aCtTK+oQXGhBnzrb5p9wSDC7s6NRHUjBytONPXD1o1OonDmnfLi7ZnUjJjzHx8GX54tBcZ/7F/tBWqvUoZEwN/xIiERxxjvh4WFhnRcAu1r6yo5i5QjQIDAQAB",
   "permissions": [
     "nativeMessaging",
+    "activeTab",
     "tabs",
     "storage",
     "cookies",
     "downloads",
     "scripting",
-    "webNavigation"
+    "webNavigation",
+    "sidePanel"
   ],
   "host_permissions": [
     "*://chatgpt.com/*",
@@ -23,8 +25,14 @@
     "*://studio.vbee.vn/*",
     "*://*.studio.vbee.vn/*",
     "*://127.0.0.1/*",
-    "*://localhost/*"
+    "*://localhost/*",
+    "*://www.youtube.com/*",
+    "*://youtube.com/*",
+    "*://*.youtube.com/*"
   ],
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
   "background": {
     "service_worker": "background/serviceWorker.js",
     "type": "module"
@@ -48,6 +56,15 @@
         "*://*.studio.vbee.vn/*"
       ],
       "js": ["content/vbeeAdapter.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://*.youtube.com/*"
+      ],
+      "js": ["content/youtubeAdapter.js"],
       "run_at": "document_end"
     }
   ],

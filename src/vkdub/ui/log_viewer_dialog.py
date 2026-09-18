@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vkdub.ui.theme import apply_widget_theme
 from vkdub.utils.logging import clear_logs, get_log_file_path, read_recent_logs
 from vkdub.version import APP_BRANDING
 
@@ -32,7 +33,7 @@ class LogViewerDialog(QDialog):
         # Header
         hdr = QHBoxLayout()
         title = QLabel("📋 NHẬT KÝ HOẠT ĐỘNG & CHẨN ĐOÁN HỆ THỐNG")
-        title.setStyleSheet("font-size: 14px; font-weight: bold; color: #38bdf8;")
+        title.setProperty("role", "section")
         hdr.addWidget(title)
         hdr.addStretch()
 
@@ -44,8 +45,8 @@ class LogViewerDialog(QDialog):
         # Log content text browser
         self.txt_log = QTextBrowser()
         self.txt_log.setStyleSheet(
-            "background-color: #0b0f19; color: #cbd5e1; font-family: Consolas, monospace; "
-            "font-size: 12px; border: 1px solid #1e293b; border-radius: 6px; padding: 10px;"
+            "background-color: #0b1020; color: #e2e8f0; font-family: Consolas, monospace; "
+            "font-size: 12px; border: 2px solid #0f172a; border-radius: 8px; padding: 10px;"
         )
         layout.addWidget(self.txt_log, 1)
 
@@ -74,6 +75,7 @@ class LogViewerDialog(QDialog):
         layout.addLayout(btn_row)
 
         self.refresh_logs()
+        apply_widget_theme(self)
 
     def refresh_logs(self) -> None:
         content = read_recent_logs()

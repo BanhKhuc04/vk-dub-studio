@@ -1,10 +1,20 @@
 @echo off
 chcp 65001 >nul
-title VK Dub Studio — by vanhkhuc
+title KAPPAK Studio — Video Tools for Creators (by vanhkhuc)
 echo ===================================================
-echo     DANG KHOI CHAY VK DUB STUDIO — BY VANHKHUC
+echo     DANG KHOI CHAY KAPPAK STUDIO WEB — BY VANHKHUC
+echo     Dia chi web: http://localhost:8000
 echo ===================================================
-set "PATH=C:\Users\khucv\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.1-essentials_build\bin;%LOCALAPPDATA%\Microsoft\WinGet\Links;%PATH%"
-cd /d D:\ToolVideo
+cd /d "%~dp0"
+set "PATH=%~dp0tools;%LOCALAPPDATA%\Microsoft\WinGet\Links;%PATH%"
+set "PYTHONPATH=src;%PYTHONPATH%"
+
+if not exist ".\.venv\Scripts\python.exe" (
+    echo [LOI] Khong tim thay Python virtual environment tai .\.venv\Scripts\python.exe
+    echo Vui long kiem tra hoac tao virtualenv truoc khi chay.
+    pause
+    exit /b 1
+)
+
 .\.venv\Scripts\python.exe app.py
 pause

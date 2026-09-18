@@ -12,12 +12,7 @@ if exist "%~dp0..\VK Dub Studio.exe" (
     exit /b %ERRORLEVEL%
 )
 
-:: 2. Prefer workspace virtualenv python if present
-if exist "d:\ToolVideo\.venv\Scripts\python.exe" (
-    set "PYTHON_EXE=d:\ToolVideo\.venv\Scripts\python.exe"
-    goto :RUN
-)
-
+:: 2. Prefer the virtualenv belonging to this workspace.
 if exist "%~dp0..\..\.venv\Scripts\python.exe" (
     set "PYTHON_EXE=%~dp0..\..\.venv\Scripts\python.exe"
     goto :RUN

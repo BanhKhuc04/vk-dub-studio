@@ -61,7 +61,7 @@ class SubstepConsoleCard(QFrame):
         self._current_status = SubstepStatus.PENDING
 
         self.setObjectName("substepCard")
-        self.setMinimumHeight(78)
+        self.setMinimumHeight(88)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self._apply_card_style(SubstepStatus.PENDING)
 
@@ -72,8 +72,8 @@ class SubstepConsoleCard(QFrame):
         self._spin_idx = 0
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(5)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(6)
 
         # Header: Icon + Step ID & Title + Duration badge
         header_row = QHBoxLayout()
@@ -84,19 +84,19 @@ class SubstepConsoleCard(QFrame):
         self.lbl_icon.setFixedSize(22, 22)
         self.lbl_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_icon.setStyleSheet("""
-            font-size: 12px; font-weight: bold; color: #475569;
-            background-color: #0c111c; border: 2px solid #1e293b;
+            font-size: 11px; font-weight: 800; color: #0f172a;
+            background-color: #ffffff; border: 2px solid #0f172a;
             border-radius: 11px;
         """)
         header_row.addWidget(self.lbl_icon)
 
         self.lbl_title = QLabel(f"<b>{step_id}</b> {title}")
         self.lbl_title.setMinimumHeight(20)
-        self.lbl_title.setStyleSheet("font-size: 12px; color: #cbd5e1; font-weight: 500;")
+        self.lbl_title.setStyleSheet("font-size: 13px; color: #101828; font-weight: 900;")
         header_row.addWidget(self.lbl_title, 1)
 
         self.lbl_duration = QLabel("")
-        self.lbl_duration.setStyleSheet("font-size: 10px; color: #475569; font-family: Consolas;")
+        self.lbl_duration.setStyleSheet("font-size: 10px; color: #0f172a; font-weight: 700; font-family: Consolas;")
         header_row.addWidget(self.lbl_duration)
 
         layout.addLayout(header_row)
@@ -105,16 +105,16 @@ class SubstepConsoleCard(QFrame):
         self.step_progress = QProgressBar()
         self.step_progress.setRange(0, 100)
         self.step_progress.setValue(0)
-        self.step_progress.setFixedHeight(4)
+        self.step_progress.setFixedHeight(6)
         self.step_progress.setTextVisible(False)
         self.step_progress.setStyleSheet("""
             QProgressBar {
-                background-color: #0c111c;
-                border: none;
-                border-radius: 2px;
+                background-color: #e2e8f0;
+                border: 1.5px solid #0f172a;
+                border-radius: 3px;
             }
             QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
+                background-color: #22c55e;
                 border-radius: 2px;
             }
         """)
@@ -123,7 +123,7 @@ class SubstepConsoleCard(QFrame):
         # Message / Summary line
         self.lbl_summary = QLabel("Đang chờ...")
         self.lbl_summary.setMinimumHeight(18)
-        self.lbl_summary.setStyleSheet("font-size: 11px; color: #475569; padding-left: 30px;")
+        self.lbl_summary.setStyleSheet("font-size: 12px; color: #667085; font-weight: 600; padding-left: 30px;")
         self.lbl_summary.setWordWrap(True)
         layout.addWidget(self.lbl_summary)
 
@@ -135,10 +135,10 @@ class SubstepConsoleCard(QFrame):
         self.btn_open_file = QPushButton("📂 Mở file kết quả")
         self.btn_open_file.setStyleSheet("""
             QPushButton {
-                background-color: #0c111c; color: #64748b; border: 1px solid #1a2436;
-                border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 600;
+                background-color: #ffffff; color: #0f172a; border: 1.5px solid #0f172a;
+                border-radius: 5px; padding: 3px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background-color: #131b2c; color: #38bdf8; border-color: #0284c7; }
+            QPushButton:hover { background-color: #f1f5f9; }
         """)
         self.btn_open_file.hide()
         self.btn_open_file.clicked.connect(self._on_open_artifact)
@@ -147,13 +147,10 @@ class SubstepConsoleCard(QFrame):
         self.btn_retry = QPushButton("🔄 Thử lại")
         self.btn_retry.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d97706, stop:1 #f59e0b);
-                color: #ffffff; border: none; border-radius: 4px;
-                padding: 3px 12px; font-size: 11px; font-weight: 700;
+                background-color: #fde047; color: #0f172a; border: 1.5px solid #0f172a;
+                border-radius: 5px; padding: 3px 12px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #b45309, stop:1 #d97706);
-            }
+            QPushButton:hover { background-color: #facc15; }
         """)
         self.btn_retry.hide()
         self.btn_retry.clicked.connect(lambda: self.retry_requested.emit(self.step_id))
@@ -166,10 +163,10 @@ class SubstepConsoleCard(QFrame):
             )
             self.btn_import_srt.setStyleSheet("""
                 QPushButton {
-                    background-color: #082f49; color: #38bdf8; border: 1px solid #0284c7;
-                    border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 600;
+                    background-color: #dbeafe; color: #1e40af; border: 1.5px solid #0f172a;
+                    border-radius: 5px; padding: 3px 10px; font-size: 11px; font-weight: 800;
                 }
-                QPushButton:hover { background-color: #0c4a6e; color: #ffffff; border-color: #38bdf8; }
+                QPushButton:hover { background-color: #bfdbfe; }
             """)
             self.btn_import_srt.clicked.connect(self.import_srt_requested.emit)
             self.action_row.addWidget(self.btn_import_srt)
@@ -177,10 +174,10 @@ class SubstepConsoleCard(QFrame):
         self.btn_toggle_details = QPushButton("Technical details ›")
         self.btn_toggle_details.setStyleSheet("""
             QPushButton {
-                background-color: #0c111c; color: #64748b; border: 1px solid #1a2436;
-                border-radius: 4px; padding: 3px 10px; font-size: 11px; font-weight: 600;
+                background-color: #ffffff; color: #64748b; border: 1px solid #cbd5e1;
+                border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700;
             }
-            QPushButton:hover { background-color: #131b2c; color: #94a3b8; border-color: #24334f; }
+            QPushButton:hover { color: #0f172a; border-color: #0f172a; }
         """)
         self.btn_toggle_details.hide()
         self.btn_toggle_details.clicked.connect(self._toggle_tech_details)
@@ -201,12 +198,13 @@ class SubstepConsoleCard(QFrame):
         self.tech_details_box.setFixedHeight(70)
         self.tech_details_box.setStyleSheet("""
             QPlainTextEdit {
-                background-color: #070a10;
-                border: 1px solid #1a1a2e;
-                border-radius: 4px;
-                color: #f87171;
+                background-color: #f8fafc;
+                border: 1.5px solid #0f172a;
+                border-radius: 6px;
+                color: #b91c1c;
                 font-family: Consolas, monospace;
                 font-size: 10px;
+                font-weight: 600;
                 padding: 4px;
             }
         """)
@@ -224,28 +222,26 @@ class SubstepConsoleCard(QFrame):
         if status == SubstepStatus.RUNNING:
             self.setStyleSheet("""
                 QFrame#substepCard {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #091526, stop:1 #080d16);
-                    border: 1px solid #0284c7;
-                    border-left: 3px solid #06b6d4;
-                    border-radius: 8px;
+                    background-color: #f6ffd9;
+                    border: 2px solid #0f172a;
+                    border-radius: 14px;
                 }
             """)
             return
 
-        border_colors = {
-            SubstepStatus.PENDING: "#151d2e",
-            SubstepStatus.WAITING: "#b45309",
-            SubstepStatus.VALIDATING: "#6d28d9",
-            SubstepStatus.SUCCESS: "#059669",
-            SubstepStatus.FAILED: "#dc2626",
+        bg_colors = {
+            SubstepStatus.PENDING: "#ffffff",
+            SubstepStatus.WAITING: "#fef9c3",
+            SubstepStatus.VALIDATING: "#f3e8ff",
+            SubstepStatus.SUCCESS: "#f0fdf4",
+            SubstepStatus.FAILED: "#fef2f2",
         }
-        bc = border_colors.get(status, "#151d2e")
-        bg = "#070b14" if status == SubstepStatus.PENDING else "#080d16"
+        bg = bg_colors.get(status, "#ffffff")
         self.setStyleSheet(f"""
             QFrame#substepCard {{
                 background-color: {bg};
-                border: 1px solid {bc};
-                border-radius: 8px;
+                border: 2px solid #0f172a;
+                border-radius: 14px;
             }}
         """)
 
@@ -273,14 +269,14 @@ class SubstepConsoleCard(QFrame):
 
         # Icon pill styling based on status
         icon_styles = {
-            SubstepStatus.SUCCESS: f"font-size: 13px; font-weight: bold; color: {color}; background: #0d2a1f; border: 2px solid #059669; border-radius: 12px;",
-            SubstepStatus.FAILED: f"font-size: 12px; font-weight: bold; color: {color}; background: #2a0a0a; border: 2px solid #dc2626; border-radius: 12px;",
-            SubstepStatus.RUNNING: f"font-size: 12px; font-weight: bold; color: {color}; background: #082f49; border: 2px solid #0284c7; border-radius: 12px;",
-            SubstepStatus.WAITING: f"font-size: 12px; font-weight: bold; color: {color}; background: #451a03; border: 2px solid #b45309; border-radius: 12px;",
-            SubstepStatus.VALIDATING: f"font-size: 12px; font-weight: bold; color: {color}; background: #1e0a3e; border: 2px solid #6d28d9; border-radius: 12px;",
+            SubstepStatus.SUCCESS: "font-size: 13px; font-weight: 900; color: #ffffff; background-color: #22c55e; border: 2px solid #0f172a; border-radius: 11px;",
+            SubstepStatus.FAILED: "font-size: 12px; font-weight: 900; color: #ffffff; background-color: #ef4444; border: 2px solid #0f172a; border-radius: 11px;",
+            SubstepStatus.RUNNING: "font-size: 12px; font-weight: 900; color: #ffffff; background-color: #2563eb; border: 2px solid #0f172a; border-radius: 11px;",
+            SubstepStatus.WAITING: "font-size: 12px; font-weight: 900; color: #0f172a; background-color: #fef08a; border: 2px solid #0f172a; border-radius: 11px;",
+            SubstepStatus.VALIDATING: "font-size: 12px; font-weight: 900; color: #ffffff; background-color: #a855f7; border: 2px solid #0f172a; border-radius: 11px;",
         }
         self.lbl_icon.setStyleSheet(icon_styles.get(status,
-            f"font-size: 12px; font-weight: bold; color: {color}; background-color: #0c111c; border: 2px solid #1e293b; border-radius: 12px;"
+            "font-size: 11px; font-weight: 800; color: #0f172a; background-color: #ffffff; border: 2px solid #0f172a; border-radius: 11px;"
         ))
 
         self.status_badge.setText(status.value if hasattr(status, "value") else str(status))
@@ -289,18 +285,18 @@ class SubstepConsoleCard(QFrame):
         # Progress bar color changes based on status
         if status == SubstepStatus.SUCCESS:
             self.step_progress.setStyleSheet("""
-                QProgressBar { background-color: #0c111c; border: none; border-radius: 2px; }
-                QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #34d399); border-radius: 2px; }
+                QProgressBar { background-color: #e2e8f0; border: 1.5px solid #0f172a; border-radius: 3px; }
+                QProgressBar::chunk { background-color: #22c55e; border-radius: 2px; }
             """)
         elif status == SubstepStatus.FAILED:
             self.step_progress.setStyleSheet("""
-                QProgressBar { background-color: #0c111c; border: none; border-radius: 2px; }
-                QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #dc2626, stop:1 #f87171); border-radius: 2px; }
+                QProgressBar { background-color: #e2e8f0; border: 1.5px solid #0f172a; border-radius: 3px; }
+                QProgressBar::chunk { background-color: #ef4444; border-radius: 2px; }
             """)
         else:
             self.step_progress.setStyleSheet("""
-                QProgressBar { background-color: #0c111c; border: none; border-radius: 2px; }
-                QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4); border-radius: 2px; }
+                QProgressBar { background-color: #e2e8f0; border: 1.5px solid #0f172a; border-radius: 3px; }
+                QProgressBar::chunk { background-color: #2563eb; border-radius: 2px; }
             """)
 
         # Format clean human-readable summary
@@ -382,12 +378,12 @@ class Step4AutomationPanel(QFrame):
         self.setObjectName("step4Panel")
         self.setStyleSheet("""
             QFrame#step4Panel {
-                background-color: #050810;
+                background-color: #ffffff;
             }
             QLabel.eyebrowTag {
                 font-size: 9px;
-                font-weight: 800;
-                color: #06b6d4;
+                font-weight: 900;
+                color: #2563eb;
                 letter-spacing: 1.2px;
             }
         """)
@@ -407,17 +403,17 @@ class Step4AutomationPanel(QFrame):
                 border: none;
             }
             QScrollBar:vertical {
-                background: #050810;
+                background: #f1f5f9;
                 width: 6px;
                 border: none;
             }
             QScrollBar::handle:vertical {
-                background: #1e293b;
+                background: #cbd5e1;
                 min-height: 24px;
                 border-radius: 3px;
             }
             QScrollBar::handle:vertical:hover {
-                background: #0284c7;
+                background: #0f172a;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0px;
@@ -426,40 +422,40 @@ class Step4AutomationPanel(QFrame):
 
         container = QWidget()
         container.setObjectName("step4Container")
-        container.setStyleSheet("QWidget#step4Container { background-color: #050810; }")
+        container.setStyleSheet("QWidget#step4Container { background-color: #ffffff; }")
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(22, 20, 22, 18)
+        layout.setSpacing(13)
 
         # 1. Header & Overall State Badge
         header_row = QHBoxLayout()
         header_col = QVBoxLayout()
         header_col.setSpacing(3)
 
-        eyebrow = QLabel("PIPELINE · STEP 04")
+        eyebrow = QLabel("QUY TRÌNH · BƯỚC 04")
         eyebrow.setProperty("class", "eyebrowTag")
         header_col.addWidget(eyebrow)
 
         title = QLabel("04 XỬ LÝ TỰ ĐỘNG")
         title.setStyleSheet("""
-            font-size: 16px; font-weight: 800; color: #f8fafc;
+            font-size: 20px; font-weight: 900; color: #101828;
             letter-spacing: 0.3px;
         """)
         header_col.addWidget(title)
         subtitle = QLabel("Bóc băng → Dịch ngữ cảnh → Kịch bản → Voice Vbee")
-        subtitle.setStyleSheet("font-size: 11px; color: #64748b;")
+        subtitle.setStyleSheet("font-size: 12px; color: #667085;")
         header_col.addWidget(subtitle)
         header_row.addLayout(header_col, 1)
 
         self.lbl_est_time = QLabel("")
-        self.lbl_est_time.setStyleSheet("font-size: 11px; color: #38bdf8; font-weight: 600; padding-right: 6px;")
+        self.lbl_est_time.setStyleSheet("font-size: 11px; color: #0f172a; font-weight: 700; padding-right: 6px;")
         header_row.addWidget(self.lbl_est_time)
 
         self.overall_badge = QLabel("○ Sẵn sàng")
         self.overall_badge.setStyleSheet("""
-            color: #64748b; font-size: 11px; font-weight: bold;
-            padding: 3px 10px; border-radius: 5px;
-            background: #090f1b; border: 1px solid #1a273e;
+            color: #0f172a; font-size: 11px; font-weight: 800;
+            padding: 3px 10px; border-radius: 6px;
+            background-color: #f1f5f9; border: 2px solid #0f172a;
         """)
         header_row.addWidget(self.overall_badge)
         layout.addLayout(header_row)
@@ -468,16 +464,16 @@ class Step4AutomationPanel(QFrame):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFixedHeight(4)
+        self.progress_bar.setFixedHeight(8)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
-                background-color: #0c111c;
-                border: none;
-                border-radius: 2px;
+                background-color: #e2e8f0;
+                border: 1.5px solid #0f172a;
+                border-radius: 4px;
             }
             QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
+                background-color: #22c55e;
                 border-radius: 2px;
             }
         """)
@@ -485,11 +481,12 @@ class Step4AutomationPanel(QFrame):
 
         # 2b. Browser & Extension Pre-flight Health Strip
         self.health_strip = QFrame()
+        self.health_strip.setObjectName("automationHealthStrip")
         self.health_strip.setStyleSheet("""
-            QFrame {
-                background-color: #0a0f18;
-                border: 1px solid #151d2e;
-                border-radius: 6px;
+            QFrame#automationHealthStrip {
+                background-color: #eef4ff;
+                border: 2px solid #101828;
+                border-radius: 12px;
                 padding: 4px 8px;
             }
         """)
@@ -498,15 +495,15 @@ class Step4AutomationPanel(QFrame):
         health_layout.setSpacing(12)
 
         self.lbl_health_edge = QLabel("● Edge: Chưa kết nối")
-        self.lbl_health_edge.setStyleSheet("color: #475569; font-size: 11px; font-weight: 500;")
+        self.lbl_health_edge.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 700;")
         health_layout.addWidget(self.lbl_health_edge)
 
         self.lbl_health_chatgpt = QLabel("● ChatGPT: Chưa kiểm tra")
-        self.lbl_health_chatgpt.setStyleSheet("color: #475569; font-size: 11px; font-weight: 500;")
+        self.lbl_health_chatgpt.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 700;")
         health_layout.addWidget(self.lbl_health_chatgpt)
 
         self.lbl_health_vbee = QLabel("● Vbee: Chưa kiểm tra")
-        self.lbl_health_vbee.setStyleSheet("color: #475569; font-size: 11px; font-weight: 500;")
+        self.lbl_health_vbee.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 700;")
         health_layout.addWidget(self.lbl_health_vbee)
 
         health_layout.addStretch(1)
@@ -514,11 +511,11 @@ class Step4AutomationPanel(QFrame):
         self.btn_health_check = QPushButton("🔍 Kiểm tra sẵn sàng")
         self.btn_health_check.setStyleSheet("""
             QPushButton {
-                background: #0c111c; color: #38bdf8; border: 1px solid #0284c7;
-                border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold;
+                background-color: #ffffff; color: #0f172a; border: 1.5px solid #0f172a;
+                border-radius: 5px; padding: 4px 10px; font-size: 11px; font-weight: 800;
             }
             QPushButton:hover {
-                background: #0e1a2e; color: #ffffff; border-color: #38bdf8;
+                background-color: #f1f5f9;
             }
         """)
         health_layout.addWidget(self.btn_health_check)
@@ -534,7 +531,7 @@ class Step4AutomationPanel(QFrame):
         ]
 
         cards_col = QVBoxLayout()
-        cards_col.setSpacing(6)
+        cards_col.setSpacing(8)
         for s_id, s_title in substep_configs:
             card = SubstepConsoleCard(s_id, s_title)
             card.retry_requested.connect(self.retry_step_requested.emit)
@@ -552,16 +549,18 @@ class Step4AutomationPanel(QFrame):
         self.btn_start = QPushButton("⚡ BẮT ĐẦU XỬ LÝ TOÀN BỘ")
         self.btn_start.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
-                color: #ffffff; font-size: 13px; font-weight: 800;
-                padding: 12px 18px; border: 1px solid #34d399; border-radius: 8px;
+                background-color: #b9f227;
+                color: #101828; font-size: 14px; font-weight: 900;
+                padding: 13px 18px; border: 3px solid #101828; border-radius: 12px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #047857, stop:1 #059669);
-                border-color: #6ee7b7;
+                background-color: #a7df18;
+            }
+            QPushButton:pressed {
+                background-color: #95c916;
             }
             QPushButton:disabled {
-                background: #0c111c; color: #475569; border: 1px solid #1a2436;
+                background-color: #f1f5f9; color: #94a3b8; border: 2px solid #cbd5e1;
             }
         """)
         self.btn_start.setProperty("class", "primaryBtn")
@@ -571,10 +570,10 @@ class Step4AutomationPanel(QFrame):
         self.btn_cancel = QPushButton("⏹ Dừng")
         self.btn_cancel.setStyleSheet("""
             QPushButton {
-                background-color: #450a0a; color: #fca5a5; font-size: 12px; font-weight: 700;
-                padding: 10px 16px; border: 1px solid #991b1b; border-radius: 8px;
+                background-color: #fee2e2; color: #b91c1c; font-size: 12px; font-weight: 800;
+                padding: 10px 16px; border: 2px solid #0f172a; border-radius: 8px;
             }
-            QPushButton:hover { background-color: #7f1d1d; color: #ffffff; border-color: #dc2626; }
+            QPushButton:hover { background-color: #fecaca; }
         """)
         self.btn_cancel.hide()
         self.btn_cancel.clicked.connect(self.cancel_requested.emit)
@@ -587,7 +586,7 @@ class Step4AutomationPanel(QFrame):
         self.chk_auto_voice.setToolTip(
             "Mặc định tắt để bạn có thể kiểm tra và sửa câu thoại tiếng Việt ở Bước 05 trước khi tổng hợp voice Vbee."
         )
-        self.chk_auto_voice.setStyleSheet("color: #64748b; font-size: 11px; padding: 2px 0;")
+        self.chk_auto_voice.setStyleSheet("color: #0f172a; font-size: 11px; font-weight: 700; padding: 2px 0;")
         layout.addWidget(self.chk_auto_voice)
 
         layout.addStretch(1)
@@ -597,16 +596,15 @@ class Step4AutomationPanel(QFrame):
         self.btn_continue.setEnabled(False)
         self.btn_continue.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
-                color: #ffffff; font-size: 13px; font-weight: 800;
-                padding: 11px 18px; border: 1px solid #38bdf8; border-radius: 8px;
+                background-color: #2563eb;
+                color: #ffffff; font-size: 13px; font-weight: 900;
+                padding: 11px 18px; border: 2px solid #0f172a; border-radius: 8px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:1 #0891b2);
-                border-color: #7dd3fc;
+                background-color: #1d4ed8;
             }
             QPushButton:disabled {
-                background: #0c111c; color: #475569; border: 1px solid #1a2436;
+                background-color: #f1f5f9; color: #94a3b8; border: 2px solid #cbd5e1;
             }
         """)
         self.btn_continue.clicked.connect(self.continue_requested.emit)

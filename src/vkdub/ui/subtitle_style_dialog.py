@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QColorDialog,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFontComboBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from vkdub.domain.subtitle import SubtitleStyle
 from vkdub.services.subtitle_service import export_ass, export_srt, load_presets
+from vkdub.ui.theme import apply_widget_theme
 
 if TYPE_CHECKING:
     from vkdub.ui.main_window import MainWindow
@@ -40,7 +42,8 @@ class SubtitleStyleDialog(QDialog):
     def __init__(self, parent: "MainWindow | None" = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Tùy biến Phụ đề (Subtitle Styles & Presets)")
-        self.setMinimumWidth(540)
+        self.resize(720, 760)
+        self.setMinimumSize(640, 680)
         self.presets = load_presets()
         self._updating_ui = False
 
@@ -58,6 +61,34 @@ class SubtitleStyleDialog(QDialog):
         self.preset_combo.currentTextChanged.connect(self._on_preset_selected)
         preset_layout.addWidget(self.preset_combo, 1)
         layout.addWidget(preset_group)
+
+        # Live preview keeps this dialog task-oriented: every edit is visible
+        # before the user commits it to the project.
+        self.preview_frame = QFrame()
+        self.preview_frame.setObjectName("subtitlePreviewFrame")
+        self.preview_frame.setMinimumHeight(150)
+        self.preview_frame.setStyleSheet("""
+            QFrame#subtitlePreviewFrame {
+                background-color: #101828;
+                border: 3px solid #101828;
+                border-radius: 14px;
+            }
+        """)
+        preview_layout = QVBoxLayout(self.preview_frame)
+        preview_layout.setContentsMargins(18, 14, 18, 14)
+        preview_caption = QLabel("XEM TRƯỚC TRÊN VIDEO")
+        preview_caption.setStyleSheet(
+            "color:#b9f227;background:transparent;font-size:10px;font-weight:900;letter-spacing:1px;"
+        )
+        preview_layout.addWidget(preview_caption)
+        preview_layout.addStretch(1)
+        self.preview_subtitle = QLabel("Nếu bạn cảm thấy mệt, hãy dừng lại nghỉ một chút.")
+        self.preview_subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_subtitle.setWordWrap(True)
+        self.preview_subtitle.setMinimumHeight(64)
+        preview_layout.addWidget(self.preview_subtitle)
+        preview_layout.addStretch(1)
+        layout.addWidget(self.preview_frame)
 
         # Typography Group
         typo_group = QGroupBox("Phông chữ & Định dạng")
@@ -196,6 +227,7 @@ class SubtitleStyleDialog(QDialog):
         action_bar.addStretch()
 
         self.btn_close = QPushButton("Áp dụng & Đóng")
+        self.btn_close.setObjectName("primary")
         self.btn_close.setDefault(True)
         self.btn_close.clicked.connect(self.accept)
         action_bar.addWidget(self.btn_close)
@@ -203,6 +235,8 @@ class SubtitleStyleDialog(QDialog):
         layout.addLayout(action_bar)
 
         self._update_color_buttons()
+        self._refresh_preview()
+        apply_widget_theme(self)
 
     def set_current_style(self, style: SubtitleStyle) -> None:
         """Populate dialog widgets from a SubtitleStyle object."""
@@ -229,6 +263,7 @@ class SubtitleStyleDialog(QDialog):
             self._update_color_buttons()
         finally:
             self._updating_ui = False
+        self._refresh_preview()
 
     def get_style(self) -> SubtitleStyle:
         """Construct SubtitleStyle from current dialog input values."""
@@ -252,17 +287,48 @@ class SubtitleStyleDialog(QDialog):
         )
 
     def _update_color_buttons(self) -> None:
+        def contrast(hex_color: str) -> str:
+            color = QColor(hex_color)
+            luminance = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
+            return "#101828" if luminance > 160 else "#ffffff"
+
         self.btn_text_color.setStyleSheet(
-            f"background-color: {self.current_text_color}; border-radius: 4px; padding: 4px 8px;"
+            f"background-color:{self.current_text_color};color:{contrast(self.current_text_color)};"
+            "border:2px solid #101828;border-radius:8px;padding:6px 10px;font-weight:800;"
         )
         self.btn_outline_color.setStyleSheet(
-            f"background-color: {self.current_outline_color}; border-radius: 4px; padding: 4px 8px;"
+            f"background-color:{self.current_outline_color};color:{contrast(self.current_outline_color)};"
+            "border:2px solid #101828;border-radius:8px;padding:6px 10px;font-weight:800;"
         )
         self.btn_shadow_color.setStyleSheet(
-            f"background-color: {self.current_shadow_color}; border-radius: 4px; padding: 4px 8px;"
+            f"background-color:{self.current_shadow_color};color:{contrast(self.current_shadow_color)};"
+            "border:2px solid #101828;border-radius:8px;padding:6px 10px;font-weight:800;"
         )
         self.btn_bg_color.setStyleSheet(
-            f"background-color: {self.current_bg_color}; border-radius: 4px; padding: 4px 8px;"
+            f"background-color:{self.current_bg_color};color:{contrast(self.current_bg_color)};"
+            "border:2px solid #101828;border-radius:8px;padding:6px 10px;font-weight:800;"
+        )
+
+    def _refresh_preview(self) -> None:
+        if not hasattr(self, "preview_subtitle"):
+            return
+        font = QFont(self.font_combo.currentFont())
+        font.setPointSize(max(13, min(30, round(self.size_slider.value() * 0.48))))
+        font.setBold(self.check_bold.isChecked())
+        font.setItalic(self.check_italic.isChecked())
+        self.preview_subtitle.setFont(font)
+
+        bg = "transparent"
+        padding = "4px 8px"
+        if self.check_bg_box.isChecked():
+            color = QColor(self.current_bg_color)
+            alpha = round(255 * self.bg_opacity_slider.value() / 100)
+            bg = f"rgba({color.red()},{color.green()},{color.blue()},{alpha})"
+            padding = "8px 14px"
+        self.preview_subtitle.setStyleSheet(
+            f"color:{self.current_text_color};background-color:{bg};padding:{padding};"
+            f"border:{max(0, self.outline_slider.value())}px solid {self.current_outline_color};"
+            "border-radius:8px;"
         )
 
     def _pick_text_color(self) -> None:
@@ -304,6 +370,7 @@ class SubtitleStyleDialog(QDialog):
     def _on_style_input_changed(self) -> None:
         if self._updating_ui:
             return
+        self._refresh_preview()
         style = self.get_style()
         self.style_changed.emit(style)
 

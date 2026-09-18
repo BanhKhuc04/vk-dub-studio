@@ -713,3 +713,555 @@ QToolButton::menu-indicator {
     width: 0;
 }
 """
+
+KAPPAK_TOKENS = {
+    "canvas": "#F5F7FB",
+    "surface": "#FFFFFF",
+    "surface_tint": "#EEF4FF",
+    "primary": "#2457F5",
+    "primary_dark": "#173FB8",
+    "lime": "#B9F227",
+    "lime_hover": "#A7DF18",
+    "pink": "#FF5C8A",
+    "success": "#20C96B",
+    "ink": "#101828",
+    "muted": "#667085",
+    "border": "#101828",
+}
+
+
+NEO_BRUTALISM_THEME = """
+/* =========================================================================
+   KAPPAK — Neo Brutalism Creative Suite Theme
+   ========================================================================= */
+QWidget {
+    background-color: #f5f7fb;
+    color: #101828;
+    font-family: 'Plus Jakarta Sans', 'Segoe UI', -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    selection-background-color: #b9f227;
+    selection-color: #101828;
+    outline: none;
+}
+
+QMainWindow {
+    background-color: #f5f7fb;
+}
+
+QDialog {
+    background-color: #ffffff;
+    color: #101828;
+}
+
+QSplitter {
+    background-color: #f5f7fb;
+}
+
+QSplitter::handle {
+    background-color: #cbd5e1;
+    width: 2px;
+    height: 2px;
+}
+
+QSplitter::handle:hover {
+    background-color: #2563eb;
+}
+
+QFrame#panel, QFrame.card, QFrame[settingsCard="true"] {
+    background-color: #ffffff;
+    border: 2px solid #101828;
+    border-radius: 16px;
+}
+
+QPushButton {
+    background-color: #ffffff;
+    color: #101828;
+    border: 2px solid #101828;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 700;
+    font-size: 13px;
+}
+
+QPushButton:hover {
+    background-color: #f1f5f9;
+}
+
+QPushButton:pressed {
+    background-color: #e2e8f0;
+}
+
+QPushButton:disabled {
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    border-color: #cbd5e1;
+}
+
+QPushButton.primaryBtn, QPushButton#primary, QPushButton[class="primary"] {
+    background-color: #b9f227;
+    color: #101828;
+    border: 3px solid #101828;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 14px;
+}
+
+QPushButton.primaryBtn:hover, QPushButton#primary:hover, QPushButton[class="primary"]:hover {
+    background-color: #a7df18;
+}
+
+QPushButton.actionBlue, QPushButton#btnBlue {
+    background-color: #2457f5;
+    color: #ffffff;
+    border: 3px solid #101828;
+    border-radius: 12px;
+    font-weight: 800;
+}
+
+QPushButton.actionBlue:hover, QPushButton#btnBlue:hover {
+    background-color: #173fb8;
+}
+
+QLineEdit, QTextEdit, QPlainTextEdit {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+    border-color: #2563eb;
+}
+
+QComboBox {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-weight: 600;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 2px solid #0f172a;
+    selection-background-color: #fde047;
+    selection-color: #0f172a;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+QProgressBar {
+    background-color: #e2e8f0;
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    color: #0f172a;
+    min-height: 14px;
+}
+
+QProgressBar::chunk {
+    background-color: #22c55e;
+    border-radius: 6px;
+}
+
+QScrollBar:vertical {
+    border: 1.5px solid #0f172a;
+    background: #f1f5f9;
+    width: 10px;
+    margin: 0px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical {
+    background: #cbd5e1;
+    min-height: 20px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #94a3b8;
+}
+
+QScrollBar:horizontal {
+    border: 1.5px solid #0f172a;
+    background: #f1f5f9;
+    height: 10px;
+    margin: 0px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #cbd5e1;
+    min-width: 20px;
+    border-radius: 4px;
+}
+
+QTabWidget::pane {
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    background-color: #ffffff;
+    padding: 12px;
+}
+
+QTabBar::tab {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 2px solid #0f172a;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 8px 18px;
+    font-weight: 700;
+    margin-right: 4px;
+}
+
+QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+QTableWidget {
+    background-color: #ffffff;
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    gridline-color: #e2e8f0;
+}
+
+QHeaderView::section {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    border: 1px solid #0f172a;
+    padding: 6px 8px;
+    font-weight: 800;
+}
+
+QCheckBox {
+    spacing: 8px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #0f172a;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #2563eb;
+    image: none;
+}
+"""
+
+# Semantic controls shared by the KAPPAK light theme.  The original UI has a
+# number of specialised widgets, so keeping these rules central lets dialogs
+# and newly-created controls inherit the same visual language automatically.
+NEO_LIGHT_THEME = (
+    NEO_BRUTALISM_THEME
+    + """
+QLabel#heading {
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 900;
+}
+QLabel[role="section"] {
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 900;
+    padding-top: 6px;
+}
+QLabel[role="muted"] { color: #64748b; font-size: 12px; }
+QLabel[role="success"] { color: #15803d; font-weight: 800; }
+QLabel[role="warning"] { color: #a16207; font-weight: 700; }
+QLabel[role="danger"] { color: #be123c; font-weight: 800; }
+
+QGroupBox {
+    background-color: #ffffff;
+    border: 2px solid #0f172a;
+    border-radius: 10px;
+    margin-top: 12px;
+    padding: 14px 10px 10px 10px;
+    font-weight: 800;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 6px;
+    color: #1d4ed8;
+    background-color: #ffffff;
+}
+QSpinBox, QDoubleSpinBox {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 2px solid #0f172a;
+    border-radius: 7px;
+    padding: 5px 8px;
+    font-weight: 650;
+}
+QListWidget, QListView, QTreeWidget, QTableView, QTextBrowser {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    alternate-background-color: #f1f5f9;
+}
+QListWidget::item, QListView::item { padding: 6px; border-radius: 5px; }
+QListWidget::item:selected, QListView::item:selected {
+    background-color: #fde047;
+    color: #0f172a;
+}
+QToolButton {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 2px solid #0f172a;
+    border-radius: 7px;
+    padding: 5px 9px;
+    font-weight: 800;
+}
+QToolButton:hover { background-color: #dbeafe; }
+QMenu {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 2px solid #0f172a;
+    padding: 5px;
+}
+QMenu::item { padding: 7px 22px 7px 10px; border-radius: 5px; }
+QMenu::item:selected { background-color: #fde047; color: #0f172a; }
+QRadioButton { spacing: 8px; font-weight: 650; }
+QRadioButton::indicator {
+    width: 17px; height: 17px; border: 2px solid #0f172a;
+    border-radius: 10px; background-color: #ffffff;
+}
+QRadioButton::indicator:checked { background-color: #2563eb; border: 4px solid #ffffff; }
+QSlider::groove:horizontal {
+    height: 7px; background: #cbd5e1; border: 1px solid #0f172a; border-radius: 4px;
+}
+QSlider::handle:horizontal {
+    background: #2563eb; border: 2px solid #0f172a;
+    width: 16px; margin: -6px 0; border-radius: 8px;
+}
+QStatusBar { background-color: #0f172a; color: #ffffff; border-top: 2px solid #020617; }
+QToolTip {
+    background-color: #0f172a; color: #ffffff; border: 1px solid #020617;
+    padding: 5px;
+}
+"""
+)
+
+NEO_DARK_THEME = """
+QWidget {
+    background-color: #0b1020;
+    color: #e5e7eb;
+    font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    selection-background-color: #a3e635;
+    selection-color: #07111f;
+    outline: none;
+}
+QMainWindow, QDialog, QSplitter { background-color: #0b1020; color: #e5e7eb; }
+QSplitter::handle { background-color: #334155; width: 2px; height: 2px; }
+QFrame#panel, QFrame.card {
+    background-color: #111827; border: 2px solid #020617; border-radius: 12px;
+}
+QLabel#heading { color: #f8fafc; font-size: 18px; font-weight: 900; }
+QLabel[role="section"] { color: #818cf8; font-size: 13px; font-weight: 900; padding-top: 6px; }
+QLabel[role="muted"] { color: #94a3b8; font-size: 12px; }
+QLabel[role="success"] { color: #86efac; font-weight: 800; }
+QLabel[role="warning"] { color: #fde047; font-weight: 700; }
+QLabel[role="danger"] { color: #fda4af; font-weight: 800; }
+QPushButton, QToolButton {
+    background-color: #1e293b; color: #f8fafc; border: 2px solid #020617;
+    border-radius: 8px; padding: 6px 14px; font-weight: 750;
+}
+QPushButton:hover, QToolButton:hover { background-color: #312e81; border-color: #818cf8; }
+QPushButton:pressed, QToolButton:pressed { background-color: #3730a3; }
+QPushButton:disabled { background-color: #111827; color: #64748b; border-color: #334155; }
+QPushButton#primary, QPushButton[class="primary"], QPushButton.primaryBtn {
+    background-color: #a3e635; color: #07111f; border: 2px solid #020617;
+    border-radius: 9px; font-weight: 900;
+}
+QPushButton#primary:hover, QPushButton[class="primary"]:hover, QPushButton.primaryBtn:hover {
+    background-color: #bef264;
+}
+QPushButton.actionBlue, QPushButton#btnBlue {
+    background-color: #4f46e5; color: #ffffff; border: 2px solid #020617; font-weight: 900;
+}
+QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QComboBox,
+QSpinBox, QDoubleSpinBox, QListWidget, QListView, QTreeWidget, QTableWidget, QTableView {
+    background-color: #111827; color: #f8fafc; border: 2px solid #020617;
+    border-radius: 8px; padding: 6px 10px;
+}
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus { border-color: #818cf8; }
+QComboBox::drop-down { border: none; width: 24px; }
+QComboBox QAbstractItemView {
+    background-color: #111827; color: #f8fafc; border: 2px solid #020617;
+    selection-background-color: #a3e635; selection-color: #07111f;
+}
+QListWidget::item, QListView::item { padding: 6px; border-radius: 5px; }
+QListWidget::item:selected, QListView::item:selected { background-color: #4f46e5; color: #ffffff; }
+QGroupBox {
+    background-color: #111827; border: 2px solid #020617; border-radius: 10px;
+    margin-top: 12px; padding: 14px 10px 10px 10px; font-weight: 800;
+}
+QGroupBox::title {
+    subcontrol-origin: margin; left: 12px; padding: 0 6px;
+    color: #a5b4fc; background-color: #111827;
+}
+QTabWidget::pane {
+    border: 2px solid #020617; border-radius: 8px;
+    background-color: #111827; padding: 12px;
+}
+QTabBar::tab {
+    background-color: #1e293b; color: #94a3b8; border: 2px solid #020617;
+    border-bottom: none; border-top-left-radius: 8px; border-top-right-radius: 8px;
+    padding: 8px 18px; font-weight: 750; margin-right: 4px;
+}
+QTabBar::tab:selected { background-color: #4f46e5; color: #ffffff; }
+QHeaderView::section {
+    background-color: #1e293b; color: #f8fafc; border: 1px solid #020617;
+    padding: 6px 8px; font-weight: 850;
+}
+QProgressBar {
+    background-color: #1e293b; border: 2px solid #020617; border-radius: 8px;
+    text-align: center; font-weight: 800; color: #f8fafc; min-height: 14px;
+}
+QProgressBar::chunk { background-color: #a3e635; border-radius: 6px; }
+QCheckBox, QRadioButton { spacing: 8px; color: #e5e7eb; font-weight: 650; }
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 18px; height: 18px; border: 2px solid #020617; background-color: #111827;
+}
+QCheckBox::indicator { border-radius: 4px; }
+QRadioButton::indicator { border-radius: 10px; }
+QCheckBox::indicator:checked { background-color: #a3e635; }
+QRadioButton::indicator:checked { background-color: #818cf8; border: 4px solid #111827; }
+QSlider::groove:horizontal {
+    height: 7px; background: #334155; border: 1px solid #020617; border-radius: 4px;
+}
+QSlider::handle:horizontal {
+    background: #a3e635; border: 2px solid #020617;
+    width: 16px; margin: -6px 0; border-radius: 8px;
+}
+QMenu { background-color: #111827; color: #f8fafc; border: 2px solid #020617; padding: 5px; }
+QMenu::item { padding: 7px 22px 7px 10px; border-radius: 5px; }
+QMenu::item:selected { background-color: #4f46e5; color: #ffffff; }
+QScrollBar:vertical { border: 1px solid #020617; background: #111827; width: 10px; margin: 0; }
+QScrollBar::handle:vertical { background: #475569; min-height: 22px; border-radius: 4px; }
+QScrollBar:horizontal { border: 1px solid #020617; background: #111827; height: 10px; margin: 0; }
+QScrollBar::handle:horizontal { background: #475569; min-width: 22px; border-radius: 4px; }
+QStatusBar { background-color: #020617; color: #e5e7eb; border-top: 2px solid #020617; }
+QToolTip { background-color: #020617; color: #f8fafc; border: 1px solid #818cf8; padding: 5px; }
+"""
+
+
+def apply_brutalist_shadow(widget, *, offset: int = 4, color: str = "#101828") -> None:
+    """Attach the crisp offset shadow used by the KAPPAK mockups."""
+    from PySide6.QtGui import QColor
+    from PySide6.QtWidgets import QGraphicsDropShadowEffect
+
+    effect = QGraphicsDropShadowEffect(widget)
+    effect.setBlurRadius(0)
+    effect.setOffset(offset, offset)
+    effect.setColor(QColor(color))
+    widget.setGraphicsEffect(effect)
+
+
+def normalize_theme(theme: str | None) -> str:
+    """Return one of the two supported persisted theme names."""
+    return "dark" if str(theme).lower() == "dark" else "light"
+
+
+def _darken_inline_qss(style: str) -> str:
+    """Translate legacy light-only component QSS into the dark KAPPAK palette.
+
+    Component-specific inline QSS is retained for backwards compatibility with
+    the mature PySide UI.  The translation is deliberately conservative and
+    starts from the saved light source each time, so switching themes never
+    accumulates colour substitutions.
+    """
+    import re
+
+    replacements = {
+        "#f8fafc": "#0b1020",
+        "#ffffff": "#111827",
+        "#fff": "#111827",
+        "#f1f5f9": "#1e293b",
+        "#e2e8f0": "#334155",
+        "#cbd5e1": "#475569",
+        "#94a3b8": "#94a3b8",
+        "#64748b": "#94a3b8",
+        "#475569": "#cbd5e1",
+        "#334155": "#e2e8f0",
+        "#1e293b": "#f1f5f9",
+        "#0f172a": "#f8fafc",
+        "#dbeafe": "#312e81",
+        "#eff6ff": "#172554",
+        "#fff1f2": "#3f1726",
+        "#fef2f2": "#450a0a",
+        "#dcfce7": "#052e16",
+        "#f0fdf4": "#052e16",
+        "#fef9c3": "#422006",
+        "#fef3c7": "#451a03",
+    }
+    pattern = re.compile(
+        "|".join(re.escape(source) for source in sorted(replacements, key=len, reverse=True)),
+        flags=re.IGNORECASE,
+    )
+    result = pattern.sub(lambda match: replacements[match.group(0).lower()], style)
+
+    # Borders remain near-black in both modes; the generic colour replacement
+    # above intentionally brightens text, then this pass restores dark outlines.
+    result = re.sub(
+        r"(border(?:-\w+)?\s*:\s*[^;{}]*?)(#f8fafc)",
+        r"\1#020617",
+        result,
+        flags=re.IGNORECASE,
+    )
+    return result
+
+
+def apply_widget_theme(root, theme: str | None = None) -> None:
+    """Apply the active theme to specialised widgets with legacy inline QSS."""
+    from PySide6.QtWidgets import QApplication, QWidget
+
+    app = QApplication.instance()
+    active = normalize_theme(theme or (app.property("kappakTheme") if app else "light"))
+    widgets = [root]
+    if isinstance(root, QWidget):
+        widgets.extend(root.findChildren(QWidget))
+    for widget in widgets:
+        current = widget.styleSheet()
+        last_applied = widget.property("_kappakLastAppliedQss")
+        base = widget.property("_kappakLightQss")
+        if current and current != last_applied:
+            base = current
+            widget.setProperty("_kappakLightQss", base)
+        if not base:
+            continue
+        themed = _darken_inline_qss(str(base)) if active == "dark" else str(base)
+        if current != themed:
+            widget.setStyleSheet(themed)
+        widget.setProperty("_kappakLastAppliedQss", themed)
+
+
+def set_application_theme(app, theme: str | None) -> str:
+    """Set the application theme and refresh all currently visible windows."""
+    active = normalize_theme(theme)
+    app.setProperty("kappakTheme", active)
+    app.setStyleSheet(NEO_DARK_THEME if active == "dark" else NEO_LIGHT_THEME)
+    for window in app.topLevelWidgets():
+        apply_widget_theme(window, active)
+    return active

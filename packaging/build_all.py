@@ -168,6 +168,16 @@ def stage_tools() -> None:
                     print(f"Copying {tool_name} from {matches[0]} to {dest}...")
                     shutil.copy2(matches[0], dest)
 
+    # yt-dlp is kept in its own directory so the runtime discovery order and
+    # packaged layout are identical. Existing verified binaries are preserved.
+    ytdlp_dest = tools_dir / "yt-dlp" / "yt-dlp.exe"
+    if not ytdlp_dest.is_file() or ytdlp_dest.stat().st_size <= 1000:
+        found_ytdlp = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
+        if found_ytdlp and Path(found_ytdlp).is_file():
+            ytdlp_dest.parent.mkdir(parents=True, exist_ok=True)
+            print(f"Copying yt-dlp from {found_ytdlp} to {ytdlp_dest}...")
+            shutil.copy2(found_ytdlp, ytdlp_dest)
+
 
 def build_pyinstaller() -> Path:
     print("\n=======================================================")

@@ -6,9 +6,10 @@ from pathlib import Path
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
+from vkdub.services.app_settings import load_app_settings
 from vkdub.ui.background_check import BackgroundCheck
 from vkdub.ui.main_window import MainWindow
-from vkdub.ui.theme import DARK_THEME
+from vkdub.ui.theme import set_application_theme
 from vkdub.utils.logging import configure_logging
 from vkdub.utils.paths import resource_path
 from vkdub.version import APP_NAME, __version__
@@ -81,7 +82,7 @@ def create_application() -> QApplication:
     app.setApplicationVersion(__version__)
     app.setOrganizationName("vanhkhuc")
     app.setStyle("Fusion")
-    app.setStyleSheet(DARK_THEME)
+    set_application_theme(app, load_app_settings().theme)
 
     icon_path = resource_path("icon.ico")
     if not icon_path.is_file():

@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vkdub.ui.theme import apply_brutalist_shadow
+
 
 class Step2VoicePanel(QFrame):
     """Contextual panel for Step 2: Voice & Speed Settings."""
@@ -35,98 +37,96 @@ class Step2VoicePanel(QFrame):
         self.setObjectName("step2Panel")
         self.setStyleSheet("""
             QFrame#step2Panel {
-                background-color: #050810;
+                background-color: #ffffff;
             }
             QLabel.eyebrowTag {
-                font-size: 9px;
-                font-weight: 800;
-                color: #06b6d4;
+                font-size: 11px;
+                font-weight: 900;
+                color: #2457f5;
                 letter-spacing: 1.2px;
             }
             QLabel.panelHeader {
-                font-size: 16px;
-                font-weight: 800;
-                color: #f8fafc;
+                font-size: 21px;
+                font-weight: 900;
+                color: #0f172a;
                 letter-spacing: 0.3px;
             }
             QLabel.panelSub {
-                font-size: 11px;
+                font-size: 12px;
                 color: #64748b;
                 line-height: 1.4;
             }
             QLabel.fieldLabel {
-                font-size: 12px;
-                font-weight: 700;
-                color: #cbd5e1;
+                font-size: 13px;
+                font-weight: 800;
+                color: #0f172a;
             }
             QComboBox {
-                background-color: #070c16;
-                color: #f8fafc;
-                border: 1px solid #1a283e;
-                border-radius: 7px;
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
                 padding: 8px 12px;
                 font-size: 12px;
+                font-weight: 700;
             }
             QComboBox:hover {
-                border-color: #38bdf8;
+                background-color: #f8fafc;
             }
             QComboBox::drop-down {
                 border: none;
             }
             QPushButton.primaryBtn {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:0.6 #0369a1, stop:1 #06b6d4);
-                color: #ffffff;
-                font-size: 13px;
-                font-weight: 800;
+                background-color: #b9f227;
+                color: #0f172a;
+                font-size: 14px;
+                font-weight: 900;
                 padding: 11px 18px;
-                border: 1px solid #38bdf8;
-                border-radius: 7px;
+                border: 3px solid #101828;
+                border-radius: 12px;
                 letter-spacing: 0.3px;
             }
             QPushButton.primaryBtn:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:0.6 #0284c7, stop:1 #22d3ee);
-                border-color: #7dd3fc;
-                color: #ffffff;
+                background-color: #a7df18;
+            }
+            QPushButton.primaryBtn:pressed {
+                background-color: #95c916;
             }
             QPushButton.navBackBtn {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131d2e, stop:1 #0e1626);
-                color: #cbd5e1;
+                background-color: #ffffff;
+                color: #0f172a;
                 font-size: 12px;
-                font-weight: 600;
+                font-weight: 800;
                 padding: 10px 16px;
-                border: 1px solid #1e2f4a;
-                border-radius: 7px;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
             }
             QPushButton.navBackBtn:hover {
-                background: #18263d;
-                color: #38bdf8;
-                border-color: #0284c7;
+                background-color: #f1f5f9;
             }
             QPushButton.actionBtn {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #101d32, stop:1 #0a1322);
-                color: #38bdf8;
+                background-color: #dbeafe;
+                color: #1e40af;
                 font-size: 12px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 9px 14px;
-                border: 1px solid #1a2c47;
-                border-radius: 7px;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
             }
             QPushButton.actionBtn:hover {
-                background: #152540;
-                border-color: #38bdf8;
-                color: #ffffff;
+                background-color: #bfdbfe;
             }
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(18)
 
         # 1. Header
         header_col = QVBoxLayout()
         header_col.setSpacing(3)
 
-        eyebrow = QLabel("PIPELINE · STEP 02")
+        eyebrow = QLabel("QUY TRÌNH · BƯỚC 02")
         eyebrow.setProperty("class", "eyebrowTag")
         header_col.addWidget(eyebrow)
 
@@ -141,17 +141,18 @@ class Step2VoicePanel(QFrame):
 
         # 2. Main Config Card
         card = QFrame()
+        card.setObjectName("voiceConfigCard")
         card.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0e1627, stop:1 #090f1b);
-                border: 1px solid #1a2942;
-                border-radius: 10px;
-                padding: 14px;
+            QFrame#voiceConfigCard {
+                background-color: #ffffff;
+                border: 3px solid #101828;
+                border-radius: 16px;
+                padding: 16px;
             }
         """)
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(12, 12, 12, 12)
-        card_layout.setSpacing(14)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(17)
 
         # Voice Field
         voice_col = QVBoxLayout()
@@ -196,10 +197,11 @@ class Step2VoicePanel(QFrame):
 
         # Waveform Visualization Placeholder
         wave_box = QFrame()
+        wave_box.setObjectName("waveformPreview")
         wave_box.setStyleSheet("""
-            QFrame {
-                background-color: #060a12;
-                border: 1px solid #131d2e;
+            QFrame#waveformPreview {
+                background-color: #f8fafc;
+                border: 1.5px solid #0f172a;
                 border-radius: 6px;
                 padding: 6px 10px;
             }
@@ -208,10 +210,10 @@ class Step2VoicePanel(QFrame):
         wave_layout.setContentsMargins(6, 4, 6, 4)
         wave_layout.setSpacing(6)
         wave_tag = QLabel("WAVEFORM")
-        wave_tag.setStyleSheet("color: #475569; font-size: 8px; font-weight: 800; letter-spacing: 1px;")
+        wave_tag.setStyleSheet("color: #0f172a; font-size: 9px; font-weight: 900; letter-spacing: 1px;")
         wave_layout.addWidget(wave_tag)
         wave_bars = QLabel(" ▂▃▅▆▇▆▅▃▂  ▂▃▅▆▇█▇▆▅▃▂  ▂▃▅▆▇▆▅▃ ")
-        wave_bars.setStyleSheet("color: #06b6d4; font-size: 12px; font-family: monospace; letter-spacing: 1.5px;")
+        wave_bars.setStyleSheet("color: #2563eb; font-size: 12px; font-family: monospace; font-weight: bold; letter-spacing: 1.5px;")
         wave_layout.addWidget(wave_bars, 1)
         card_layout.addWidget(wave_box)
 
@@ -223,10 +225,19 @@ class Step2VoicePanel(QFrame):
         card_layout.addWidget(self.btn_test_listen)
 
         layout.addWidget(card)
+        apply_brutalist_shadow(card, offset=4)
 
         # Helper hint
-        hint_lbl = QLabel("💡 Mặc định tối ưu: Ngọc Huyền · Tốc độ 1.1x khớp tốt nhất với nhịp video ngắn.")
-        hint_lbl.setStyleSheet("color: #72d7c1; font-size: 11px; font-style: italic;")
+        hint_lbl = QLabel("💡 Mặc định tối ưu: Ngọc Huyền · Tốc độ 1.1x khớp tốt nhất với nhịp video ngắn Douyin/TikTok.")
+        hint_lbl.setStyleSheet("""
+            color: #854d0e;
+            background-color: #fff0f5;
+            border: 2px solid #101828;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 12px;
+            font-weight: 700;
+        """)
         hint_lbl.setWordWrap(True)
         layout.addWidget(hint_lbl)
 

@@ -194,7 +194,10 @@ class TranslationController(QObject):
                 self._failed(str(exc))
                 return
             self.window.project.translation = result
-            assert self.window.project.transcript is not None
+            # BUG-07 FIX: replace assert with proper guard to avoid AssertionError in production
+            if self.window.project.transcript is None:
+                self._failed("Không có dữ liệu chép lời. Vui lòng chạy lại bước Transcription.")
+                return
             self.window.project.set_script(
                 draft_from_source(self.window.project.transcript, result)
             )

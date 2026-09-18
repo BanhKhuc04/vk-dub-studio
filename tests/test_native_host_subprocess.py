@@ -1,6 +1,7 @@
 """End-to-End subprocess test of vkdub_host.py simulating Chromium Edge Native Messaging."""
 
 import json
+import os
 import struct
 import subprocess
 import sys
@@ -26,8 +27,9 @@ def qapp():
 
 
 def test_vkdub_host_stdio_relay(qapp):
-    # 1. Start LocalAgent on standard port 49814
-    agent = LocalAgent(port=49814)
+    test_port = 49826
+    # 1. Start LocalAgent on isolated port
+    agent = LocalAgent(port=test_port)
     assert agent.start() is True
 
     connection_events = []
@@ -35,12 +37,15 @@ def test_vkdub_host_stdio_relay(qapp):
     agent.browser_connection_changed.connect(lambda connected: connection_events.append(connected))
     agent.status_updated.connect(lambda status: status_events.append(status))
 
-    # 2. Launch vkdub_host.py as a subprocess with piped stdin/stdout
+    # 2. Launch vkdub_host.py as a subprocess with piped stdin/stdout targeting test_port
+    env = os.environ.copy()
+    env["VKDUB_AGENT_PORT"] = str(test_port)
     proc = subprocess.Popen(
         [PYTHON_EXE, "-u", str(HOST_SCRIPT)],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=env,
     )
 
     try:
@@ -72,8 +77,11 @@ def test_vkdub_host_stdio_relay(qapp):
         proc.stdin.write(header + encoded)
         proc.stdin.flush()
 
-        time.sleep(0.5)
-        qapp.processEvents()
+        for _ in range(30):
+            time.sleep(0.1)
+            qapp.processEvents()
+            if status_events and status_events[-1].chatgpt_logged_in:
+                break
 
         # Check that LocalAgent received and processed the status report
         assert len(status_events) > 0

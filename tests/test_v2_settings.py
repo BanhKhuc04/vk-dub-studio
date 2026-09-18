@@ -19,6 +19,12 @@ def test_app_settings_defaults(tmp_path, monkeypatch):
     assert settings.original_volume == 20.0
     assert settings.capcut_draft_root != ""
     assert settings.workspace_root != ""
+    assert settings.theme == "light"
+
+
+def test_app_settings_supports_both_kappak_themes():
+    assert AppSettings(theme="light").theme == "light"
+    assert AppSettings(theme="dark").theme == "dark"
 
 
 def test_app_settings_roundtrip_persistence(tmp_path, monkeypatch):

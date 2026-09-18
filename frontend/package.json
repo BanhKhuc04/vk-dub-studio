@@ -1,0 +1,19 @@
+{
+  "name": "kappak-ui-v2",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "canvas-confetti": "^1.9.4",
+    "framer-motion": "^13.3.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  }
+}

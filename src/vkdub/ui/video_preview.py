@@ -77,64 +77,68 @@ class VideoPreview(QFrame):
 
         # Controls row (Play, time, volume, timeline, secondary tools)
         controls_frame = QFrame()
+        controls_frame.setObjectName("previewControls")
         controls_frame.setStyleSheet("""
-            QFrame {
-                background-color: #080d17;
-                border: 1px solid #152033;
+            QFrame#previewControls {
+                background-color: #ffffff;
+                border: 2px solid #0f172a;
                 border-radius: 8px;
                 padding: 4px;
             }
         """)
         controls = QHBoxLayout(controls_frame)
-        controls.setContentsMargins(8, 6, 8, 6)
-        controls.setSpacing(10)
+        controls.setContentsMargins(6, 5, 6, 5)
+        controls.setSpacing(6)
 
-        self.play_button = QPushButton("▶ Phát")
+        self.play_button = QPushButton("▶")
         self.play_button.setEnabled(False)
+        self.play_button.setToolTip("Phát / Tạm dừng video (Space)")
+        self.play_button.setFixedWidth(34)
+        self.play_button.setFixedHeight(28)
         self.play_button.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
-                color: #ffffff;
-                border: 1px solid #38bdf8;
+                background-color: #fde047;
+                color: #0f172a;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
-                font-weight: 800;
-                font-size: 12px;
-                min-width: 80px;
-                padding: 6px 14px;
+                font-weight: 900;
+                font-size: 13px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:1 #0891b2);
-                border-color: #7dd3fc;
+                background-color: #facc15;
+            }
+            QPushButton:pressed {
+                background-color: #eab308;
             }
             QPushButton:disabled {
-                background: #0d1524;
-                color: #475569;
-                border: 1px solid #162032;
+                background-color: #f1f5f9;
+                color: #94a3b8;
+                border: 2px solid #cbd5e1;
             }
         """)
         controls.addWidget(self.play_button)
 
         self.time_label = QLabel("00:00 / 00:00")
         self.time_label.setStyleSheet("""
-            background-color: #050810;
-            border: 1px solid #162236;
-            border-radius: 5px;
-            padding: 4px 8px;
-            font-family: 'Consolas', 'JetBrains Mono', monospace;
-            font-weight: 700;
-            color: #38bdf8;
-            font-size: 11px;
+            background-color: #f1f5f9;
+            border: 2px solid #0f172a;
+            border-radius: 6px;
+            padding: 3px 6px;
+            font-family: 'Consolas', monospace;
+            font-weight: 800;
+            color: #0f172a;
+            font-size: 10px;
         """)
         controls.addWidget(self.time_label)
 
         # Volume control
         vol_label = QLabel("🔊")
-        vol_label.setStyleSheet("color: #64748b; font-size: 12px;")
+        vol_label.setStyleSheet("color: #0f172a; font-size: 11px;")
         controls.addWidget(vol_label)
         self.volume = QSlider(Qt.Orientation.Horizontal)
         self.volume.setRange(0, 100)
         self.volume.setValue(70)
-        self.volume.setMaximumWidth(70)
+        self.volume.setMaximumWidth(50)
         self.volume.setAccessibleName("Âm lượng xem trước")
         controls.addWidget(self.volume)
 
@@ -143,54 +147,53 @@ class VideoPreview(QFrame):
         # Secondary tools (Subtitle, Blur, Voice Preview, More ...)
         btn_tool_style = """
             QPushButton {
-                background-color: #0c1220;
-                color: #cbd5e1;
-                border: 1px solid #1a273e;
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
-                padding: 5px 12px;
+                padding: 4px 7px;
                 font-size: 11px;
-                font-weight: 600;
+                font-weight: 800;
             }
             QPushButton:hover {
-                background-color: #131c30;
-                border-color: #38bdf8;
-                color: #38bdf8;
+                background-color: #f8fafc;
+            }
+            QPushButton:pressed {
+                background-color: #f1f5f9;
             }
         """
-        self.btn_subtitle = QPushButton("✥ Phụ đề")
-        self.btn_subtitle.setToolTip("Mở bảng cài đặt font, màu sắc, vị trí phụ đề")
+        self.btn_subtitle = QPushButton("✥ Kiểu")
+        self.btn_subtitle.setToolTip("Cài đặt phụ đề (font, màu sắc, vị trí)")
         self.btn_subtitle.setStyleSheet(btn_tool_style)
         self.btn_subtitle.clicked.connect(self._subtitle_clicked)
         controls.addWidget(self.btn_subtitle)
 
-        self.btn_blur = QPushButton("🌫 Làm mờ")
-        self.btn_blur.setToolTip("Thêm hoặc chỉnh vùng làm mờ (che logo / watermark)")
+        self.btn_blur = QPushButton("🌫 Mờ")
+        self.btn_blur.setToolTip("Thêm/chỉnh vùng làm mờ watermark")
         self.btn_blur.setStyleSheet(btn_tool_style)
         self.btn_blur.clicked.connect(self._blur_clicked)
         controls.addWidget(self.btn_blur)
 
-        self.btn_sub_region = QPushButton("🔴 Vùng Sub")
-        self.btn_sub_region.setToolTip("Thêm hoặc chỉnh vùng lấy phụ đề (viền đỏ, không mờ video)")
+        self.btn_sub_region = QPushButton("🔴 Vùng")
+        self.btn_sub_region.setToolTip("Thêm/chỉnh khung lấy phụ đề (viền đỏ)")
         self.btn_sub_region.setStyleSheet("""
             QPushButton {
-                background-color: #1a0d14;
-                color: #fca5a5;
-                border: 1px solid #7f1d1d;
+                background-color: #fee2e2;
+                color: #b91c1c;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
-                padding: 5px 12px;
+                padding: 4px 7px;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
             }
             QPushButton:hover {
-                background-color: #2b111a;
-                border-color: #ef4444;
-                color: #ffffff;
+                background-color: #fecaca;
             }
         """)
         self.btn_sub_region.clicked.connect(self._sub_region_clicked)
         controls.addWidget(self.btn_sub_region)
 
-        self.btn_preview_voice = QPushButton("🎵 Nghe Voice")
+        self.btn_preview_voice = QPushButton("🎵 Voice")
         self.btn_preview_voice.setToolTip("Nghe thử voice lồng tiếng đã tạo")
         self.btn_preview_voice.setStyleSheet(btn_tool_style)
         self.btn_preview_voice.clicked.connect(self._voice_preview_clicked)
@@ -211,18 +214,16 @@ class VideoPreview(QFrame):
         self.btn_more.setText("⋯")
         self.btn_more.setStyleSheet("""
             QToolButton {
-                background-color: #0c1220;
-                color: #cbd5e1;
-                border: 1px solid #1a273e;
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
                 font-size: 14px;
-                font-weight: bold;
+                font-weight: 900;
                 padding: 3px 10px;
             }
             QToolButton:hover {
-                background-color: #131c30;
-                border-color: #38bdf8;
-                color: #38bdf8;
+                background-color: #f8fafc;
             }
         """)
         self.btn_more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -252,9 +253,17 @@ class VideoPreview(QFrame):
 
         layout.addWidget(controls_frame)
 
-        # Concise Metadata label
-        self.metadata_label = label("Chưa có metadata.")
-        self.metadata_label.setStyleSheet("color: #72d7c1; font-size: 11px;")
+        # Concise Metadata label in Neo Brutalism card
+        self.metadata_label = QLabel("Chưa có metadata.")
+        self.metadata_label.setStyleSheet("""
+            color: #0f172a;
+            font-size: 11px;
+            font-weight: 700;
+            background-color: #ffffff;
+            border: 2px solid #0f172a;
+            border-radius: 6px;
+            padding: 6px 12px;
+        """)
         layout.addWidget(self.metadata_label)
 
         self._last_metadata: VideoMetadata | None = None

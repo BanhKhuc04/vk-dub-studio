@@ -23,6 +23,7 @@ from vkdub.domain.voice import timing_warning
 from vkdub.ui.left_config_panel import label
 from vkdub.ui.script_list import ScriptList
 from vkdub.ui.script_row_editor import ScriptRowEditor
+from vkdub.ui.theme import apply_brutalist_shadow
 
 
 class ScriptReviewPanel(QFrame):
@@ -49,8 +50,8 @@ class ScriptReviewPanel(QFrame):
         self._editor_item: QListWidgetItem | None = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(8)
+        layout.setContentsMargins(18, 18, 18, 16)
+        layout.setSpacing(10)
 
         # ---------------------------------------------------------
         # Header: KỊCH BẢN & Trạng thái duyệt
@@ -58,12 +59,12 @@ class ScriptReviewPanel(QFrame):
         header_row = QHBoxLayout()
         title_col = QVBoxLayout()
         title_col.setSpacing(3)
-        eyebrow = QLabel("PIPELINE · STEP 05")
-        eyebrow.setStyleSheet("font-size: 9px; font-weight: 800; color: #06b6d4; letter-spacing: 1.2px;")
+        eyebrow = QLabel("QUY TRÌNH · BƯỚC 05")
+        eyebrow.setStyleSheet("font-size: 11px; font-weight: 900; color: #2457f5; letter-spacing: 1.2px;")
         title_col.addWidget(eyebrow)
-        title_col.addWidget(label("KỊCH BẢN", "heading"))
+        title_col.addWidget(label("KỊCH BẢN & XUẤT BẢN", "heading"))
         self.summary = QLabel("0 câu")
-        self.summary.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
+        self.summary.setStyleSheet("color: #101828; font-weight: 850; font-size: 13px;")
         title_col.addWidget(self.summary)
         header_row.addLayout(title_col, 1)
 
@@ -71,20 +72,19 @@ class ScriptReviewPanel(QFrame):
         self.badge.setObjectName("badge")
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setStyleSheet(
-            "background: #090f1b; color: #64748b; border: 1px solid #1a273e; "
-            "font-weight: 800; padding: 4px 10px; border-radius: 5px; font-size: 10px; letter-spacing: 0.5px;"
+            "background: #f1f5f9; color: #0f172a; border: 2px solid #0f172a; "
+            "font-weight: 900; padding: 4px 10px; border-radius: 6px; font-size: 10px; letter-spacing: 0.5px;"
         )
         header_row.addWidget(self.badge)
         layout.addLayout(header_row)
 
         self.stage = QLabel("Chưa có bản chép lời.")
-        self.stage.setStyleSheet("color: #475569; font-size: 11px;")
+        self.stage.setStyleSheet("color: #667085; font-weight: 650; font-size: 12px;")
         layout.addWidget(self.stage)
 
         # ---------------------------------------------------------
         # Toolbar: Tinh giản tối đa theo yêu cầu
         # Giữ: Tìm kiếm, Nạp/Tải SRT dịch, Nạp/Tải SRT gốc
-        # Loại bỏ: Thêm câu, Thao tác khác (...)
         # ---------------------------------------------------------
         toolbar = QHBoxLayout()
         toolbar.setSpacing(6)
@@ -115,10 +115,10 @@ class ScriptReviewPanel(QFrame):
         self.btn_search_toggle = QPushButton("🔍 Tìm kiếm")
         self.btn_search_toggle.setStyleSheet("""
             QPushButton {
-                background: #0f172a; color: #94a3b8; border: 1px solid #1e293b;
-                border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 600;
+                background: #ffffff; color: #0f172a; border: 2px solid #0f172a;
+                border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background: #1e293b; color: #38bdf8; border-color: #0284c7; }
+            QPushButton:hover { background: #f8fafc; }
         """)
         self.btn_search_toggle.clicked.connect(self._toggle_search_box)
         toolbar.addWidget(self.btn_search_toggle)
@@ -127,10 +127,10 @@ class ScriptReviewPanel(QFrame):
         self.btn_load_trans = self.buttons["load"]
         self.btn_load_trans.setStyleSheet("""
             QPushButton {
-                background: #0c1a2d; color: #38bdf8; border: 1px solid #1e3a5f;
-                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+                background: #eef4ff; color: #173fb8; border: 2px solid #101828;
+                border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background: #132742; border-color: #38bdf8; color: #ffffff; }
+            QPushButton:hover { background: #bfdbfe; }
         """)
         self.btn_load_trans.setToolTip("Nạp file phụ đề SRT tiếng Việt đã dịch vào kịch bản")
         toolbar.addWidget(self.btn_load_trans)
@@ -138,10 +138,10 @@ class ScriptReviewPanel(QFrame):
         self.btn_save_trans = self.buttons["save"]
         self.btn_save_trans.setStyleSheet("""
             QPushButton {
-                background: #0c1a2d; color: #38bdf8; border: 1px solid #1e3a5f;
-                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+                background: #eef4ff; color: #173fb8; border: 2px solid #101828;
+                border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background: #132742; border-color: #38bdf8; color: #ffffff; }
+            QPushButton:hover { background: #bfdbfe; }
         """)
         self.btn_save_trans.setToolTip("Tải/xuất file phụ đề SRT tiếng Việt hoàn chỉnh về máy")
         toolbar.addWidget(self.btn_save_trans)
@@ -150,10 +150,10 @@ class ScriptReviewPanel(QFrame):
         self.btn_load_source = self.buttons["load_source"]
         self.btn_load_source.setStyleSheet("""
             QPushButton {
-                background: #181126; color: #c084fc; border: 1px solid #3b2057;
-                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+                background: #fff0f5; color: #c51652; border: 2px solid #101828;
+                border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background: #241738; border-color: #a855f7; color: #ffffff; }
+            QPushButton:hover { background: #e9d5ff; }
         """)
         self.btn_load_source.setToolTip("Nạp file phụ đề SRT gốc chưa dịch")
         toolbar.addWidget(self.btn_load_source)
@@ -161,10 +161,10 @@ class ScriptReviewPanel(QFrame):
         self.btn_save_source = self.buttons["save_source"]
         self.btn_save_source.setStyleSheet("""
             QPushButton {
-                background: #181126; color: #c084fc; border: 1px solid #3b2057;
-                border-radius: 5px; padding: 5px 10px; font-size: 11px; font-weight: 700;
+                background: #fff0f5; color: #c51652; border: 2px solid #101828;
+                border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background: #241738; border-color: #a855f7; color: #ffffff; }
+            QPushButton:hover { background: #e9d5ff; }
         """)
         self.btn_save_source.setToolTip("Tải/xuất file phụ đề SRT gốc chưa dịch về máy")
         toolbar.addWidget(self.btn_save_source)
@@ -215,27 +215,27 @@ class ScriptReviewPanel(QFrame):
         self.rows.setSpacing(6)
         self.rows.setStyleSheet("""
             QListWidget#scriptList {
-                background-color: #06090f;
-                border: 1px solid #162032;
-                border-radius: 6px;
-                padding: 4px;
+                background-color: #ffffff;
+                border: 2px solid #0f172a;
+                border-radius: 14px;
+                padding: 6px;
             }
             QListWidget#scriptList::item {
-                background-color: #0b101b;
-                border: 1px solid #162032;
+                background-color: #ffffff;
+                border: 1.5px solid #0f172a;
                 border-radius: 6px;
                 padding: 8px 10px;
                 margin-bottom: 4px;
-                color: #f1f5f9;
+                color: #0f172a;
             }
             QListWidget#scriptList::item:hover {
-                background-color: #121a2c;
-                border-color: #24334f;
+                background-color: #f8fafc;
             }
             QListWidget#scriptList::item:selected {
-                background-color: #0f1c30;
-                border: 1px solid #0284c7;
-                border-left: 3px solid #06b6d4;
+                background-color: #f6ffd9;
+                border: 2px solid #0f172a;
+                color: #0f172a;
+                font-weight: 800;
             }
         """)
         self.rows.setAccessibleName("Danh sách các câu kịch bản")
@@ -246,22 +246,24 @@ class ScriptReviewPanel(QFrame):
 
         # Bottom Approval Gate & Primary Export Section
         bottom_box = QFrame()
+        bottom_box.setObjectName("reviewApprovalCard")
         bottom_box.setStyleSheet("""
-            QFrame {
-                background-color: #080d16;
-                border: 1px solid #151d2e;
-                border-radius: 8px;
+            QFrame#reviewApprovalCard {
+                background-color: #ffffff;
+                border: 3px solid #101828;
+                border-radius: 14px;
                 padding: 10px;
             }
         """)
         bottom_layout = QVBoxLayout(bottom_box)
         bottom_layout.setContentsMargins(12, 12, 12, 12)
         bottom_layout.setSpacing(10)
+        apply_brutalist_shadow(bottom_box, offset=4)
 
         # Approval Gate
         self.review_checkbox = QCheckBox("Tôi đã kiểm tra toàn bộ kịch bản")
         self.review_checkbox.setEnabled(False)
-        self.review_checkbox.setStyleSheet("font-weight: 600; color: #e5eaf4; font-size: 12px;")
+        self.review_checkbox.setStyleSheet("font-weight: 800; color: #0f172a; font-size: 12px;")
         bottom_layout.addWidget(self.review_checkbox)
 
         self.approve_button = QPushButton("✔ BƯỚC 5: CHỐT KỊCH BẢN (DUYỆT)")
@@ -269,21 +271,21 @@ class ScriptReviewPanel(QFrame):
         self.approve_button.setEnabled(False)
         self.approve_button.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                background-color: #2457f5;
                 color: #ffffff;
-                font-weight: 800;
+                font-weight: 900;
                 font-size: 12px;
                 padding: 10px;
                 border-radius: 6px;
-                border: 1px solid #34d399;
+                border: 2px solid #0f172a;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #047857, stop:1 #059669);
+                background-color: #173fb8;
             }
             QPushButton:disabled {
-                background: #0f172a;
-                color: #475569;
-                border: 1px solid #1e293b;
+                background-color: #f1f5f9;
+                color: #94a3b8;
+                border: 2px solid #cbd5e1;
             }
         """)
         self.approve_button.setToolTip(
@@ -299,21 +301,21 @@ class ScriptReviewPanel(QFrame):
         self.export_video_button.setEnabled(False)
         self.export_video_button.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #6366f1);
-                color: #ffffff;
-                font-weight: 800;
+                background-color: #b9f227;
+                color: #0f172a;
+                font-weight: 900;
                 font-size: 12px;
                 padding: 10px;
                 border-radius: 6px;
-                border: 1px solid #818cf8;
+                border: 2px solid #0f172a;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4338ca, stop:1 #4f46e5);
+                background-color: #a7df18;
             }
             QPushButton:disabled {
-                background: #0f172a;
-                color: #475569;
-                border: 1px solid #1e293b;
+                background-color: #f1f5f9;
+                color: #94a3b8;
+                border: 2px solid #cbd5e1;
             }
         """)
         self.export_video_button.setToolTip("Tạo video MP4 hoàn chỉnh kèm xóa chữ, voice và phụ đề")
@@ -323,22 +325,21 @@ class ScriptReviewPanel(QFrame):
         self.export_capcut_button.setEnabled(False)
         self.export_capcut_button.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
+                background-color: #20c96b;
                 color: #ffffff;
-                font-weight: 800;
+                font-weight: 900;
                 font-size: 12px;
                 padding: 10px;
                 border-radius: 6px;
-                border: 1px solid #38bdf8;
+                border: 2px solid #0f172a;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:1 #0891b2);
-                border-color: #7dd3fc;
+                background-color: #16a34a;
             }
             QPushButton:disabled {
-                background: #0f172a;
-                color: #475569;
-                border: 1px solid #1e293b;
+                background-color: #f1f5f9;
+                color: #94a3b8;
+                border: 2px solid #cbd5e1;
             }
         """)
         self.export_capcut_button.setToolTip("Tạo project CapCut có video đã xóa chữ và âm thanh giọng đọc")
@@ -353,11 +354,12 @@ class ScriptReviewPanel(QFrame):
 
         # CapCut Studio Actions Container Card
         capcut_panel = QFrame()
+        capcut_panel.setObjectName("capcutExportCard")
         capcut_panel.setStyleSheet("""
-            QFrame {
-                background-color: #070c14;
-                border: 1px solid #151f30;
-                border-radius: 8px;
+            QFrame#capcutExportCard {
+                background-color: #eef4ff;
+                border: 2px solid #101828;
+                border-radius: 12px;
                 padding: 6px;
             }
         """)
@@ -378,15 +380,15 @@ class ScriptReviewPanel(QFrame):
             QPushButton {
                 padding: 3px 10px;
                 font-size: 11px;
-                background: #0f1624;
-                color: #8b9bb4;
-                border: 1px solid #1e2b40;
-                border-radius: 4px;
+                background: #ffffff;
+                color: #344054;
+                border: 2px solid #101828;
+                border-radius: 8px;
             }
             QPushButton:hover {
-                background: #182337;
-                color: #38bdf8;
-                border-color: #0284c7;
+                background: #dbeafe;
+                color: #173fb8;
+                border-color: #2457f5;
             }
         """)
         self.btn_capcut_folder.setToolTip("Thay đổi thư mục lưu project CapCut (com.lveditor.draft)")
@@ -403,15 +405,15 @@ class ScriptReviewPanel(QFrame):
                 padding: 6px 12px;
                 font-size: 11px;
                 font-weight: 700;
-                background: #0c1424;
-                color: #38bdf8;
-                border: 1px solid #0284c7;
-                border-radius: 5px;
+                background: #ffffff;
+                color: #173fb8;
+                border: 2px solid #101828;
+                border-radius: 9px;
             }
             QPushButton:hover {
-                background: #102038;
-                color: #ffffff;
-                border-color: #38bdf8;
+                background: #dbeafe;
+                color: #101828;
+                border-color: #2457f5;
             }
         """)
         self.open_capcut_folder_button.setToolTip("Mở thư mục lưu trữ project CapCut trong File Explorer")
@@ -423,14 +425,14 @@ class ScriptReviewPanel(QFrame):
                 padding: 6px 14px;
                 font-size: 11px;
                 font-weight: 800;
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                background: #20c96b;
                 color: #ffffff;
-                border: 1px solid #34d399;
-                border-radius: 5px;
+                border: 2px solid #101828;
+                border-radius: 9px;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #047857, stop:1 #059669);
-                border-color: #6ee7b7;
+                background: #18ad5b;
+                border-color: #101828;
             }
         """)
         self.open_capcut_button.setToolTip("Khởi chạy trực tiếp phần mềm CapCut trên máy tính")

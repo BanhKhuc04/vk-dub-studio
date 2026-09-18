@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from vkdub.domain.mask import MaskItem
+from vkdub.ui.theme import apply_widget_theme
 
 if TYPE_CHECKING:
     from vkdub.ui.main_window import MainWindow
@@ -46,21 +48,43 @@ class MaskEditorDialog(QDialog):
         self.masks: list[MaskItem] = []
         self.current_mask_id: str | None = None
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(14)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(12)
+
+        title = QLabel("MASK EDITOR · VÙNG CHE VIDEO")
+        title.setObjectName("heading")
+        title.setStyleSheet("font-size:20px;font-weight:900;color:#101828;")
+        subtitle = QLabel(
+            "Tạo vùng xóa chữ, làm mờ hoặc lấy phụ đề. Chọn một vùng để chỉnh trực tiếp trên video."
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setProperty("role", "muted")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Left: List of masks
-        left_widget = QWidget()
+        left_widget = QFrame()
+        left_widget.setObjectName("maskListCard")
+        left_widget.setStyleSheet(
+            "QFrame#maskListCard{background:#eef4ff;border:3px solid #101828;"
+            "border-radius:14px;}"
+        )
         left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setContentsMargins(12, 12, 12, 12)
         left_layout.setSpacing(10)
 
         left_header = QHBoxLayout()
-        left_header.addWidget(QLabel("<b>Danh sách vùng che:</b>"))
+        left_header.addWidget(QLabel("<b>DANH SÁCH VÙNG CHE</b>"))
         left_header.addStretch()
+        self.mask_count = QLabel("0 VÙNG")
+        self.mask_count.setStyleSheet(
+            "background:#ffffff;border:2px solid #101828;border-radius:7px;"
+            "padding:3px 8px;font-size:10px;font-weight:900;"
+        )
+        left_header.addWidget(self.mask_count)
         left_layout.addLayout(left_header)
 
         self.table = QTableWidget()
@@ -73,10 +97,21 @@ class MaskEditorDialog(QDialog):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.itemSelectionChanged.connect(self._on_table_selection_changed)
+        self.empty_hint = QLabel(
+            "Chưa có vùng che.\nBấm ‘Thêm vùng che’ để tạo vùng đầu tiên, sau đó kéo trực tiếp trên preview."
+        )
+        self.empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_hint.setWordWrap(True)
+        self.empty_hint.setStyleSheet(
+            "background:#ffffff;color:#667085;border:2px dashed #101828;border-radius:10px;"
+            "padding:16px;font-weight:700;"
+        )
+        left_layout.addWidget(self.empty_hint)
         left_layout.addWidget(self.table, 1)
 
         btn_row = QHBoxLayout()
         self.btn_add = QPushButton("+ Thêm vùng che")
+        self.btn_add.setObjectName("primary")
         self.btn_add.clicked.connect(self._add_mask)
         self.btn_duplicate = QPushButton("Nhân bản")
         self.btn_duplicate.clicked.connect(self._duplicate_mask)
@@ -90,9 +125,14 @@ class MaskEditorDialog(QDialog):
         splitter.addWidget(left_widget)
 
         # Right: Detail Config
-        self.right_widget = QWidget()
+        self.right_widget = QFrame()
+        self.right_widget.setObjectName("maskDetailCard")
+        self.right_widget.setStyleSheet(
+            "QFrame#maskDetailCard{background:#ffffff;border:3px solid #101828;"
+            "border-radius:14px;}"
+        )
         right_layout = QVBoxLayout(self.right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(12, 12, 12, 12)
         right_layout.setSpacing(12)
 
         # Basic properties
@@ -221,7 +261,8 @@ class MaskEditorDialog(QDialog):
         self.spin_start.setRange(0, 36000000)
         self.spin_start.setSuffix(" ms")
         self.spin_start.valueChanged.connect(self._on_input_changed)
-        self.btn_get_start = QPushButton("Lấy từ video")
+        self.btn_get_start = QPushButton("▶ Lấy bắt đầu")
+        self.btn_get_start.setToolTip("Lấy vị trí hiện tại từ video làm thời điểm bắt đầu")
         self.btn_get_start.clicked.connect(self._set_start_from_video)
         start_row.addWidget(self.spin_start, 1)
         start_row.addWidget(self.btn_get_start)
@@ -232,7 +273,8 @@ class MaskEditorDialog(QDialog):
         self.spin_end.setRange(0, 36000000)
         self.spin_end.setSuffix(" ms (0 = hết video)")
         self.spin_end.valueChanged.connect(self._on_input_changed)
-        self.btn_get_end = QPushButton("Lấy từ video")
+        self.btn_get_end = QPushButton("⏹ Lấy kết thúc")
+        self.btn_get_end.setToolTip("Lấy vị trí hiện tại từ video làm thời điểm kết thúc")
         self.btn_get_end.clicked.connect(self._set_end_from_video)
         end_row.addWidget(self.spin_end, 1)
         end_row.addWidget(self.btn_get_end)
@@ -245,6 +287,7 @@ class MaskEditorDialog(QDialog):
         action_bar = QHBoxLayout()
         action_bar.addStretch()
         self.btn_close = QPushButton("Xong & Đóng")
+        self.btn_close.setObjectName("primary")
         self.btn_close.setDefault(True)
         self.btn_close.clicked.connect(self.accept)
         action_bar.addWidget(self.btn_close)
@@ -252,10 +295,22 @@ class MaskEditorDialog(QDialog):
 
         splitter.addWidget(self.right_widget)
         layout.addWidget(splitter)
+        apply_widget_theme(self)
+        self.load_masks([])
 
     def _update_color_button_style(self, hex_color: str) -> None:
+        # UX-10 FIX: compute contrasting text color (black or white) based on perceived brightness
+        try:
+            r = int(hex_color[1:3], 16)
+            g = int(hex_color[3:5], 16)
+            b = int(hex_color[5:7], 16)
+            # Perceived luminance formula (WCAG)
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            text_color = "#000000" if luminance > 0.5 else "#FFFFFF"
+        except (ValueError, IndexError):
+            text_color = "#FFFFFF"
         self.btn_color.setStyleSheet(
-            f"background-color: {hex_color}; color: #FFF; padding: 4px 10px;"
+            f"background-color: {hex_color}; color: {text_color}; padding: 4px 10px;"
         )
 
     def load_masks(self, masks: list[MaskItem]) -> None:
@@ -275,12 +330,24 @@ class MaskEditorDialog(QDialog):
                 self.right_widget.setEnabled(False)
         finally:
             self._updating_ui = False
+        if self.masks:
+            self._on_table_selection_changed()
 
     def _rebuild_table(self) -> None:
         self.table.setRowCount(len(self.masks))
+        self.mask_count.setText(f"{len(self.masks)} VÙNG")
+        self.empty_hint.setVisible(not self.masks)
+        self.table.setVisible(bool(self.masks))
+        self.btn_duplicate.setEnabled(bool(self.masks))
+        self.btn_delete.setEnabled(bool(self.masks))
         for row, mask in enumerate(self.masks):
             item_name = QTableWidgetItem(mask.name)
-            type_labels = {"erase": "Xóa chữ", "blur": "Làm mờ", "solid": "Màu đặc", "sub_region": "🔴 Lấy Sub"}
+            type_labels = {
+                "erase": "Xóa chữ",
+                "blur": "Làm mờ",
+                "solid": "Màu đặc",
+                "sub_region": "🔴 Lấy Sub",
+            }
             item_type = QTableWidgetItem(type_labels.get(mask.mask_type, "Làm mờ"))
             if mask.start_ms == 0 and mask.end_ms == 0:
                 time_str = "Toàn bộ video"
@@ -355,10 +422,13 @@ class MaskEditorDialog(QDialog):
     def _delete_mask(self) -> None:
         if not self.current_mask_id:
             return
+        # BUG-03 FIX: capture current row BEFORE removing the mask from the list
+        current_row = self.table.currentRow()
         self.masks = [m for m in self.masks if m.id != self.current_mask_id]
         self._rebuild_table()
         if self.masks:
-            self.table.selectRow(min(len(self.masks) - 1, 0))
+            # Select the row at the same position, or the last row if we deleted the last item
+            self.table.selectRow(min(current_row, len(self.masks) - 1))
         else:
             self.current_mask_id = None
             self.right_widget.setEnabled(False)

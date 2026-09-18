@@ -29,6 +29,7 @@ from vkdub.services.app_settings import (
 from vkdub.services.credential_service import CredentialStore
 from vkdub.services.health_service import check_gemini, check_tts_backend, run_startup_health_checks
 from vkdub.ui.background_check import BackgroundCheck
+from vkdub.ui.theme import apply_brutalist_shadow, apply_widget_theme
 from vkdub.version import APP_NAME
 
 
@@ -36,8 +37,8 @@ class SetupWizardDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"Chào mừng đến {APP_NAME} 2.0 — Thiết lập ban đầu")
-        self.resize(680, 520)
-        self.setMinimumSize(620, 480)
+        self.resize(760, 600)
+        self.setMinimumSize(680, 540)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
         self.settings = load_app_settings()
@@ -45,25 +46,48 @@ class SetupWizardDialog(QDialog):
         self.gemini_job: BackgroundCheck | None = None
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(26, 22, 26, 22)
+        main_layout.setSpacing(12)
 
         # Header with step breadcrumbs
-        self.header_title = QLabel("CHÀO MỪNG ĐẾN VK DUB STUDIO 2.0")
+        self.header_title = QLabel("CHÀO MỪNG ĐẾN KAPPAK")
         self.header_title.setObjectName("heading")
-        self.header_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #72d7c1;")
+        self.header_title.setStyleSheet("font-size: 24px; font-weight: 900; color: #101828;")
         main_layout.addWidget(self.header_title)
 
         self.step_label = QLabel("Bước 1 / 5: Cấu hình Gemini AI")
-        self.step_label.setStyleSheet("color: #94a3b8; font-size: 13px; font-weight: 600;")
+        self.step_label.setProperty("role", "muted")
         main_layout.addWidget(self.step_label)
+
+        self.progress_chips: list[QLabel] = []
+        progress_row = QHBoxLayout()
+        progress_row.setSpacing(8)
+        for number, short_title in enumerate(("AI", "VOICE", "CAPCUT", "THƯ MỤC", "KIỂM TRA"), 1):
+            chip = QLabel(f"{number}  {short_title}")
+            chip.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            chip.setMinimumHeight(34)
+            chip.setAccessibleName(f"Bước {number}: {short_title}")
+            self.progress_chips.append(chip)
+            progress_row.addWidget(chip, 1)
+        main_layout.addLayout(progress_row)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color: #293245;")
         main_layout.addWidget(sep)
 
-        # Pages stacked widget
+        # Pages live inside one strong, reusable setup card.
+        self.page_card = QFrame()
+        self.page_card.setObjectName("wizardPageCard")
+        self.page_card.setStyleSheet("""
+            QFrame#wizardPageCard {
+                background: #ffffff;
+                border: 3px solid #101828;
+                border-radius: 16px;
+            }
+        """)
+        card_layout = QVBoxLayout(self.page_card)
+        card_layout.setContentsMargins(18, 18, 18, 18)
+
         self.stack = QStackedWidget()
         self.page_gemini = self._build_gemini_page()
         self.page_voice = self._build_voice_page()
@@ -77,16 +101,18 @@ class SetupWizardDialog(QDialog):
         self.stack.addWidget(self.page_workspace)
         self.stack.addWidget(self.page_check)
 
-        main_layout.addWidget(self.stack, 1)
+        card_layout.addWidget(self.stack, 1)
+        main_layout.addWidget(self.page_card, 1)
+        apply_brutalist_shadow(self.page_card, offset=5)
 
         # Bottom nav buttons
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("color: #293245;")
         main_layout.addWidget(sep2)
 
         nav_row = QHBoxLayout()
         self.btn_prev = QPushButton("← Quay lại")
+        self.btn_prev.setToolTip("Quay lại bước cấu hình trước")
         self.btn_prev.clicked.connect(self._prev_step)
         self.btn_prev.setEnabled(False)
         nav_row.addWidget(self.btn_prev)
@@ -94,7 +120,7 @@ class SetupWizardDialog(QDialog):
         nav_row.addStretch()
 
         self.btn_skip = QPushButton("Thiết lập sau")
-        self.btn_skip.setStyleSheet("color: #94a3b8;")
+        self.btn_skip.setProperty("class", "secondary")
         self.btn_skip.clicked.connect(self._skip_wizard)
         nav_row.addWidget(self.btn_skip)
 
@@ -105,6 +131,8 @@ class SetupWizardDialog(QDialog):
         nav_row.addWidget(self.btn_next)
 
         main_layout.addLayout(nav_row)
+        apply_widget_theme(self)
+        self._update_step_ui()
 
     # -------------------------------------------------------------
     # Page 1: Gemini
@@ -120,7 +148,7 @@ class SetupWizardDialog(QDialog):
             "Windows Credential Manager."
         )
         info.setWordWrap(True)
-        info.setStyleSheet("color: #cbd5e1; font-size: 13px; line-height: 1.4;")
+        info.setProperty("role", "muted")
         layout.addWidget(info)
 
         form = QFormLayout()
@@ -129,6 +157,7 @@ class SetupWizardDialog(QDialog):
         self.gemini_key_input = QLineEdit()
         self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.gemini_key_input.setPlaceholderText("Dán API Key (AIzaSy...)")
+        self.gemini_key_input.setClearButtonEnabled(True)
         try:
             existing_key = CredentialStore().get()
         except RuntimeError:
@@ -159,6 +188,7 @@ class SetupWizardDialog(QDialog):
 
         self.gemini_status_lbl = QLabel()
         self.gemini_status_lbl.setWordWrap(True)
+        self.gemini_status_lbl.setProperty("role", "warning")
         layout.addWidget(self.gemini_status_lbl)
 
         layout.addStretch()
@@ -196,36 +226,37 @@ class SetupWizardDialog(QDialog):
         layout.setSpacing(14)
 
         info = QLabel(
-            "VK Dub Studio 2.0 hỗ trợ 2 backend tạo giọng đọc tiếng Việt:\n"
+            "KAPPAK hỗ trợ 2 backend tạo giọng đọc tiếng Việt:\n"
             "• VieNeu Local: Chạy offline hoàn toàn trên máy tính, v3 Turbo tối ưu CPU.\n"
             "• CapCut TTS (Tùy chọn): Tận dụng kho giọng CapCut qua API trực tuyến."
         )
         info.setWordWrap(True)
-        info.setStyleSheet("color: #cbd5e1; font-size: 13px; line-height: 1.4;")
+        info.setProperty("role", "muted")
         layout.addWidget(info)
 
         self.radio_vieneu = QRadioButton("VieNeu Local (Mặc định — Khuyên dùng)")
         self.radio_vieneu.setChecked(self.settings.tts_backend == "vieneu_local")
-        self.radio_vieneu.setStyleSheet("font-weight: bold; font-size: 13px; color: #72d7c1;")
+        self.radio_vieneu.setStyleSheet("font-weight: 800; font-size: 13px; color: #1d4ed8;")
 
         self.radio_capcut_tts = QRadioButton("CapCut TTS API (Thử nghiệm / Online)")
         self.radio_capcut_tts.setChecked(self.settings.tts_backend == "capcut_tts")
-        self.radio_capcut_tts.setStyleSheet("font-size: 13px; color: #cbd5e1;")
+        self.radio_capcut_tts.setStyleSheet("font-size: 13px;")
 
         self.voice_group = QButtonGroup(self)
         self.voice_group.addButton(self.radio_vieneu)
         self.voice_group.addButton(self.radio_capcut_tts)
+        self.voice_group.buttonToggled.connect(lambda *_: self._check_voice())
 
         layout.addWidget(self.radio_vieneu)
         vieneu_desc = QLabel(
             "  ✓ Hoàn toàn cục bộ, không gửi audio ra ngoài, không giới hạn ký tự."
         )
-        vieneu_desc.setStyleSheet("color: #94a3b8; font-size: 12px; margin-bottom: 6px;")
+        vieneu_desc.setProperty("role", "muted")
         layout.addWidget(vieneu_desc)
 
         layout.addWidget(self.radio_capcut_tts)
         capcut_desc = QLabel("  ⚠️ Yêu cầu kết nối mạng, phụ thuộc máy chủ CapCut TTS.")
-        capcut_desc.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        capcut_desc.setProperty("role", "muted")
         layout.addWidget(capcut_desc)
         self.voice_status = QLabel()
         self.voice_status.setWordWrap(True)
@@ -255,7 +286,7 @@ class SetupWizardDialog(QDialog):
             "App ghi nhớ thư mục này và chỉ tạo project mới với mã riêng."
         )
         info.setWordWrap(True)
-        info.setStyleSheet("color: #cbd5e1; font-size: 13px; line-height: 1.4;")
+        info.setProperty("role", "muted")
         layout.addWidget(info)
 
         detected = detect_default_capcut_draft_root()
@@ -265,18 +296,19 @@ class SetupWizardDialog(QDialog):
                 "✓ Đã tự động tìm thấy thư mục CapCut Draft trên Windows!"
             )
             self.capcut_detect_status.setStyleSheet(
-                "color: #34d399; font-weight: bold; font-size: 13px;"
+                "color: #15803d; font-weight: bold; font-size: 13px;"
             )
         else:
             self.capcut_detect_status.setText(
                 "ℹ Chưa phát hiện thư mục mặc định CapCut. Bạn có thể chọn thư mục bên dưới."
             )
-            self.capcut_detect_status.setStyleSheet("color: #fbbf24; font-size: 12px;")
+            self.capcut_detect_status.setStyleSheet("color: #a16207; font-size: 12px;")
         layout.addWidget(self.capcut_detect_status)
 
         form = QFormLayout()
         self.capcut_path_input = QLineEdit()
         self.capcut_path_input.setText(self.settings.capcut_draft_root)
+        self.capcut_path_input.setClearButtonEnabled(True)
         form.addRow("Đường dẫn CapCut Draft:", self.capcut_path_input)
         layout.addLayout(form)
 
@@ -314,7 +346,7 @@ class SetupWizardDialog(QDialog):
             "Các thiết lập này sẽ được ghi nhớ cho mọi lần mở sau."
         )
         info.setWordWrap(True)
-        info.setStyleSheet("color: #cbd5e1; font-size: 13px;")
+        info.setProperty("role", "muted")
         layout.addWidget(info)
 
         form = QFormLayout()
@@ -322,6 +354,7 @@ class SetupWizardDialog(QDialog):
 
         self.workspace_input = QLineEdit()
         self.workspace_input.setText(self.settings.workspace_root)
+        self.workspace_input.setClearButtonEnabled(True)
         ws_row = QHBoxLayout()
         ws_row.addWidget(self.workspace_input, 1)
         btn_ws = QPushButton("Chọn…")
@@ -344,7 +377,7 @@ class SetupWizardDialog(QDialog):
         form.addRow("Ngôn ngữ nguồn mặc định:", self.src_lang_combo)
 
         self.tgt_lang_lbl = QLabel("Tiếng Việt (vi)")
-        self.tgt_lang_lbl.setStyleSheet("color: #72d7c1; font-weight: bold;")
+        self.tgt_lang_lbl.setStyleSheet("color: #1d4ed8; font-weight: bold;")
         form.addRow("Dịch sang:", self.tgt_lang_lbl)
 
         layout.addLayout(form)
@@ -365,15 +398,12 @@ class SetupWizardDialog(QDialog):
         layout.setSpacing(12)
 
         info = QLabel("Tổng kết kiểm tra hệ thống trước khi sẵn sàng sử dụng:")
-        info.setStyleSheet("color: #cbd5e1; font-size: 13px; font-weight: bold;")
+        info.setProperty("role", "muted")
         layout.addWidget(info)
 
         self.check_list_box = QFrame()
         self.check_list_box.setObjectName("systemChecks")
-        self.check_list_box.setStyleSheet(
-            "QFrame#systemChecks { background: #0f141e; border: 1px solid #232d3f; "
-            "border-radius: 6px; }"
-        )
+        self.check_list_box.setProperty("class", "card")
         self.check_layout = QVBoxLayout(self.check_list_box)
         self.check_layout.setSpacing(8)
         check_scroll = QScrollArea()
@@ -418,7 +448,7 @@ class SetupWizardDialog(QDialog):
     def _show_checks(self, results: list[HealthResult]) -> None:
         for res in results:
             icon = "✓" if res.ok else "⚠️"
-            color = "#34d399" if res.ok else "#fbbf24"
+            color = "#15803d" if res.ok else "#a16207"
             lbl = QLabel(f"{icon}  <b>{res.title}</b>: {res.message}")
             lbl.setStyleSheet(f"color: {color}; font-size: 12px; padding: 4px; border: none;")
             lbl.setWordWrap(True)
@@ -465,8 +495,28 @@ class SetupWizardDialog(QDialog):
             "Bước 5 / 5: Kiểm tra hệ thống",
         ]
         self.step_label.setText(titles[idx])
+        for chip_idx, chip in enumerate(self.progress_chips):
+            if chip_idx < idx:
+                chip.setText(f"✓  {('AI', 'VOICE', 'CAPCUT', 'THƯ MỤC', 'KIỂM TRA')[chip_idx]}")
+                chip.setStyleSheet(
+                    "background:#dcfce7;color:#166534;border:2px solid #101828;"
+                    "border-radius:9px;font-size:10px;font-weight:900;padding:4px;"
+                )
+            elif chip_idx == idx:
+                chip.setText(f"{chip_idx + 1}  {('AI', 'VOICE', 'CAPCUT', 'THƯ MỤC', 'KIỂM TRA')[chip_idx]}")
+                chip.setStyleSheet(
+                    "background:#b9f227;color:#101828;border:3px solid #101828;"
+                    "border-radius:9px;font-size:10px;font-weight:900;padding:4px;"
+                )
+            else:
+                chip.setText(f"{chip_idx + 1}  {('AI', 'VOICE', 'CAPCUT', 'THƯ MỤC', 'KIỂM TRA')[chip_idx]}")
+                chip.setStyleSheet(
+                    "background:#eef4ff;color:#667085;border:2px solid #cbd5e1;"
+                    "border-radius:9px;font-size:10px;font-weight:800;padding:4px;"
+                )
         self.btn_prev.setEnabled(idx > 0)
         self.btn_next.setText("Hoàn tất ✓" if idx == self.stack.count() - 1 else "Tiếp tục →")
+        self.btn_skip.setVisible(idx < self.stack.count() - 1)
 
     def _finish_wizard(self) -> None:
         self.settings.gemini_model = self.gemini_model_combo.currentText()

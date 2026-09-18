@@ -29,9 +29,9 @@ def window(qtbot, monkeypatch):
 
 
 def test_shell_branding_and_workflow_gate(window):
-    assert "VK Dub Studio — by vanhkhuc.dev" in window.windowTitle()
+    assert "KAPPAK — Video tools for creators" in window.windowTitle()
     assert f"v{__version__}" in window.windowTitle()
-    assert "Sản phẩm được tạo bởi vanhkhuc.dev" in window.left.credit_label.text()
+    assert "Sản phẩm tạo bởi vanhkhuc.dev" in window.left.credit_label.text()
     assert "Dành tặng em bé Trang Vũ <3" in window.left.credit_label.text()
     assert not window.review.approve_button.isEnabled()
     assert not window.review.export_button.isEnabled()
@@ -92,6 +92,18 @@ def test_invalid_import_preserves_existing_project(window, tmp_path, monkeypatch
     assert not window.import_video(tmp_path / "missing.mp4")
     assert window.project is current
     assert messages
+
+
+def test_import_accepts_youtube_clip_containers(window, tmp_path, monkeypatch):
+    window.tools.paths["ffprobe"] = "unused"
+    monkeypatch.setattr(window.tools, "probe", lambda path: None)
+
+    for suffix in (".mp4", ".mkv", ".webm", ".mov"):
+        source = tmp_path / f"clip{suffix}"
+        source.write_bytes(b"media")
+        window.busy = False
+        assert window.import_video(source)
+        assert window._pending_import == source.resolve()
 
 
 def test_probe_failure_preserves_existing_project(window, tmp_path, monkeypatch):

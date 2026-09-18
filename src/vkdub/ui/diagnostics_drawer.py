@@ -54,30 +54,28 @@ class _FilterTab(QPushButton):
         if self._active:
             self.setStyleSheet("""
                 QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:1 #06b6d4);
-                    color: #ffffff;
-                    border: 1px solid #38bdf8;
+                    background-color: #fde047;
+                    color: #0f172a;
+                    border: 1.5px solid #0f172a;
                     border-radius: 4px;
                     padding: 2px 12px;
                     font-size: 10px;
-                    font-weight: 700;
+                    font-weight: 900;
                 }
             """)
         else:
             self.setStyleSheet("""
                 QPushButton {
-                    background-color: #0c121e;
-                    color: #8b9bb4;
-                    border: 1px solid #1a2538;
+                    background-color: #ffffff;
+                    color: #0f172a;
+                    border: 1.5px solid #0f172a;
                     border-radius: 4px;
                     padding: 2px 12px;
                     font-size: 10px;
-                    font-weight: 600;
+                    font-weight: 700;
                 }
                 QPushButton:hover {
-                    background-color: #121c2d;
-                    color: #38bdf8;
-                    border-color: #0284c7;
+                    background-color: #f8fafc;
                 }
             """)
 
@@ -100,8 +98,8 @@ class DiagnosticsDrawer(QFrame):
         self.setObjectName("diagnosticsDrawer")
         self.setStyleSheet("""
             QFrame#diagnosticsDrawer {
-                background-color: #050810;
-                border-top: 1px solid #131b2a;
+                background-color: #ffffff;
+                border-top: 2px solid #0f172a;
             }
         """)
 
@@ -117,11 +115,12 @@ class DiagnosticsDrawer(QFrame):
         # Header bar (always visible)
         # ---------------------------------------------------------
         self.header_bar = QFrame()
+        self.header_bar.setObjectName("diagnosticsHeader")
         self.header_bar.setFixedHeight(36)
         self.header_bar.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #060a12, stop:0.5 #0d1524, stop:1 #080d16);
-                border-bottom: 1px solid #162438;
+            QFrame#diagnosticsHeader {
+                background-color: #ffffff;
+                border-bottom: 2px solid #0f172a;
             }
         """)
         self.header_bar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -132,9 +131,9 @@ class DiagnosticsDrawer(QFrame):
         # Live Indicator & Title
         self.toggle_btn = QLabel("▶  ⚡ LIVE TERMINAL")
         self.toggle_btn.setStyleSheet("""
-            color: #475569;
+            color: #0f172a;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 800;
             letter-spacing: 0.5px;
             font-family: 'Segoe UI', sans-serif;
         """)
@@ -143,13 +142,13 @@ class DiagnosticsDrawer(QFrame):
         # Status badge (Pill)
         self.live_pill = QLabel("● READY")
         self.live_pill.setStyleSheet("""
-            color: #06b6d4;
-            background-color: #082f49;
-            border: 1px solid #0284c7;
+            color: #15803d;
+            background-color: #dcfce7;
+            border: 1.5px solid #0f172a;
             padding: 1px 8px;
             border-radius: 4px;
             font-size: 9px;
-            font-weight: bold;
+            font-weight: 900;
             letter-spacing: 0.5px;
         """)
         header_layout.addWidget(self.live_pill)
@@ -166,13 +165,13 @@ class DiagnosticsDrawer(QFrame):
         # Log count badge
         self.log_count_lbl = QLabel("0")
         self.log_count_lbl.setStyleSheet("""
-            color: #64748b;
-            background-color: #0c111c;
-            border: 1px solid #1a2436;
+            color: #0f172a;
+            background-color: #f1f5f9;
+            border: 1.5px solid #0f172a;
             padding: 0px 6px;
-            border-radius: 3px;
+            border-radius: 4px;
             font-size: 9px;
-            font-weight: bold;
+            font-weight: 800;
         """)
         header_layout.addWidget(self.log_count_lbl)
 
@@ -180,10 +179,10 @@ class DiagnosticsDrawer(QFrame):
         self.btn_clear = QPushButton("Xóa")
         self.btn_clear.setStyleSheet("""
             QPushButton {
-                background-color: #0c111c; color: #64748b; border: 1px solid #1a2436;
-                border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 600;
+                background-color: #ffffff; color: #0f172a; border: 1.5px solid #0f172a;
+                border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background-color: #131b2c; color: #94a3b8; border-color: #24334f; }
+            QPushButton:hover { background-color: #f1f5f9; }
         """)
         self.btn_clear.setToolTip("Xóa trắng nhật ký màn hình")
         self.btn_clear.clicked.connect(self.clear_logs)
@@ -192,10 +191,10 @@ class DiagnosticsDrawer(QFrame):
         self.btn_copy = QPushButton("Sao chép")
         self.btn_copy.setStyleSheet("""
             QPushButton {
-                background-color: #0c111c; color: #64748b; border: 1px solid #1a2436;
-                border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 600;
+                background-color: #ffffff; color: #0f172a; border: 1.5px solid #0f172a;
+                border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background-color: #131b2c; color: #94a3b8; border-color: #24334f; }
+            QPushButton:hover { background-color: #f1f5f9; }
         """)
         self.btn_copy.setToolTip("Sao chép toàn bộ nhật ký vào clipboard")
         self.btn_copy.clicked.connect(self.copy_logs)
@@ -204,10 +203,10 @@ class DiagnosticsDrawer(QFrame):
         self.btn_viewer = QPushButton("F12 Toàn màn hình")
         self.btn_viewer.setStyleSheet("""
             QPushButton {
-                background-color: #0c111c; color: #64748b; border: 1px solid #1a2436;
-                border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 600;
+                background-color: #ffffff; color: #0f172a; border: 1.5px solid #0f172a;
+                border-radius: 4px; padding: 2px 10px; font-size: 11px; font-weight: 800;
             }
-            QPushButton:hover { background-color: #131b2c; color: #38bdf8; border-color: #0284c7; }
+            QPushButton:hover { background-color: #fde047; }
         """)
         self.btn_viewer.setToolTip("Mở cửa sổ chi tiết log hệ thống (F12)")
         self.btn_viewer.clicked.connect(self.open_log_viewer_requested.emit)

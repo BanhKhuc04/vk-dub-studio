@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from vkdub.domain.mask import MaskItem
+from vkdub.ui.theme import apply_brutalist_shadow
 
 
 class Step3BlurPanel(QFrame):
@@ -49,149 +50,127 @@ class Step3BlurPanel(QFrame):
         self.setObjectName("step3Panel")
         self.setStyleSheet("""
             QFrame#step3Panel {
-                background-color: #050810;
+                background-color: #ffffff;
             }
             QLabel.panelHeader {
-                font-size: 15px;
-                font-weight: 800;
-                color: #f8fafc;
+                font-size: 20px;
+                font-weight: 900;
+                color: #101828;
                 letter-spacing: 0.3px;
             }
             QLabel.panelSub {
-                font-size: 11px;
+                font-size: 12px;
                 color: #64748b;
                 line-height: 1.4;
             }
             QLabel.fieldLabel {
-                font-size: 11px;
-                font-weight: 700;
-                color: #94a3b8;
+                font-size: 12px;
+                font-weight: 800;
+                color: #0f172a;
             }
             QListWidget {
-                background-color: #070c16;
-                border: 1px solid #1a283e;
-                border-radius: 7px;
-                color: #f1f5f9;
+                background-color: #ffffff;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
+                color: #0f172a;
                 font-size: 11px;
                 padding: 4px;
             }
             QListWidget::item {
                 padding: 6px 10px;
-                border-radius: 5px;
+                border-radius: 6px;
+                margin-bottom: 2px;
             }
             QListWidget::item:selected {
-                background-color: #10243d;
-                color: #38bdf8;
-                font-weight: bold;
+                background-color: #fff0f5;
+                color: #0f172a;
+                font-weight: 800;
+                border: 1px solid #0f172a;
             }
             QDoubleSpinBox, QSpinBox, QLineEdit, QComboBox {
-                background-color: #070c16;
-                color: #f8fafc;
-                border: 1px solid #1a283e;
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
                 padding: 5px 8px;
                 font-size: 11px;
+                font-weight: 700;
             }
             QDoubleSpinBox:hover, QSpinBox:hover, QLineEdit:focus, QComboBox:hover {
-                border-color: #38bdf8;
+                background-color: #f8fafc;
             }
             QPushButton.primaryBtn {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:0.6 #0369a1, stop:1 #06b6d4);
-                color: #ffffff;
+                background-color: #b9f227;
+                color: #0f172a;
                 font-size: 13px;
-                font-weight: 800;
+                font-weight: 900;
                 padding: 11px 18px;
-                border: 1px solid #38bdf8;
-                border-radius: 7px;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
                 letter-spacing: 0.3px;
             }
             QPushButton.primaryBtn:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:0.6 #0284c7, stop:1 #22d3ee);
-                border-color: #7dd3fc;
-                color: #ffffff;
+                background-color: #a7df18;
             }
             QPushButton.navBackBtn {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131d2e, stop:1 #0e1626);
-                color: #cbd5e1;
+                background-color: #ffffff;
+                color: #0f172a;
                 font-size: 12px;
-                font-weight: 600;
+                font-weight: 800;
                 padding: 10px 16px;
-                border: 1px solid #1e2f4a;
-                border-radius: 7px;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
             }
             QPushButton.navBackBtn:hover {
-                background: #18263d;
-                color: #38bdf8;
-                border-color: #0284c7;
+                background-color: #f1f5f9;
             }
             QPushButton.actionBtn {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #101d32, stop:1 #0a1322);
-                color: #38bdf8;
-                font-size: 11px;
-                font-weight: 700;
-                padding: 7px 12px;
-                border: 1px solid #1a2c47;
-                border-radius: 6px;
-            }
-            QPushButton.actionBtn:hover {
-                background: #152540;
-                border-color: #38bdf8;
-                color: #ffffff;
-            }
-            QPushButton.redBtn {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #dc2626, stop:0.6 #b91c1c, stop:1 #991b1b);
-                color: #ffffff;
+                background-color: #ffffff;
+                color: #0f172a;
                 font-size: 11px;
                 font-weight: 800;
                 padding: 7px 12px;
-                border: 1px solid #ef4444;
+                border: 2px solid #0f172a;
+                border-radius: 6px;
+            }
+            QPushButton.actionBtn:hover {
+                background-color: #f8fafc;
+            }
+            QPushButton.redBtn {
+                background-color: #fee2e2;
+                color: #b91c1c;
+                font-size: 11px;
+                font-weight: 800;
+                padding: 7px 12px;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
             }
             QPushButton.redBtn:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ef4444, stop:0.6 #dc2626, stop:1 #b91c1c);
-                border-color: #f87171;
-                color: #ffffff;
+                background-color: #fecaca;
             }
-            QPushButton.subPresetBtn {
-                background-color: #1a0f14;
-                color: #fca5a5;
-                border: 1px solid #571c26;
+            QPushButton.snapBtn {
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 1.5px solid #0f172a;
                 border-radius: 5px;
                 font-size: 10px;
                 font-weight: 700;
-                padding: 4px 9px;
-            }
-            QPushButton.subPresetBtn:hover {
-                background-color: #2b111d;
-                border-color: #ef4444;
-                color: #ffffff;
-            }
-            QPushButton.snapBtn {
-                background-color: #101a2c;
-                color: #93c5fd;
-                border: 1px solid #1e2f4a;
-                border-radius: 5px;
-                font-size: 10px;
-                font-weight: 600;
                 padding: 3px 8px;
             }
             QPushButton.snapBtn:hover {
-                background-color: #1a2a46;
-                border-color: #38bdf8;
-                color: #ffffff;
+                background-color: #f1f5f9;
             }
             QPushButton.dangerBtn {
-                background-color: #450a0a;
-                color: #fca5a5;
+                background-color: #fee2e2;
+                color: #b91c1c;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 6px 12px;
-                border: 1px solid #991b1b;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
             }
             QPushButton.dangerBtn:hover {
-                background-color: #7f1d1d;
-                color: #ffffff;
+                background-color: #fca5a5;
             }
         """)
 
@@ -200,8 +179,8 @@ class Step3BlurPanel(QFrame):
         self._updating_ui = False
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(22, 20, 22, 18)
+        layout.setSpacing(13)
 
         # 1. Header
         header_col = QVBoxLayout()
@@ -242,34 +221,35 @@ class Step3BlurPanel(QFrame):
         layout.addLayout(add_buttons_row)
 
         # 3. Region List
-        lbl_list = QLabel("DANH SÁCH CÁC VÙNG:")
-        lbl_list.setStyleSheet("font-size: 11px; font-weight: bold; color: #8b949e; letter-spacing: 0.5px;")
-        layout.addWidget(lbl_list)
+        self.lbl_region_list = QLabel("DANH SÁCH CÁC VÙNG:")
+        self.lbl_region_list.setStyleSheet("font-size: 11px; font-weight: bold; color: #8b949e; letter-spacing: 0.5px;")
+        layout.addWidget(self.lbl_region_list)
 
         self.region_list = QListWidget()
-        self.region_list.setFixedHeight(105)
+        self.region_list.setFixedHeight(112)
         self.region_list.currentRowChanged.connect(self._on_list_selection_changed)
         self.regions_list = self.region_list
         layout.addWidget(self.region_list)
 
         # 4. Selected Region Inspector Card
         self.inspector_card = QFrame()
+        self.inspector_card.setObjectName("regionInspector")
         self.inspector_card.setStyleSheet("""
-            QFrame {
-                background-color: #131a26;
-                border: 1px solid #233147;
-                border-radius: 8px;
-                padding: 10px;
+            QFrame#regionInspector {
+                background-color: #ffffff;
+                border: 3px solid #101828;
+                border-radius: 14px;
+                padding: 12px;
             }
         """)
         ins_layout = QVBoxLayout(self.inspector_card)
-        ins_layout.setContentsMargins(8, 8, 8, 8)
-        ins_layout.setSpacing(8)
+        ins_layout.setContentsMargins(11, 11, 11, 11)
+        ins_layout.setSpacing(9)
 
         # Header: Title & Delete
         ins_header = QHBoxLayout()
         self.lbl_selected_title = QLabel("Chi tiết vùng đang chọn:")
-        self.lbl_selected_title.setStyleSheet("font-size: 12px; font-weight: bold; color: #ffffff;")
+        self.lbl_selected_title.setStyleSheet("font-size: 12px; font-weight: 900; color: #0f172a;")
         ins_header.addWidget(self.lbl_selected_title, 1)
 
         self.btn_delete_region = QPushButton("🗑 Xóa vùng")
@@ -313,7 +293,7 @@ class Step3BlurPanel(QFrame):
         snap_row = QHBoxLayout()
         snap_row.setSpacing(6)
         lbl_snap = QLabel("Gắn nhanh:")
-        lbl_snap.setStyleSheet("font-size: 10px; color: #64748b; font-weight: 700;")
+        lbl_snap.setStyleSheet("font-size: 10px; color: #0f172a; font-weight: 800;")
         snap_row.addWidget(lbl_snap)
 
         self.btn_snap_bottom = QPushButton("⬇ Ở dưới (76%)")
@@ -398,10 +378,11 @@ class Step3BlurPanel(QFrame):
 
         # Sub Region Contextual Banner (Notice)
         self.sub_banner = QFrame()
+        self.sub_banner.setObjectName("subtitleRegionBanner")
         self.sub_banner.setStyleSheet("""
-            QFrame {
-                background: rgba(239, 68, 68, 0.08);
-                border: 1px solid rgba(239, 68, 68, 0.4);
+            QFrame#subtitleRegionBanner {
+                background-color: #fef2f2;
+                border: 2px solid #0f172a;
                 border-radius: 6px;
                 padding: 6px 8px;
             }
@@ -410,14 +391,14 @@ class Step3BlurPanel(QFrame):
         sub_banner_layout.setContentsMargins(4, 4, 4, 4)
         sub_banner_layout.setSpacing(3)
         lbl_sub_info = QLabel("🔴 VÙNG LẤY PHỤ ĐỀ (VIỀN ĐỎ):")
-        lbl_sub_info.setStyleSheet("font-size: 11px; font-weight: bold; color: #f87171;")
+        lbl_sub_info.setStyleSheet("font-size: 11px; font-weight: 900; color: #b91c1c;")
         sub_banner_layout.addWidget(lbl_sub_info)
         lbl_sub_desc = QLabel(
             "• Định vị phụ đề xuất hiện (trên hoặc dưới video).\n"
             "• Video xuất ra GIỮ NGUYÊN ĐỘ NÉT 100%, hoàn toàn không bị làm mờ.\n"
             "• Kéo chuột trực tiếp trên khung video xem trước để chỉnh nhanh cỡ chữ."
         )
-        lbl_sub_desc.setStyleSheet("font-size: 10px; color: #fca5a5; line-height: 1.3;")
+        lbl_sub_desc.setStyleSheet("font-size: 10px; color: #7f1d1d; font-weight: 600; line-height: 1.3;")
         lbl_sub_desc.setWordWrap(True)
         sub_banner_layout.addWidget(lbl_sub_desc)
         ins_layout.addWidget(self.sub_banner)
@@ -432,7 +413,7 @@ class Step3BlurPanel(QFrame):
         lbl_blur.setProperty("class", "fieldLabel")
         blur_row.addWidget(lbl_blur, 1)
         self.lbl_blur_val = QLabel("20 px")
-        self.lbl_blur_val.setStyleSheet("font-size: 11px; font-weight: bold; color: #72d7c1;")
+        self.lbl_blur_val.setStyleSheet("font-size: 11px; font-weight: 800; color: #0f172a;")
         blur_row.addWidget(self.lbl_blur_val)
         blur_box.addLayout(blur_row)
 
@@ -444,14 +425,23 @@ class Step3BlurPanel(QFrame):
 
         ins_layout.addWidget(self.blur_box_widget)
         layout.addWidget(self.inspector_card)
+        apply_brutalist_shadow(self.inspector_card, offset=4)
 
         # Empty state notice
         self.lbl_empty = QLabel(
             "Chưa có vùng làm mờ hoặc vùng lấy sub nào.\n"
-            "• Bấm '🔴 + Thêm vùng lấy Sub' để đánh dấu vùng chữ (viền đỏ).\n"
-            "• Bấm '🌫 + Thêm vùng làm mờ' để tạo vùng che chữ cũ hoặc logo."
+            "• Bấm ‘Sub ở dưới’ hoặc ‘Sub ở trên’ để đánh dấu vùng chữ (viền đỏ).\n"
+            "• Bấm ‘Thêm làm mờ’ để tạo vùng che chữ cũ hoặc logo."
         )
-        self.lbl_empty.setStyleSheet("color: #8b949e; font-size: 11px; padding: 12px; background: #161b22; border-radius: 6px;")
+        self.lbl_empty.setStyleSheet("""
+            color: #334155;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 12px;
+            background-color: #f8fafc;
+            border: 2px dashed #0f172a;
+            border-radius: 8px;
+        """)
         self.lbl_empty.setWordWrap(True)
         layout.addWidget(self.lbl_empty)
 
@@ -478,6 +468,7 @@ class Step3BlurPanel(QFrame):
         nav_row.addWidget(self.btn_continue, 1)
 
         layout.addLayout(nav_row)
+        self.set_masks([], None)
 
     def set_masks(self, masks: list[MaskItem], active_id: str | None = None) -> None:
         self._masks = list(masks)
@@ -485,6 +476,8 @@ class Step3BlurPanel(QFrame):
         self.region_list.clear()
 
         has_masks = len(self._masks) > 0
+        self.lbl_region_list.setVisible(has_masks)
+        self.region_list.setVisible(has_masks)
         self.inspector_card.setVisible(has_masks)
         self.lbl_empty.setVisible(not has_masks)
 

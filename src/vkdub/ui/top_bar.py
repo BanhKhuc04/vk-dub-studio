@@ -9,8 +9,12 @@ Pro Studio header containing:
 
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Qt, Signal
+import time
+
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -19,10 +23,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-import time
-
 from vkdub.bridge.protocol import BridgeStatus
-from vkdub.version import APP_CREDIT, __version__
+from vkdub.ui.theme import apply_widget_theme, normalize_theme
+from vkdub.utils.paths import resource_path
+from vkdub.version import __version__
 
 
 class TopBar(QFrame):
@@ -34,38 +38,44 @@ class TopBar(QFrame):
     open_requested = Signal()
     open_edge_requested = Signal()
     refresh_bridge_requested = Signal()
+    theme_requested = Signal(str)
+    notifications_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("topBar")
-        self.setFixedHeight(50)
+        self.setFixedHeight(94)
         self.setStyleSheet("""
             QFrame#topBar {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #060a10, stop:1 #080d16);
-                border-bottom: 1px solid #131b2a;
+                background-color: #ffffff;
+                border-bottom: 3px solid #101828;
             }
             QPushButton.topBtn {
-                background-color: #0c111c;
-                color: #94a3b8;
-                border: 1px solid #1a2436;
-                border-radius: 5px;
-                padding: 4px 10px;
-                font-size: 11px;
-                font-weight: 600;
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 2px solid #101828;
+                border-radius: 9px;
+                padding: 6px 12px;
+                font-size: 12px;
+                font-weight: 800;
             }
             QPushButton.topBtn:hover {
-                background-color: #131b2c;
-                color: #38bdf8;
-                border-color: #0284c7;
+                background-color: #f1f5f9;
             }
             QPushButton.topBtn:pressed {
-                background-color: #0a0e16;
+                background-color: #e2e8f0;
             }
         """)
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 4, 16, 4)
-        layout.setSpacing(12)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(16, 7, 16, 7)
+        root_layout.setSpacing(5)
+        layout = QHBoxLayout()
+        layout.setSpacing(10)
+        meta_row = QHBoxLayout()
+        meta_row.setSpacing(8)
+        root_layout.addLayout(layout, 1)
+        root_layout.addLayout(meta_row, 1)
 
         # ---------------------------------------------------------
         # 1. Left: Branding & Project name
@@ -73,70 +83,103 @@ class TopBar(QFrame):
         brand_box = QHBoxLayout()
         brand_box.setSpacing(8)
 
-        self.lbl_title = QLabel("VK Dub Studio")
+        # Logo Icon
+        self.lbl_logo = QLabel()
+        icon_path = resource_path("icon.png")
+        if icon_path.is_file():
+            pix = QPixmap(str(icon_path)).scaled(
+                38,
+                38,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.lbl_logo.setPixmap(pix)
+            self.lbl_logo.setFixedSize(44, 44)
+            self.lbl_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_logo.setStyleSheet(
+                "border: 2px solid #101828; border-radius: 10px; background: #ffffff; padding: 1px;"
+            )
+            brand_box.addWidget(self.lbl_logo)
+
+        self.lbl_title = QLabel("KAPPAK")
         self.lbl_title.setStyleSheet("""
-            font-size: 14px;
+            font-size: 20px;
             font-weight: 900;
-            color: #f1f5f9;
-            letter-spacing: 1px;
-            font-family: 'Segoe UI', sans-serif;
+            color: #101828;
+            letter-spacing: 0.5px;
+            font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
         """)
         brand_box.addWidget(self.lbl_title)
 
-        # Pro badge
+        # Compatibility-only branding widgets.  They are intentionally hidden:
+        # KAPPAK and the requested creator card already provide enough identity,
+        # while these decorative labels made the working header feel crowded.
         self.badge_pro = QLabel("PRO STUDIO")
         self.badge_pro.setStyleSheet("""
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #8b5cf6);
-            color: #ffffff;
-            font-size: 8px;
+            background-color: #eef4ff;
+            color: #173fb8;
+            border: 2px solid #2457f5;
+            font-size: 9px;
             font-weight: 800;
-            padding: 2px 8px;
-            border-radius: 3px;
-            letter-spacing: 1px;
+            padding: 3px 7px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
         """)
         brand_box.addWidget(self.badge_pro)
+        self.badge_pro.hide()
 
         self.lbl_version = QLabel(f"v{__version__}")
-        self.lbl_version.setStyleSheet("font-size: 10px; color: #475569; font-weight: 600;")
+        self.lbl_version.setStyleSheet("font-size: 11px; color: #64748b; font-weight: 700;")
+        self.lbl_version.setToolTip(f"Phiên bản KAPPAK {__version__}")
         brand_box.addWidget(self.lbl_version)
+        self.lbl_version.hide()
 
-        sep = QLabel("│")
-        sep.setStyleSheet("color: #1a2436; font-size: 12px;")
-        brand_box.addWidget(sep)
+        # Kept as an attribute for compatibility, but the header now prioritises
+        # the two user-requested creator/dedication badges on the second row.
+        self.badge_doodle = QLabel("Good Content 👑")
+        self.badge_doodle.setStyleSheet("""
+            background-color: #fff0f5;
+            color: #c51652;
+            border: 2px solid #101828;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+        """)
+        self.badge_doodle.hide()
 
         # Nút Project mới
-        self.btn_new = QPushButton("✨ Tạo dự án mới")
+        self.btn_new = QPushButton("✨ Dự án mới")
         self.btn_new.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #b45309, stop:1 #d97706);
-                color: #ffffff;
-                border: 1px solid #f59e0b;
-                border-radius: 5px;
-                padding: 4px 10px;
-                font-size: 11px;
-                font-weight: 700;
+                background-color: #b9f227;
+                color: #101828;
+                border: 2px solid #101828;
+                border-radius: 9px;
+                padding: 6px 12px;
+                font-size: 12px;
+                font-weight: 900;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d97706, stop:1 #f59e0b);
-                border-color: #fde68a;
+                background-color: #a7df18;
             }
             QPushButton:pressed {
-                background-color: #92400e;
+                background-color: #95c916;
             }
         """)
         self.btn_new.setToolTip("Khởi tạo dự án mới (Ctrl+N)")
         self.btn_new.clicked.connect(self.new_requested.emit)
         brand_box.addWidget(self.btn_new)
 
-        self.lbl_project_name = QLabel("📁 Dự án: Mới")
+        self.lbl_project_name = QLabel("📁 Mới")
         self.lbl_project_name.setStyleSheet("""
             font-size: 11px;
-            font-weight: 600;
-            color: #38bdf8;
-            background-color: #081220;
-            border: 1px solid #0c2646;
-            padding: 3px 10px;
-            border-radius: 4px;
+            font-weight: 800;
+            color: #0f172a;
+            background-color: #ffffff;
+            border: 2px solid #101828;
+            padding: 5px 10px;
+            border-radius: 9px;
         """)
         brand_box.addWidget(self.lbl_project_name)
 
@@ -156,32 +199,43 @@ class TopBar(QFrame):
         layout.addLayout(brand_box)
         layout.addStretch(1)
 
-        # Center branding credit with special romantic glow effect
+        # Center branding credit
         self.credit_card = QFrame()
+        self.credit_card.setObjectName("creditCard")
         self.credit_card.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(225, 29, 72, 0.10), stop:0.5 rgba(236, 72, 153, 0.16), stop:1 rgba(147, 51, 234, 0.10));
-                border: 1px solid qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #f43f5e, stop:0.5 #ec4899, stop:1 #a855f7);
-                border-radius: 7px;
+            QFrame#creditCard {
+                background-color: #fff0f5;
+                border: 2px solid #101828;
+                border-radius: 9px;
                 padding: 1px 12px;
             }
         """)
-        credit_layout = QVBoxLayout(self.credit_card)
+        credit_layout = QHBoxLayout(self.credit_card)
         credit_layout.setContentsMargins(8, 2, 8, 2)
-        credit_layout.setSpacing(1)
+        credit_layout.setSpacing(10)
 
-        self.lbl_credit_author = QLabel("✨ Sản phẩm tạo bởi <b style='color: #67e8f9;'>vanhkhuc.dev</b>")
+        self.lbl_credit_author = QLabel("✨ Sản phẩm tạo bởi <b>vanhkhuc.dev</b>")
         self.lbl_credit_author.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_credit_author.setStyleSheet("font-size: 9px; color: #94a3b8; font-weight: 600; background: transparent;")
+        self.lbl_credit_author.setStyleSheet(
+            "font-size: 10px; color: #344054; font-weight: 700; background: transparent;"
+        )
         credit_layout.addWidget(self.lbl_credit_author)
 
-        self.lbl_credit = QLabel("💖 Dành tặng em bé <b style='color: #ffe4e6;'>Trang Vũ</b> &lt;3")
+        credit_separator = QLabel("•")
+        credit_separator.setStyleSheet(
+            "font-size: 11px; color: #ff5c8a; font-weight: 900; background: transparent;"
+        )
+        credit_layout.addWidget(credit_separator)
+
+        self.lbl_credit = QLabel("💖 Dành tặng em bé <b style='color: #e11d48;'>Trang Vũ</b> &lt;3")
         self.lbl_credit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_credit.setStyleSheet("font-size: 10px; color: #f472b6; font-weight: 700; background: transparent;")
+        self.lbl_credit.setStyleSheet(
+            "font-size: 10px; color: #d91d5c; font-weight: 800; background: transparent;"
+        )
         credit_layout.addWidget(self.lbl_credit)
 
-        layout.addWidget(self.credit_card)
-        layout.addStretch(1)
+        meta_row.addWidget(self.credit_card)
+        meta_row.addStretch(1)
 
         # ---------------------------------------------------------
         # 2. Center/Right: Browser connection statuses (Edge, ChatGPT, Vbee)
@@ -191,41 +245,43 @@ class TopBar(QFrame):
 
         self.badge_edge = QLabel("🟡 Edge")
         self.badge_edge.setStyleSheet("""
-            color: #fbbf24;
+            color: #854d0e;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 800;
             padding: 3px 9px;
-            border-radius: 4px;
-            background-color: #451a03;
-            border: 1px solid #78350f;
+            border-radius: 6px;
+            background-color: #fef9c3;
+            border: 2px solid #0f172a;
         """)
-        self.badge_edge.setToolTip("Trình duyệt Microsoft Edge: Đang chờ kết nối (Click để mở Edge)")
+        self.badge_edge.setToolTip(
+            "Trình duyệt Microsoft Edge: Đang chờ kết nối (Click để mở Edge)"
+        )
         self.badge_edge.setCursor(Qt.CursorShape.PointingHandCursor)
         self.badge_edge.mousePressEvent = lambda _: self.open_edge_requested.emit()
         status_box.addWidget(self.badge_edge)
 
         self.badge_chatgpt = QLabel("⚪ ChatGPT")
         self.badge_chatgpt.setStyleSheet("""
-            color: #94a3b8;
+            color: #64748b;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 800;
             padding: 3px 9px;
-            border-radius: 4px;
-            background-color: #0f172a;
-            border: 1px solid #1e293b;
+            border-radius: 6px;
+            background-color: #f1f5f9;
+            border: 2px solid #0f172a;
         """)
         self.badge_chatgpt.setToolTip("ChatGPT: Chưa kiểm tra")
         status_box.addWidget(self.badge_chatgpt)
 
         self.badge_vbee = QLabel("⚪ Vbee")
         self.badge_vbee.setStyleSheet("""
-            color: #94a3b8;
+            color: #64748b;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 800;
             padding: 3px 9px;
-            border-radius: 4px;
-            background-color: #0f172a;
-            border: 1px solid #1e293b;
+            border-radius: 6px;
+            background-color: #f1f5f9;
+            border: 2px solid #0f172a;
         """)
         self.badge_vbee.setToolTip("Vbee Studio: Chưa kiểm tra")
         status_box.addWidget(self.badge_vbee)
@@ -233,7 +289,7 @@ class TopBar(QFrame):
         self.btn_refresh_bridge = QPushButton("🔄")
         self.btn_refresh_bridge.setProperty("class", "topBtn")
         self.btn_refresh_bridge.setToolTip("Kiểm tra lại trạng thái kết nối Edge, ChatGPT, Vbee")
-        self.btn_refresh_bridge.setFixedWidth(28)
+        self.btn_refresh_bridge.setFixedWidth(32)
         self.btn_refresh_bridge.clicked.connect(self.refresh_bridge_requested.emit)
         status_box.addWidget(self.btn_refresh_bridge)
 
@@ -242,45 +298,81 @@ class TopBar(QFrame):
         self.timer_badge.setObjectName("timerBadge")
         self.timer_badge.setStyleSheet("""
             QLabel#timerBadge {
-                color: #94a3b8;
+                color: #0f172a;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 font-family: 'Consolas', 'Segoe UI', monospace;
                 padding: 3px 10px;
-                border-radius: 5px;
-                background-color: #0c1424;
-                border: 1px solid #1e293b;
+                border-radius: 6px;
+                background-color: #f1f5f9;
+                border: 2px solid #0f172a;
             }
         """)
-        self.timer_badge.setToolTip("Đồng hồ đếm thời gian thực hiện (từ lúc chọn video đến khi xuất CapCut xong)")
+        self.timer_badge.setToolTip(
+            "Đồng hồ đếm thời gian thực hiện (từ lúc chọn video đến khi xuất CapCut xong)"
+        )
         status_box.addWidget(self.timer_badge)
 
-        layout.addLayout(status_box)
+        meta_row.addLayout(status_box)
 
         # ---------------------------------------------------------
-        # 3. Far Right: Settings button
+        # 3. Far Right: Theme and Settings
         # ---------------------------------------------------------
+        current_theme = normalize_theme(
+            QApplication.instance().property("kappakTheme") if QApplication.instance() else "light"
+        )
+        self.btn_theme = QPushButton()
+        self.btn_theme.setProperty("class", "topBtn")
+        self.btn_theme.setFixedWidth(34)
+        self.btn_theme.clicked.connect(self._toggle_theme)
+        layout.addWidget(self.btn_theme)
+
+        self.btn_notifications = QPushButton("🔔")
+        self.btn_notifications.setProperty("class", "topBtn")
+        self.btn_notifications.setFixedWidth(38)
+        self.btn_notifications.setToolTip("Mở thông báo và nhật ký hoạt động")
+        self.btn_notifications.setAccessibleName("Thông báo và nhật ký hoạt động")
+        self.btn_notifications.clicked.connect(self.notifications_requested.emit)
+        layout.addWidget(self.btn_notifications)
+
+        self.avatar_chip = QLabel("VK")
+        self.avatar_chip.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.avatar_chip.setFixedSize(36, 36)
+        self.avatar_chip.setToolTip("vanhkhuc.dev · KAPPAK Creator")
+        self.avatar_chip.setStyleSheet("""
+            color: #ffffff;
+            background-color: #2457f5;
+            border: 2px solid #101828;
+            border-radius: 18px;
+            font-size: 12px;
+            font-weight: 900;
+        """)
+        layout.addWidget(self.avatar_chip)
+        self.avatar_chip.hide()
+
         self.btn_settings = QPushButton("⚙ Cài đặt")
-        self.btn_settings.setProperty("class", "topBtn")
         self.btn_settings.setStyleSheet("""
             QPushButton {
-                background-color: #0c111c;
-                color: #94a3b8;
-                border: 1px solid #1a2436;
-                border-radius: 5px;
-                padding: 5px 14px;
-                font-size: 11px;
-                font-weight: 700;
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 2px solid #101828;
+                border-radius: 9px;
+                padding: 6px 12px;
+                font-size: 12px;
+                font-weight: 800;
             }
             QPushButton:hover {
-                background-color: #131b2c;
-                border-color: #38bdf8;
-                color: #38bdf8;
+                background-color: #b9f227;
+            }
+            QPushButton:pressed {
+                background-color: #a7df18;
             }
         """)
         self.btn_settings.setToolTip("Mở bảng Cài đặt chi tiết (AI, Voice, CapCut, Hệ thống)")
         self.btn_settings.clicked.connect(self.settings_requested.emit)
         layout.addWidget(self.btn_settings)
+
+        self.set_theme(current_theme)
 
         # Pulse timer for active connections
         self._pulse_state = False
@@ -304,10 +396,26 @@ class TopBar(QFrame):
         self._heart_timer.timeout.connect(self._on_heart_pulse)
         self._heart_timer.start()
 
+    def set_theme(self, theme: str) -> None:
+        """Update the compact theme switch without changing application state."""
+        self._theme = normalize_theme(theme)
+        if self._theme == "dark":
+            self.btn_theme.setText("☀")
+            self.btn_theme.setToolTip("Chuyển sang giao diện sáng")
+        else:
+            self.btn_theme.setText("☾")
+            self.btn_theme.setToolTip("Chuyển sang giao diện tối")
+        apply_widget_theme(self, self._theme)
+
+    def _toggle_theme(self) -> None:
+        self.theme_requested.emit("light" if self._theme == "dark" else "dark")
+
     def _on_heart_pulse(self) -> None:
         self._heart_state = not self._heart_state
         heart = "💖" if self._heart_state else "💗"
-        self.lbl_credit.setText(f"{heart} Dành tặng em bé <b style='color: #ffe4e6;'>Trang Vũ</b> &lt;3")
+        self.lbl_credit.setText(
+            f"{heart} Dành tặng em bé <b style='color: #e11d48;'>Trang Vũ</b> &lt;3"
+        )
 
     def start_timer(self) -> None:
         self._timer_start_time = time.monotonic()
@@ -347,42 +455,43 @@ class TopBar(QFrame):
         if finished:
             self.timer_badge.setStyleSheet("""
                 QLabel#timerBadge {
-                    color: #34d399;
+                    color: #15803d;
                     font-size: 11px;
                     font-weight: 800;
                     font-family: 'Consolas', 'Segoe UI', monospace;
                     padding: 3px 10px;
-                    border-radius: 5px;
-                    background-color: #064e3b;
-                    border: 1px solid #059669;
+            border-radius: 8px;
+                    background-color: #dcfce7;
+            border: 2px solid #101828;
                 }
             """)
         elif running:
             self.timer_badge.setStyleSheet("""
                 QLabel#timerBadge {
-                    color: #38bdf8;
-                    font-size: 11px;
+                    color: #1e40af;
+            font-size: 12px;
                     font-weight: 800;
                     font-family: 'Consolas', 'Segoe UI', monospace;
                     padding: 3px 10px;
-                    border-radius: 5px;
-                    background-color: #082f49;
-                    border: 1px solid #0284c7;
+            border-radius: 8px;
+                    background-color: #dbeafe;
+            border: 2px solid #101828;
                 }
             """)
         else:
             self.timer_badge.setStyleSheet("""
                 QLabel#timerBadge {
-                    color: #94a3b8;
-                    font-size: 11px;
-                    font-weight: 700;
+                    color: #0f172a;
+            font-size: 12px;
+                    font-weight: 800;
                     font-family: 'Consolas', 'Segoe UI', monospace;
                     padding: 3px 10px;
-                    border-radius: 5px;
-                    background-color: #0c1424;
-                    border: 1px solid #1e293b;
+            border-radius: 8px;
+                    background-color: #f1f5f9;
+            border: 2px solid #101828;
                 }
             """)
+        apply_widget_theme(self)
 
     def _on_pulse(self) -> None:
         self._pulse_state = not self._pulse_state
@@ -395,53 +504,55 @@ class TopBar(QFrame):
         if dirty:
             self.lbl_project_name.setStyleSheet("""
                 font-size: 11px;
-                font-weight: 700;
-                color: #fbbf24;
-                background-color: #1a1710;
-                border: 1px solid #78350f;
+                font-weight: 800;
+                color: #854d0e;
+                background-color: #fef08a;
+                border: 2px solid #0f172a;
                 padding: 3px 10px;
-                border-radius: 4px;
+                border-radius: 6px;
             """)
         else:
             self.lbl_project_name.setStyleSheet("""
                 font-size: 11px;
-                font-weight: 600;
-                color: #38bdf8;
-                background-color: #081220;
-                border: 1px solid #0c2646;
+                font-weight: 800;
+                color: #0f172a;
+                background-color: #ffffff;
+                border: 2px solid #0f172a;
                 padding: 3px 10px;
-                border-radius: 4px;
+                border-radius: 6px;
             """)
+        apply_widget_theme(self)
 
     def update_bridge_status(self, status: BridgeStatus) -> None:
-        """Update top bar badges with glowing pills and status tooltips."""
+        """Update top bar badges with Neo Brutalism status pills."""
         self._last_status = status
-        pulse_border_success = "#34d399" if self._pulse_state else "#059669"
-        pulse_bg_success = "#083327" if self._pulse_state else "#064e3b"
+        pulse_bg_success = "#bbf7d0" if self._pulse_state else "#dcfce7"
 
         # 1. Edge
         if status.browser_connected:
             self.badge_edge.setText("🟢 Edge")
             self.badge_edge.setStyleSheet(f"""
-                color: #34d399;
+                color: #15803d;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
+                border-radius: 6px;
                 background-color: {pulse_bg_success};
-                border: 1px solid {pulse_border_success};
+                border: 2px solid #0f172a;
             """)
-            self.badge_edge.setToolTip(f"Microsoft Edge: Đã kết nối ({status.browser_name or 'Edge'})")
+            self.badge_edge.setToolTip(
+                f"Microsoft Edge: Đã kết nối ({status.browser_name or 'Edge'})"
+            )
         else:
             self.badge_edge.setText("🟡 Edge")
             self.badge_edge.setStyleSheet("""
-                color: #fbbf24;
+                color: #854d0e;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
-                background-color: #451a03;
-                border: 1px solid #78350f;
+                border-radius: 6px;
+                background-color: #fef9c3;
+                border: 2px solid #0f172a;
             """)
             self.badge_edge.setToolTip("Microsoft Edge: Đang chờ mở (Click để mở Edge)")
 
@@ -451,38 +562,40 @@ class TopBar(QFrame):
             self.badge_chatgpt.setStyleSheet("""
                 color: #64748b;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
-                background-color: #0b101b;
-                border: 1px solid #1e293b;
+                border-radius: 6px;
+                background-color: #f1f5f9;
+                border: 2px solid #0f172a;
             """)
             self.badge_chatgpt.setToolTip("ChatGPT: Chờ kết nối trình duyệt Edge")
         elif status.chatgpt_logged_in:
             tabs = f" ({status.chatgpt_tabs})" if status.chatgpt_tabs > 0 else ""
             self.badge_chatgpt.setText(f"🟢 ChatGPT{tabs}")
             self.badge_chatgpt.setStyleSheet(f"""
-                color: #34d399;
+                color: #15803d;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
+                border-radius: 6px;
                 background-color: {pulse_bg_success};
-                border: 1px solid {pulse_border_success};
+                border: 2px solid #0f172a;
             """)
             self.badge_chatgpt.setToolTip("ChatGPT: Đã đăng nhập và sẵn sàng dịch tự động")
         else:
             self.badge_chatgpt.setText("🔴 ChatGPT")
             self.badge_chatgpt.setStyleSheet("""
-                color: #f87171;
+                color: #b91c1c;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
-                background-color: #450a0a;
-                border: 1px solid #991b1b;
+                border-radius: 6px;
+                background-color: #fee2e2;
+                border: 2px solid #0f172a;
             """)
-            self.badge_chatgpt.setToolTip("ChatGPT: Chưa đăng nhập trong Edge. Vui lòng mở Edge và đăng nhập chatgpt.com")
+            self.badge_chatgpt.setToolTip(
+                "ChatGPT: Chưa đăng nhập trong Edge. Vui lòng mở Edge và đăng nhập chatgpt.com"
+            )
 
         # 3. Vbee
         if not status.browser_connected:
@@ -490,35 +603,38 @@ class TopBar(QFrame):
             self.badge_vbee.setStyleSheet("""
                 color: #64748b;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
-                background-color: #0b101b;
-                border: 1px solid #1e293b;
+                border-radius: 6px;
+                background-color: #f1f5f9;
+                border: 2px solid #0f172a;
             """)
             self.badge_vbee.setToolTip("Vbee: Chờ kết nối trình duyệt Edge")
         elif status.vbee_logged_in:
             tabs = f" ({status.vbee_tabs})" if status.vbee_tabs > 0 else ""
             self.badge_vbee.setText(f"🟢 Vbee{tabs}")
             self.badge_vbee.setStyleSheet(f"""
-                color: #34d399;
+                color: #15803d;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
+                border-radius: 6px;
                 background-color: {pulse_bg_success};
-                border: 1px solid {pulse_border_success};
+                border: 2px solid #0f172a;
             """)
             self.badge_vbee.setToolTip("Vbee: Đã đăng nhập và sẵn sàng tạo giọng lồng tiếng")
         else:
             self.badge_vbee.setText("🔴 Vbee")
             self.badge_vbee.setStyleSheet("""
-                color: #f87171;
+                color: #b91c1c;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 800;
                 padding: 3px 9px;
-                border-radius: 4px;
-                background-color: #450a0a;
-                border: 1px solid #991b1b;
+                border-radius: 6px;
+                background-color: #fee2e2;
+                border: 2px solid #0f172a;
             """)
-            self.badge_vbee.setToolTip("Vbee: Chưa đăng nhập trong Edge. Vui lòng mở Edge và đăng nhập vbee.vn")
+            self.badge_vbee.setToolTip(
+                "Vbee: Chưa đăng nhập trong Edge. Vui lòng mở Edge và đăng nhập vbee.vn"
+            )
+        apply_widget_theme(self)

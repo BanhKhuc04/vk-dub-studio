@@ -21,9 +21,15 @@ def _run() -> int:
         run_native_host()
         return 0
 
-    from vkdub.app import main
+    if args and args[0] == "--gui":
+        from vkdub.app import main
 
-    return main()
+        return main()
+
+    from vkdub.web.server import run_server
+
+    run_server(host="127.0.0.1", port=8000, open_browser=True)
+    return 0
 
 
 if __name__ == "__main__":

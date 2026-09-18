@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from vkdub.media.ffprobe import VideoMetadata
+from vkdub.ui.theme import apply_brutalist_shadow
 
 
 class Step1SourcePanel(QFrame):
@@ -37,85 +38,82 @@ class Step1SourcePanel(QFrame):
         self.setObjectName("step1Panel")
         self.setStyleSheet("""
             QFrame#step1Panel {
-                background-color: #050810;
+                background-color: #ffffff;
             }
             QLabel.eyebrowTag {
-                font-size: 9px;
-                font-weight: 800;
-                color: #06b6d4;
+                font-size: 11px;
+                font-weight: 900;
+                color: #2457f5;
                 letter-spacing: 1.2px;
             }
             QLabel.panelHeader {
-                font-size: 16px;
-                font-weight: 800;
-                color: #f8fafc;
+                font-size: 21px;
+                font-weight: 900;
+                color: #101828;
                 letter-spacing: 0.3px;
             }
             QLabel.panelSub {
-                font-size: 11px;
+                font-size: 12px;
                 color: #64748b;
                 line-height: 1.4;
             }
             QPushButton.primaryBtn {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284c7, stop:0.6 #0369a1, stop:1 #06b6d4);
-                color: #ffffff;
-                font-size: 13px;
-                font-weight: 800;
+                background-color: #b9f227;
+                color: #101828;
+                font-size: 14px;
+                font-weight: 900;
                 padding: 11px 18px;
-                border: 1px solid #38bdf8;
-                border-radius: 7px;
+                border: 3px solid #101828;
+                border-radius: 12px;
                 letter-spacing: 0.3px;
             }
             QPushButton.primaryBtn:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369a1, stop:0.6 #0284c7, stop:1 #22d3ee);
-                border-color: #7dd3fc;
-                color: #ffffff;
+                background-color: #a7df18;
             }
             QPushButton.primaryBtn:pressed {
-                background: #0284c7;
+                background-color: #95c916;
             }
             QPushButton.primaryBtn:disabled {
-                background: #0a101d;
-                color: #475569;
-                border: 1px solid #141f32;
+                background-color: #f1f5f9;
+                color: #94a3b8;
+                border: 2px solid #cbd5e1;
             }
             QPushButton.secondaryBtn {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131d2e, stop:1 #0e1626);
-                color: #cbd5e1;
+                background-color: #ffffff;
+                color: #0f172a;
                 font-size: 12px;
-                font-weight: 600;
+                font-weight: 800;
                 padding: 8px 15px;
-                border: 1px solid #1e2f4a;
-                border-radius: 7px;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
             }
             QPushButton.secondaryBtn:hover {
-                background: #18263d;
-                color: #38bdf8;
-                border-color: #0284c7;
+                background-color: #f8fafc;
             }
             QLineEdit.inputField {
-                background-color: #070c16;
-                color: #f8fafc;
-                border: 1px solid #1a283e;
-                border-radius: 7px;
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 2px solid #0f172a;
+                border-radius: 8px;
                 padding: 8px 12px;
                 font-size: 12px;
+                font-weight: 700;
             }
             QLineEdit.inputField:focus {
-                border-color: #06b6d4;
-                background-color: #0a1220;
+                border-color: #2563eb;
+                background-color: #f8fafc;
             }
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(18)
 
         # 1. Header
         header_col = QVBoxLayout()
         header_col.setSpacing(3)
 
-        eyebrow = QLabel("PIPELINE · STEP 01")
+        eyebrow = QLabel("QUY TRÌNH · BƯỚC 01")
         eyebrow.setProperty("class", "eyebrowTag")
         header_col.addWidget(eyebrow)
 
@@ -140,63 +138,65 @@ class Step1SourcePanel(QFrame):
         drop_frame.setObjectName("dropZone")
         drop_frame.setStyleSheet("""
             QFrame#dropZone {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0d172a, stop:1 #070b14);
-                border: 2px dashed #203454;
-                border-radius: 14px;
-                padding: 24px 16px;
+                background-color: #eef4ff;
+                border: 3px dashed #101828;
+                border-radius: 18px;
+                padding: 28px 18px;
             }
             QFrame#dropZone:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #101e38, stop:1 #0a1120);
-                border-color: #06b6d4;
+                background-color: #f6ffd9;
+                border-color: #101828;
             }
         """)
         drop_layout = QVBoxLayout(drop_frame)
-        drop_layout.setContentsMargins(12, 16, 12, 16)
-        drop_layout.setSpacing(10)
+        drop_layout.setContentsMargins(16, 22, 16, 22)
+        drop_layout.setSpacing(13)
 
-        drop_icon = QLabel("📥")
+        drop_icon = QLabel("📁")
         drop_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_icon.setStyleSheet("font-size: 28px; background: transparent;")
+        drop_icon.setStyleSheet("font-size: 42px; background: transparent;")
         drop_layout.addWidget(drop_icon)
 
         drop_hint = QLabel("Kéo thả file MP4 vào đây\nhoặc bấm nút bên dưới để chọn từ ổ cứng")
         drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_hint.setStyleSheet("font-size: 12px; color: #94a3b8; font-weight: 600; line-height: 1.4; background: transparent;")
+        drop_hint.setStyleSheet("font-size: 13px; color: #344054; font-weight: 700; line-height: 1.4; background: transparent;")
         drop_layout.addWidget(drop_hint)
 
-        self.btn_choose_file = QPushButton("📂 CHỌN VIDEO TỪ MÁY (MP4)")
+        self.btn_choose_file = QPushButton("📂 CHỌN VIDEO TỪ MÁY")
         self.btn_choose_file.setProperty("class", "primaryBtn")
         self.btn_choose_file.clicked.connect(self.choose_video_requested.emit)
         self.btn_choose_video = self.btn_choose_file
         drop_layout.addWidget(self.btn_choose_file)
         layout.addWidget(drop_frame)
+        apply_brutalist_shadow(drop_frame, offset=4)
 
         # 5. Selected Video Metadata Inspector Card
         self.info_card = QFrame()
+        self.info_card.setObjectName("sourceInfoCard")
         self.info_card.setStyleSheet("""
-            QFrame {
-                background-color: #080d17;
-                border: 1px dashed #1a283e;
-                border-radius: 10px;
-                padding: 12px;
+            QFrame#sourceInfoCard {
+                background-color: #ffffff;
+                border: 3px solid #101828;
+                border-radius: 16px;
+                padding: 14px;
             }
         """)
         info_layout = QVBoxLayout(self.info_card)
-        info_layout.setContentsMargins(12, 12, 12, 12)
-        info_layout.setSpacing(8)
+        info_layout.setContentsMargins(14, 14, 14, 14)
+        info_layout.setSpacing(10)
 
         info_header_row = QHBoxLayout()
         info_header = QLabel("THÔNG TIN VIDEO ĐÃ CHỌN")
-        info_header.setStyleSheet("font-size: 10px; font-weight: 800; color: #38bdf8; letter-spacing: 0.8px;")
+        info_header.setStyleSheet("font-size: 11px; font-weight: 900; color: #101828; letter-spacing: 0.8px;")
         info_header_row.addWidget(info_header)
 
         self.lbl_status_pill = QLabel("CHỜ CHỌN")
         self.lbl_status_pill.setStyleSheet("""
             color: #64748b;
-            background-color: #0d1524;
-            border: 1px solid #1a283e;
+            background-color: #f1f5f9;
+            border: 1.5px solid #0f172a;
             border-radius: 4px;
-            padding: 1px 6px;
+            padding: 2px 8px;
             font-size: 9px;
             font-weight: 800;
         """)
@@ -204,8 +204,8 @@ class Step1SourcePanel(QFrame):
         info_header_row.addStretch(1)
         info_layout.addLayout(info_header_row)
 
-        self.lbl_file_name = QLabel("Chưa chọn video MP4")
-        self.lbl_file_name.setStyleSheet("font-size: 13px; font-weight: 700; color: #94a3b8;")
+        self.lbl_file_name = QLabel("Chưa chọn video")
+        self.lbl_file_name.setStyleSheet("font-size: 15px; font-weight: 900; color: #101828;")
         self.lbl_file_name.setWordWrap(True)
         info_layout.addWidget(self.lbl_file_name)
 
@@ -216,10 +216,11 @@ class Step1SourcePanel(QFrame):
         self.lbl_resolution_dur = QLabel("—")
         self.lbl_resolution_dur.setStyleSheet("""
             font-size: 11px;
-            color: #cbd5e1;
+            font-weight: 700;
+            color: #0f172a;
             font-family: 'Consolas', 'Segoe UI', monospace;
-            background-color: #070c16;
-            border: 1px solid #17243a;
+            background-color: #f8fafc;
+            border: 1.5px solid #0f172a;
             border-radius: 6px;
             padding: 6px 10px;
         """)
@@ -228,9 +229,10 @@ class Step1SourcePanel(QFrame):
         self.lbl_fps_audio = QLabel("—")
         self.lbl_fps_audio.setStyleSheet("""
             font-size: 11px;
-            color: #cbd5e1;
-            background-color: #070c16;
-            border: 1px solid #17243a;
+            font-weight: 700;
+            color: #0f172a;
+            background-color: #f8fafc;
+            border: 1.5px solid #0f172a;
             border-radius: 6px;
             padding: 6px 10px;
         """)
@@ -240,10 +242,10 @@ class Step1SourcePanel(QFrame):
         self.lbl_full_path = QLabel("")
         self.lbl_full_path.setStyleSheet("""
             font-size: 10px;
-            color: #64748b;
+            color: #475569;
             font-family: 'Consolas', monospace;
-            background-color: #050810;
-            border: 1px solid #131b2c;
+            background-color: #f1f5f9;
+            border: 1.5px solid #cbd5e1;
             border-radius: 5px;
             padding: 4px 8px;
         """)
@@ -251,6 +253,7 @@ class Step1SourcePanel(QFrame):
         info_layout.addWidget(self.lbl_full_path)
 
         layout.addWidget(self.info_card)
+        apply_brutalist_shadow(self.info_card, offset=4)
 
         layout.addStretch(1)
 
@@ -269,25 +272,24 @@ class Step1SourcePanel(QFrame):
     def set_video_info(self, path: Path | None, metadata: VideoMetadata | None = None) -> None:
         if path and path.is_file():
             self.lbl_file_name.setText(path.name)
-            self.lbl_file_name.setStyleSheet("font-size: 13px; font-weight: 800; color: #ffffff;")
+            self.lbl_file_name.setStyleSheet("font-size: 15px; font-weight: 900; color: #101828;")
             self.lbl_full_path.setText(str(path))
             self.lbl_status_pill.setText("● SẴN SÀNG")
             self.lbl_status_pill.setStyleSheet("""
-                color: #34d399;
-                background-color: #064e3b;
-                border: 1px solid #059669;
+                color: #15803d;
+                background-color: #dcfce7;
+                border: 1.5px solid #0f172a;
                 border-radius: 4px;
-                padding: 1px 6px;
+                padding: 2px 8px;
                 font-size: 9px;
-                font-weight: 800;
+                font-weight: 900;
             """)
             self.btn_continue.setEnabled(True)
             self.info_card.setStyleSheet("""
-                QFrame {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0f1c30, stop:1 #0a1220);
-                    border: 1px solid #0284c7;
-                    border-left: 3.5px solid #06b6d4;
-                    border-radius: 10px;
+                QFrame#sourceInfoCard {
+                    background-color: #f0fdf4;
+                    border: 3px solid #101828;
+                    border-radius: 16px;
                     padding: 12px;
                 }
             """)
@@ -305,15 +307,15 @@ class Step1SourcePanel(QFrame):
                 self.lbl_resolution_dur.setText("📐 Đang đọc thông số media...")
                 self.lbl_fps_audio.setText("")
         else:
-            self.lbl_file_name.setText("Chưa chọn video MP4")
-            self.lbl_file_name.setStyleSheet("font-size: 13px; font-weight: 700; color: #94a3b8;")
+            self.lbl_file_name.setText("Chưa chọn video")
+            self.lbl_file_name.setStyleSheet("font-size: 13px; font-weight: 700; color: #64748b;")
             self.lbl_status_pill.setText("CHỜ CHỌN")
             self.lbl_status_pill.setStyleSheet("""
                 color: #64748b;
-                background-color: #0d1524;
-                border: 1px solid #1a283e;
+                background-color: #f1f5f9;
+                border: 1.5px solid #cbd5e1;
                 border-radius: 4px;
-                padding: 1px 6px;
+                padding: 2px 8px;
                 font-size: 9px;
                 font-weight: 800;
             """)
@@ -322,9 +324,9 @@ class Step1SourcePanel(QFrame):
             self.lbl_full_path.setText("")
             self.btn_continue.setEnabled(False)
             self.info_card.setStyleSheet("""
-                QFrame {
-                    background-color: #080d17;
-                    border: 1px dashed #1a283e;
+                QFrame#sourceInfoCard {
+                    background-color: #ffffff;
+                    border: 2px solid #0f172a;
                     border-radius: 10px;
                     padding: 12px;
                 }

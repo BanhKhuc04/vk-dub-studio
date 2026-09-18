@@ -234,9 +234,14 @@ class ReviewController(QObject):
             self.was_changed_after_approval = True
         self.window.project.set_script(script)
         if hasattr(self.window, "tts"):
-            self.window.tts.player.stop()
-            self.window.tts.errors.clear()
-            self.window.tts.force_retry_ids.clear()
+            # BUG-09 FIX: guard sub-attributes in case tts is partially initialized
+            tts = self.window.tts
+            if hasattr(tts, "player"):
+                tts.player.stop()
+            if hasattr(tts, "errors"):
+                tts.errors.clear()
+            if hasattr(tts, "force_retry_ids"):
+                tts.force_retry_ids.clear()
 
         # Invalidate old Vbee audio files on disk since script changed
         if self.window.project.video_path:
@@ -332,9 +337,11 @@ class ReviewController(QObject):
                 self.window.review.show_project(project)
         try:
             confirmed = self.window.review.review_checkbox.isChecked()
+            # BUG-08 FIX: removed "or confirmed" which made revision check always True —
+            # now approval requires BOTH user confirmation AND unchanged script since acknowledgement
             revision = project.approve(
                 confirmed
-                and (self.acknowledged_revision == project.revision_hash or confirmed)
+                and (self.acknowledged_revision == project.revision_hash)
             )
         except ValueError as exc:
             self.window.log(str(exc))
@@ -355,10 +362,10 @@ class ReviewController(QObject):
                     "Sẵn sàng xuất",
                     "Kịch bản và audio timeline đã sẵn sàng. Bạn có thể xuất video MP4 hoặc CapCut ngay."
                 )
-        elif hasattr(self.window, "_start_vbee_generation"):
-            self.window._start_vbee_generation()
-        elif getattr(self.window, "legacy_tts_enabled", False):
+        elif getattr(self.window, "legacy_tts_enabled", False) or (hasattr(self.window, "tts") and self.window.tts.can_generate()):
             self.window.tts.start()
+        elif project.voice.provider == "vbee" and hasattr(self.window, "_start_vbee_generation"):
+            self.window._start_vbee_generation()
         else:
             self.window.log("Đã lưu phê duyệt kịch bản.")
         return True
@@ -500,6 +507,8 @@ class ReviewController(QObject):
             from vkdub.utils.paths import workspace_root
             transcript = self.window.project.transcript
             result = read_srt(path, source_digest(transcript) if transcript else None)
+            if not self.confirm_replace():
+                return False
             self.commit(result, "Mở SRT", selected=0)
 
             # Copy to export folder as translated.srt

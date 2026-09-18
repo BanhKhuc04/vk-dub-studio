@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLineEdit,
@@ -26,9 +27,28 @@ from vkdub.services.translation_service import batches
 from vkdub.services.tts_usage import TTSUsage
 from vkdub.services.usage_service import UsageLedger
 from vkdub.ui.left_config_panel import label
+from vkdub.ui.theme import apply_widget_theme
 
 if TYPE_CHECKING:
     from vkdub.ui.translation_controller import TranslationController
+
+
+def _dashboard_card(title: str, accent: str) -> tuple[QFrame, QVBoxLayout]:
+    card = QFrame()
+    card.setProperty("settingsCard", True)
+    card.setStyleSheet(
+        f"QFrame[settingsCard='true']{{background:#ffffff;border:3px solid #101828;"
+        f"border-radius:14px;border-top:7px solid {accent};}}"
+    )
+    card_layout = QVBoxLayout(card)
+    card_layout.setContentsMargins(14, 10, 14, 12)
+    card_layout.setSpacing(8)
+    heading = label(title, "eyebrow")
+    heading.setStyleSheet(
+        f"color:{accent};background:transparent;font-size:12px;font-weight:900;letter-spacing:.7px;"
+    )
+    card_layout.addWidget(heading)
+    return card, card_layout
 
 
 class ApiCostDialog(QDialog):
@@ -36,14 +56,21 @@ class ApiCostDialog(QDialog):
         super().__init__(controller.window)
         self.controller = controller
         self.store = CredentialStore()
-        self.setWindowTitle("VK Dub Studio — API & Chi phí")
+        self.setWindowTitle("KAPPAK — API & Chi phí")
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.resize(1080, 780)
         self.close_after_job = False
         self.credential_status = "Chưa kiểm tra"
         layout = QVBoxLayout(self)
-        layout.addWidget(label("API & CHI PHÍ", "heading"))
-        layout.addWidget(label(DISCLAIMER, "badge"))
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
+        title = label("API & CHI PHÍ", "heading")
+        title.setStyleSheet("font-size:22px;font-weight:900;color:#101828;")
+        layout.addWidget(title)
+        overview_card, overview_layout = _dashboard_card("TỔNG QUAN PIPELINE", "#2457f5")
+        disclaimer = label(DISCLAIMER, "badge")
+        disclaimer.setWordWrap(True)
+        overview_layout.addWidget(disclaimer)
         self.table = QTableWidget(4, 7)
         self.table.setHorizontalHeaderLabels(
             [
@@ -61,9 +88,13 @@ class ApiCostDialog(QDialog):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().hide()
         self.table.setMinimumHeight(170)
-        layout.addWidget(self.table)
-        layout.addWidget(label(f"Gemini CLOUD • {GEMINI_MODEL}", "eyebrow"))
-        layout.addWidget(
+        overview_layout.addWidget(self.table)
+        layout.addWidget(overview_card)
+
+        gemini_card, gemini_layout = _dashboard_card(
+            f"GEMINI CLOUD · {GEMINI_MODEL}", "#ff5c8a"
+        )
+        gemini_layout.addWidget(
             label(
                 "Dịch gửi bản chép lời tới Google; không gửi video/audio. "
                 "Điều khoản dữ liệu và quota "
@@ -77,19 +108,24 @@ class ApiCostDialog(QDialog):
             "Nhập Gemini API key mới • lưu trong Windows Credential Manager"
         )
         self.key_input.setAccessibleName("Gemini API key")
-        layout.addWidget(self.key_input)
+        self.key_input.setClearButtonEnabled(True)
+        gemini_layout.addWidget(self.key_input)
         actions = QHBoxLayout()
         self.save_key = QPushButton("Lưu khóa")
         self.delete_key = QPushButton("Xóa khóa")
         self.test_key = QPushButton("Kiểm tra kết nối")
         for button in (self.save_key, self.delete_key, self.test_key):
             actions.addWidget(button)
-        layout.addLayout(actions)
+        gemini_layout.addLayout(actions)
         self.status = label("Chưa kiểm tra kết nối.")
-        layout.addWidget(self.status)
+        self.status.setWordWrap(True)
+        gemini_layout.addWidget(self.status)
+        layout.addWidget(gemini_card)
+
+        cost_card, cost_layout = _dashboard_card("NGÂN SÁCH & MỨC SỬ DỤNG", "#20c96b")
         self.vbee_button = QPushButton("Vbee • Cấu hình / Kiểm tra / Thống kê")
         self.vbee_button.clicked.connect(controller.window.tts.open_manager)
-        layout.addWidget(self.vbee_button)
+        cost_layout.addWidget(self.vbee_button)
         self.mode = QComboBox()
         self.mode.addItems(["FREE_TIER", "PAID"])
         self.rate = QDoubleSpinBox()
@@ -108,7 +144,7 @@ class ApiCostDialog(QDialog):
         form.addRow("USD → VND (tự nhập)", self.rate)
         form.addRow("Ngân sách tháng (VND, tùy chọn)", self.budget)
         form.addRow("Ngưỡng cảnh báo ngân sách", self.threshold)
-        layout.addLayout(form)
+        cost_layout.addLayout(form)
         try:
             settings = load_settings()
         except (OSError, ValueError) as exc:
@@ -120,18 +156,23 @@ class ApiCostDialog(QDialog):
         self.threshold.setValue(settings.warning_percent)
         self.usage = label("")
         self.estimate = label("")
-        layout.addWidget(self.estimate)
-        layout.addWidget(self.usage)
+        self.estimate.setWordWrap(True)
+        self.usage.setWordWrap(True)
+        cost_layout.addWidget(self.estimate)
+        cost_layout.addWidget(self.usage)
         self.price_note = label(
             "Token dự án dùng công thức gần đúng, chưa trừ cache. "
             "FREE_TIER không chứng minh yêu cầu miễn phí. "
             '<a href="https://ai.google.dev/gemini-api/docs/pricing">Bảng giá Google</a>'
         )
         self.price_note.setOpenExternalLinks(True)
-        layout.addWidget(self.price_note)
+        self.price_note.setWordWrap(True)
+        cost_layout.addWidget(self.price_note)
+        layout.addWidget(cost_card)
         footer = QHBoxLayout()
         self.reset_button = QPushButton("Đặt lại thống kê cục bộ")
         self.save_button = QPushButton("Lưu cài đặt")
+        self.save_button.setObjectName("primary")
         self.close_button = QPushButton("Đóng")
         for button in (self.reset_button, self.save_button, self.close_button):
             footer.addWidget(button)
@@ -147,6 +188,7 @@ class ApiCostDialog(QDialog):
             spin.valueChanged.connect(self.refresh)
         self._read_credential_status()
         self.refresh()
+        apply_widget_theme(self)
 
     def _read_credential_status(self) -> None:
         try:

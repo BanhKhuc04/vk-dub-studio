@@ -1187,6 +1187,11 @@ class SettingsDialog(QDialog):
         self.update_channel = QComboBox()
         self.update_channel.addItem("Ổn định (Stable)", DEFAULT_UPDATE_FEED_STABLE)
         self.update_channel.addItem("Thử nghiệm (Beta)", DEFAULT_UPDATE_FEED_BETA)
+        # FEAT-03: Restore saved update channel preference
+        saved_channel = getattr(self.app_settings, "update_channel", "stable")
+        if saved_channel == "beta":
+            self.update_channel.setCurrentIndex(1)
+        self.update_channel.currentIndexChanged.connect(self._save_update_preference)
         form.addRow("Kênh phát hành:", self.update_channel)
 
         self.chk_auto_update = QCheckBox("Tự động kiểm tra bản cập nhật khi khởi động")
@@ -1210,9 +1215,13 @@ class SettingsDialog(QDialog):
         layout.addStretch()
         return widget
 
-    def _save_update_preference(self, enabled: bool) -> None:
+    def _save_update_preference(self, *_args: object) -> None:
         self.app_settings = load_app_settings()
-        self.app_settings.auto_update = enabled
+        self.app_settings.auto_update = self.chk_auto_update.isChecked()
+        channel_data = self.update_channel.currentData()
+        self.app_settings.update_channel = (
+            "beta" if "beta" in str(channel_data).lower() else "stable"
+        )
         self._persist_settings()
 
     def _check_for_updates(self) -> None:

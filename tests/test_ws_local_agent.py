@@ -16,7 +16,12 @@ from vkdub.bridge.ws_framing import (
 
 
 def test_local_agent_websocket_handshake_and_flow():
-    app = QCoreApplication.instance() or QCoreApplication([])
+    try:
+        from PySide6.QtWidgets import QApplication
+
+        app = QApplication.instance() or QCoreApplication.instance() or QApplication([])
+    except Exception:
+        app = QCoreApplication.instance() or QCoreApplication([])
 
     test_port = 49825
     agent = LocalAgent(port=test_port)

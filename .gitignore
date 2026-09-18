@@ -24,3 +24,8 @@ cache/
 *.mp4
 !resources/**
 .serena/
+frontend/node_modules/
+frontend/dist/
+ui_screenshots/
+*.log
+test_icon.ico

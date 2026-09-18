@@ -25,6 +25,7 @@ def find_tool(name: str) -> str | None:
         path = Path(configured).expanduser()
         if path.is_file():
             return _inject_and_return(path)
+        return None
 
     # 2. Bundled tools inside application directory (production standalone bundle or repo)
     base_dirs: list[Path] = []

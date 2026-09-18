@@ -64,7 +64,7 @@ class LeftConfigPanel(QFrame):
         header_row = QHBoxLayout()
         title_col = QVBoxLayout()
         title_col.setSpacing(2)
-        title_col.addWidget(label("VK Dub Studio", "heading"))
+        title_col.addWidget(label("KAPPAK", "heading"))
         title_col.addWidget(label(f"by vanhkhuc.dev   •   v{__version__}"))
         header_row.addLayout(title_col, 1)
 
@@ -122,7 +122,7 @@ class LeftConfigPanel(QFrame):
         self.import_button.setStyleSheet("font-size: 13px; padding: 9px; font-weight: bold;")
         layout.addWidget(self.import_button)
 
-        self.video_info = QLabel("Chưa chọn video MP4")
+        self.video_info = QLabel("Chưa chọn video")
         self.video_info.setWordWrap(True)
         self.video_info.setStyleSheet("color: #72d7c1; font-weight: 600; font-size: 12px;")
         layout.addWidget(self.video_info)

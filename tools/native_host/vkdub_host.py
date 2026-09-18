@@ -37,8 +37,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("vkdub.native_host")
 
-DEFAULT_AGENT_PORT = 49814
-DEFAULT_AGENT_HOST = "127.0.0.1"
+# The receiver thread and the Chromium stdin loop can both answer the
+# extension. Native Messaging frames must never be interleaved on stdout.
+_NATIVE_WRITE_LOCK = threading.Lock()
+
+DEFAULT_AGENT_PORT = int(os.environ.get("VKDUB_AGENT_PORT", "49814"))
+DEFAULT_AGENT_HOST = os.environ.get("VKDUB_AGENT_HOST", "127.0.0.1")
 
 
 def read_native_message() -> dict | None:
@@ -65,9 +69,10 @@ def write_native_message(message: dict) -> bool:
     try:
         encoded = json.dumps(message, separators=(",", ":")).encode("utf-8")
         header = struct.pack("<I", len(encoded))
-        sys.stdout.buffer.write(header)
-        sys.stdout.buffer.write(encoded)
-        sys.stdout.buffer.flush()
+        with _NATIVE_WRITE_LOCK:
+            sys.stdout.buffer.write(header)
+            sys.stdout.buffer.write(encoded)
+            sys.stdout.buffer.flush()
         return True
     except Exception as exc:
         logger.error("Error writing native message: %s", exc)
@@ -105,12 +110,18 @@ class AgentBridge:
             else:
                 time.sleep(1.0)
 
-    def send_to_agent(self, msg: dict) -> None:
+    def send_to_agent(self, msg: dict) -> bool:
         """Enqueue message to be sent to Local Agent."""
+        # Telemetry is disposable while the desktop app is offline. Keeping it
+        # would fill the bounded queue and evict real export commands.
+        if not self.connected and msg.get("action") == "STATUS_REPORT":
+            return False
         try:
             self.send_queue.put_nowait(msg)
+            return True
         except queue.Full:
             logger.warning("Send queue full, dropping message: %s", msg.get("action"))
+            return False
 
     def send_loop(self) -> None:
         """Flush queued messages to Local Agent socket."""
@@ -180,7 +191,9 @@ class AgentBridge:
 
 def main() -> None:
     logger.info("VK Dub Native Messaging Host started. PID=%d", os.getpid())
-    bridge = AgentBridge()
+    port = int(os.environ.get("VKDUB_AGENT_PORT", DEFAULT_AGENT_PORT))
+    host = os.environ.get("VKDUB_AGENT_HOST", DEFAULT_AGENT_HOST)
+    bridge = AgentBridge(host=host, port=port)
 
     # Start background threads for Local Agent communication
     t_connect = threading.Thread(target=bridge.connect_loop, daemon=True)
@@ -196,6 +209,46 @@ def main() -> None:
                 break
 
             logger.debug("Received from extension: %s", msg.get("action"))
+            action = msg.get("action")
+
+            # This health check is answered by the native host itself. A
+            # successful connectNative port only proves that this process is
+            # alive; it does not prove that ToolVideo/Local Agent is running.
+            if action == "GET_AGENT_STATUS":
+                write_native_message(
+                    {
+                        "action": "AGENT_STATUS",
+                        "payload": {
+                            "connected": bool(bridge.connected),
+                            "host": bridge.host,
+                            "port": bridge.port,
+                            "timestamp": int(time.time() * 1000),
+                        },
+                    }
+                )
+                continue
+
+            # Never leave an export spinning at PROBING 0% when the desktop
+            # application is closed. Return a deterministic error immediately.
+            if action == "CLIP_EXPORT_REQUEST" and not bridge.connected:
+                payload = msg.get("payload") or {}
+                request_id = payload.get("requestId") or payload.get("request_id") or ""
+                write_native_message(
+                    {
+                        "action": "CLIP_EXPORT_ERROR",
+                        "payload": {
+                            "requestId": request_id,
+                            "jobId": request_id,
+                            "status": "ERROR",
+                            "stage": "ERROR",
+                            "error": "ToolVideo chưa chạy hoặc Local Agent chưa mở cổng 49814.",
+                            "details": "Native host đang hoạt động nhưng không kết nối được tới Local Agent.",
+                            "success": False,
+                        },
+                    }
+                )
+                continue
+
             bridge.send_to_agent(msg)
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received.")

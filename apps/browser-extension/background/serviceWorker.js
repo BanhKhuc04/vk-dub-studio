@@ -23,6 +23,19 @@ const state = {
 };
 
 let bridge = null;
+let nativeAgentConnected = false;
+
+function isLocalAgentConnected() {
+  if (!bridge || !bridge.isConnected) return false;
+  if (bridge.activeTransport === "websocket") return true;
+  return bridge.activeTransport === "native" && nativeAgentConnected;
+}
+
+function requestNativeAgentStatus() {
+  if (bridge && bridge.isConnected && bridge.activeTransport === "native") {
+    bridge.send({ action: Actions.GET_AGENT_STATUS, timestamp: Date.now() });
+  }
+}
 
 async function checkCookiesAuth() {
   let chatgptAuthFromCookie = false;
@@ -196,10 +209,9 @@ async function refreshAllStatus() {
 
 async function sendStatusReport() {
   await refreshAllStatus();
-  if (!bridge || !bridge.isConnected) return;
-
+  const isConnected = isLocalAgentConnected();
   const report = createStatusReport({
-    browserConnected: true,
+    browserConnected: isConnected,
     chatgptAvailable: state.chatgptAvailable,
     chatgptLoggedIn: state.chatgptLoggedIn,
     vbeeAvailable: state.vbeeAvailable,
@@ -213,7 +225,13 @@ async function sendStatusReport() {
     },
   });
 
-  bridge.send(report);
+  if (isConnected) {
+    bridge.send(report);
+  }
+  try {
+    chrome.runtime.sendMessage(report).catch(() => {});
+  } catch (e) {}
+  return report;
 }
 
 async function findMatchingTab(urlPatterns, domainKeywords = []) {
@@ -309,6 +327,98 @@ async function ensureInjected(tabId, scriptPath) {
     }
   }
   return false;
+}
+
+async function ensureYouTubeAdapter(tabId) {
+  if (!tabId) {
+    return { success: false, error: "Không xác định được tab YouTube đang mở." };
+  }
+
+  const statusMessage = { action: "GET_YOUTUBE_STATUS" };
+
+  // --- Attempt 1: Ask the already-running content script ----------------
+  try {
+    const existing = await chrome.tabs.sendMessage(tabId, statusMessage);
+    if (existing?.state?.videoId) {
+      return { success: true, adapterReady: true, state: existing.state };
+    }
+  } catch (_existingError) {}
+
+  // --- Attempt 2: Inject + retry with progressive back-off --------------
+  let injectionError = "";
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content/youtubeAdapter.js"],
+    });
+  } catch (injectErr) {
+    injectionError = injectErr?.message || String(injectErr);
+  }
+
+  // Retry up to 4 times with progressive delays: 400, 700, 1200, 2000 ms
+  const delays = [400, 700, 1200, 2000];
+  for (const delay of delays) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      const injected = await chrome.tabs.sendMessage(tabId, statusMessage);
+      if (injected?.state?.videoId) {
+        return { success: true, adapterReady: true, state: injected.state };
+      }
+    } catch (_retryError) {
+      // Content script listener not ready yet — keep trying
+    }
+  }
+
+  // --- Attempt 3: Diagnostic fallback (inline func) ---------------------
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const url = new URL(window.location.href);
+        const video =
+          document.querySelector("#movie_player video.html5-main-video") ||
+          document.querySelector("#movie_player video") ||
+          document.querySelector("video");
+        const titleElement =
+          document.querySelector("h1.ytd-watch-metadata yt-formatted-string") ||
+          document.querySelector("h1.title yt-formatted-string") ||
+          document.querySelector("meta[name='title']");
+        const rawTitle =
+          titleElement?.textContent ||
+          titleElement?.getAttribute?.("content") ||
+          document.title ||
+          "Video YouTube";
+
+        return {
+          isWatchPage: url.pathname === "/watch",
+          videoId: url.searchParams.get("v") || "",
+          videoTitle: rawTitle.replace(/\s*-\s*YouTube\s*$/i, "").trim(),
+          duration: Number.isFinite(video?.duration) ? video.duration : 0,
+          currentTime: Number.isFinite(video?.currentTime) ? video.currentTime : 0,
+        };
+      },
+    });
+    const state = results?.[0]?.result;
+    if (state?.videoId) {
+      return {
+        success: true,
+        adapterReady: false,
+        state,
+        error: injectionError || "Adapter chưa đăng ký được bộ điều khiển.",
+      };
+    }
+  } catch (probeError) {
+    const detail = probeError?.message || String(probeError);
+    return {
+      success: false,
+      error: [injectionError, detail].filter(Boolean).join(" | "),
+    };
+  }
+
+  return {
+    success: false,
+    error: injectionError || "Không đọc được thông tin video trên tab YouTube.",
+  };
 }
 
 async function waitForVbeeDownload(jobName, startedAtMs, timeoutMs = 45000) {
@@ -511,9 +621,12 @@ function initBridge() {
   bridge = new NativeMessagingBridge({
     onConnect: () => {
       console.log("[SW] Native bridge connected! Sending initial status...");
+      nativeAgentConnected = bridge?.activeTransport === "websocket";
+      requestNativeAgentStatus();
       sendStatusReport();
     },
     onDisconnect: (err) => {
+      nativeAgentConnected = false;
       console.warn("[SW] Native bridge disconnected:", err);
     },
     onMessage: async (msg) => {
@@ -521,6 +634,15 @@ function initBridge() {
       if (!msg || !msg.action) return;
 
       switch (msg.action) {
+        case Actions.AGENT_STATUS:
+          nativeAgentConnected = msg.payload?.connected === true;
+          try {
+            chrome.runtime.sendMessage({
+              action: Actions.AGENT_STATUS,
+              payload: { ...msg.payload, transport: bridge?.activeTransport || null },
+            }).catch(() => {});
+          } catch (e) {}
+          break;
         case Actions.GET_STATUS:
           await sendStatusReport();
           break;
@@ -541,6 +663,16 @@ function initBridge() {
             console.warn("[SW] Reload failed:", e);
           }
           break;
+        case Actions.STATUS_REPORT:
+        case Actions.CLIP_EXPORT_ACCEPTED:
+        case Actions.CLIP_EXPORT_PROGRESS:
+        case Actions.CLIP_EXPORT_RESULT:
+        case Actions.CLIP_EXPORT_ERROR:
+        case Actions.IMPORT_TO_STUDIO_RESULT:
+          try {
+            chrome.runtime.sendMessage(msg).catch(() => {});
+          } catch (e) {}
+          break;
       }
     },
   });
@@ -548,7 +680,7 @@ function initBridge() {
   bridge.connect();
 }
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.action === "CHATGPT_TRANSLATE_DONE") {
     bridge.send({ action: Actions.CHATGPT_TRANSLATE_RESULT, payload: message.payload });
     return;
@@ -611,6 +743,124 @@ chrome.runtime.onMessage.addListener((message) => {
     return;
   }
 
+  if (message?.action === Actions.YOUTUBE_CONTEXT_SYNC) {
+    const youtubePayload = {
+      ...(message.payload || {}),
+      tabId: sender?.tab?.id || message.payload?.tabId || null,
+    };
+    if (youtubePayload.videoId || youtubePayload.video_id) {
+      chrome.storage.local.set({ current_youtube_context: youtubePayload }).catch(() => {});
+    }
+    if (isLocalAgentConnected()) {
+      bridge.send({ action: Actions.YOUTUBE_CONTEXT_SYNC, payload: youtubePayload });
+    }
+    chrome.runtime.sendMessage({ action: Actions.YOUTUBE_CONTEXT_SYNC, payload: youtubePayload }).catch(() => {});
+    return;
+  }
+
+  if (message?.action === Actions.ENSURE_YOUTUBE_ADAPTER) {
+    const requestedTabId = message.payload?.tabId || sender?.tab?.id;
+    ensureYouTubeAdapter(requestedTabId)
+      .then((result) => sendResponse(result))
+      .catch((error) => {
+        sendResponse({ success: false, error: error?.message || String(error) });
+      });
+    return true;
+  }
+
+  if (message?.action === "YOUTUBE_ADAPTER_READY") {
+    const readyPayload = {
+      ...(message.payload || {}),
+      tabId: sender?.tab?.id || message.payload?.tabId || null,
+    };
+    chrome.runtime.sendMessage({ action: "YOUTUBE_ADAPTER_READY", payload: readyPayload }).catch(() => {});
+    return;
+  }
+
+  if (message?.action === "YOUTUBE_CLIP_ADDED") {
+    chrome.runtime.sendMessage(message).catch(() => {});
+    return;
+  }
+
+  if (message?.action === Actions.YOUTUBE_SEEK_TO || message?.action === Actions.YOUTUBE_PREVIEW_CLIP) {
+    const tabId = message.payload?.tabId || message.payload?.tab_id;
+    if (tabId) {
+      chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    } else {
+      chrome.tabs.query({ url: "*://*.youtube.com/watch*" }).then((tabs) => {
+        const targetTab = tabs.find((t) => t.active) || tabs[0];
+        if (targetTab?.id) {
+          chrome.tabs.sendMessage(targetTab.id, message).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  if (message?.action === Actions.CLIP_EXPORT_REQUEST) {
+    if (isLocalAgentConnected()) {
+      bridge.send({ action: Actions.CLIP_EXPORT_REQUEST, payload: message.payload });
+    } else {
+      chrome.runtime.sendMessage({
+        action: Actions.CLIP_EXPORT_ERROR,
+        payload: {
+          requestId: message.payload?.requestId || message.payload?.request_id,
+          error: "Không thể kết nối tới VK Dub Studio Local Agent. Vui lòng kiểm tra ứng dụng đang chạy.",
+        },
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  if (message?.action === Actions.CLIP_EXPORT_CANCEL) {
+    if (isLocalAgentConnected()) {
+      bridge.send({ action: Actions.CLIP_EXPORT_CANCEL, payload: message.payload });
+    }
+    return;
+  }
+
+  if (message?.action === Actions.OPEN_OUTPUT_FOLDER) {
+    if (isLocalAgentConnected()) {
+      bridge.send({ action: Actions.OPEN_OUTPUT_FOLDER, payload: message.payload });
+    }
+    return;
+  }
+
+  if (message?.action === Actions.IMPORT_TO_STUDIO) {
+    if (isLocalAgentConnected()) {
+      bridge.send({ action: Actions.IMPORT_TO_STUDIO, payload: message.payload });
+    }
+    return;
+  }
+
+  if (message?.action === "OPEN_SIDE_PANEL") {
+    if (chrome.sidePanel && typeof chrome.sidePanel.open === "function") {
+      const tabId = message.payload?.tabId;
+      if (tabId) {
+        chrome.sidePanel.open({ tabId }).catch(() => {});
+      } else {
+        chrome.windows.getLastFocused({ populate: false }).then((win) => {
+          if (win?.id) {
+            chrome.sidePanel.open({ windowId: win.id }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    }
+    return;
+  }
+
+  if (message?.action === Actions.GET_STATUS) {
+    requestNativeAgentStatus();
+    sendResponse({
+      success: true,
+      connected: isLocalAgentConnected(),
+      transport: bridge?.activeTransport || null,
+      timestamp: Date.now(),
+    });
+    if (!message.payload?.lightweight) sendStatusReport();
+    return;
+  }
+
   if (
     message?.action === "CHATGPT_TAB_READY" ||
     message?.action === "CHATGPT_STATUS_CHANGED" ||
@@ -634,9 +884,28 @@ chrome.tabs.onRemoved.addListener(() => {
 });
 
 setInterval(() => {
-  if (bridge && bridge.isConnected) {
+  if (isLocalAgentConnected()) {
     sendStatusReport();
   }
 }, 3000);
+
+if (typeof chrome !== "undefined" && chrome.sidePanel && typeof chrome.sidePanel.setPanelBehavior === "function") {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+}
+
+// Static content_scripts handles newly loaded YouTube pages. This fallback
+// activates the adapter in tabs that were already open when the extension reloads.
+if (chrome.scripting && chrome.tabs) {
+  chrome.tabs.query({ url: "*://*.youtube.com/*" }).then((tabs) => {
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content/youtubeAdapter.js"],
+        }).catch(() => {});
+      }
+    }
+  }).catch(() => {});
+}
 
 initBridge();

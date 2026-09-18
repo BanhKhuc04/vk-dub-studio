@@ -15,7 +15,7 @@ class VbeeDialog(QDialog):
     def __init__(self, controller: "TTSController") -> None:
         super().__init__(controller.window)
         self.controller = controller
-        self.setWindowTitle("VK Dub Studio — Vbee API")
+        self.setWindowTitle("KAPPAK — Vbee API")
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.resize(600, 400)
         layout = QVBoxLayout(self)

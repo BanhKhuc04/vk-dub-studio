@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
-import os
 import sys
 from pathlib import Path
 
 logger = logging.getLogger("vkdub.register_host")
 
 HOST_NAME = "com.vkdub.bridge"
+EXTENSION_ID = "bnpmffibedppchkljkcaidgijekgfmgl"
 
 REGISTRY_TARGETS = [
     (r"Software\Microsoft\Edge\NativeMessagingHosts", "Microsoft Edge"),
@@ -19,8 +20,33 @@ REGISTRY_TARGETS = [
 
 
 def get_manifest_path() -> Path:
-    """Return absolute path to Native Messaging Host manifest file."""
-    return Path(__file__).resolve().parent / f"{HOST_NAME}.json"
+    """Return absolute path to Native Messaging Host manifest file.
+
+    Dynamically generates/updates the manifest file so it points to the
+    exact local path of vkdub_host.bat in this repository.
+    """
+    manifest = Path(__file__).resolve().parent / f"{HOST_NAME}.json"
+    host_bat = Path(__file__).resolve().parent / "vkdub_host.bat"
+
+    manifest_data = {
+        "name": HOST_NAME,
+        "description": "VK Dub Studio Native Messaging Bridge Host",
+        "path": str(host_bat.resolve()),
+        "type": "stdio",
+        "allowed_origins": [
+            f"chrome-extension://{EXTENSION_ID}/"
+        ],
+    }
+
+    try:
+        manifest.write_text(
+            json.dumps(manifest_data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        logger.warning("Failed writing static manifest file: %s", exc)
+
+    return manifest
 
 
 def register_host(manifest_path: Path | None = None) -> list[str]:
@@ -45,10 +71,16 @@ def register_host(manifest_path: Path | None = None) -> list[str]:
     for subkey_base, browser_name in REGISTRY_TARGETS:
         key_path = f"{subkey_base}\\{HOST_NAME}"
         try:
-            with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
+            with winreg.CreateKeyEx(
+                winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE
+            ) as key:
                 winreg.SetValueEx(key, "", 0, winreg.REG_SZ, manifest_str)
             registered.append(browser_name)
-            logger.info("Successfully registered native host for %s at HKCU\\%s", browser_name, key_path)
+            logger.info(
+                "Successfully registered native host for %s at HKCU\\%s",
+                browser_name,
+                key_path,
+            )
         except Exception as exc:
             logger.error("Failed to register native host for %s: %s", browser_name, exc)
 

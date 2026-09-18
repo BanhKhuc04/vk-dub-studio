@@ -20,7 +20,14 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 
-from vkdub.bridge.protocol import Actions, BridgeStatus
+from vkdub.bridge.protocol import (
+    Actions,
+    BridgeStatus,
+    ClipExportAccepted,
+    ClipExportError,
+    ClipExportProgress,
+    ClipExportResult,
+)
 from vkdub.bridge.registry import ensure_host_registered
 from vkdub.bridge.ws_framing import (
     create_websocket_handshake_response,
@@ -153,6 +160,12 @@ class LocalAgent(QObject):
     vbee_result_received = Signal(dict)
     log_emitted = Signal(str)
 
+    # YouTube Clip Mode signals
+    youtube_context_updated = Signal(dict)
+    clip_export_requested = Signal(dict)
+    clip_export_cancelled = Signal(dict)
+    open_output_folder_requested = Signal(str)
+
     def __init__(
         self,
         host: str = DEFAULT_HOST,
@@ -169,6 +182,42 @@ class LocalAgent(QObject):
         self.status = BridgeStatus(browser_connected=False)
         self._lock = threading.Lock()
         self._pending_requests: dict[str, tuple[threading.Event, dict[str, Any]]] = {}
+        self.latest_youtube_context: dict[str, Any] = {}
+        self._clip_export_handler: Any | None = None
+        self._clip_cancel_handler: Any | None = None
+        self._clip_import_handler: Any | None = None
+
+    def is_connected(self) -> bool:
+        """Return True if browser extension is currently connected."""
+        return bool(
+            self.running and self.client_sock is not None and self.status.browser_connected
+        )
+
+    def is_chatgpt_ready(self) -> bool:
+        """Return True if browser is connected and ChatGPT is logged in or available."""
+        return bool(
+            self.is_connected()
+            and (self.status.chatgpt_logged_in or self.status.chatgpt_available)
+        )
+
+    def is_vbee_ready(self) -> bool:
+        """Return True if browser is connected and Vbee is logged in or available."""
+        return bool(
+            self.is_connected()
+            and (self.status.vbee_logged_in or self.status.vbee_available)
+        )
+
+    def set_clip_export_handler(self, handler: Any) -> None:
+        """Register a callback handler for CLIP_EXPORT_REQUEST actions."""
+        self._clip_export_handler = handler
+
+    def set_clip_cancel_handler(self, handler: Any) -> None:
+        """Register a callback handler for CLIP_EXPORT_CANCEL actions."""
+        self._clip_cancel_handler = handler
+
+    def set_clip_import_handler(self, handler: Any) -> None:
+        """Register a callback handler for importing a completed clip."""
+        self._clip_import_handler = handler
 
     def start(self) -> bool:
         """Initialize registry keys and start background socket listener."""
@@ -249,7 +298,11 @@ class LocalAgent(QObject):
                             sock.sendall(create_websocket_handshake_response(key))
                             handshake_done = True
                             logger.info("Local Agent WebSocket client handshake completed.")
-                            self.request_status()
+                            # Wait for the extension's HELLO before sending the first
+                            # WebSocket frame.  Sending GET_STATUS immediately can be
+                            # coalesced with the HTTP 101 response in the same TCP read,
+                            # which makes the upgrade boundary unreliable for clients.
+                            # The HELLO handler below already requests status.
                             continue
                         else:
                             logger.warning("WebSocket upgrade missing Sec-WebSocket-Key header.")
@@ -383,6 +436,75 @@ class LocalAgent(QObject):
         elif action == Actions.HELLO:
             self.log_emitted.emit("Trình duyệt Microsoft Edge đã kết nối thành công.")
             self.request_status()
+        elif action == Actions.YOUTUBE_CONTEXT_SYNC:
+            payload = msg.get("payload", {})
+            self.latest_youtube_context = payload
+            self.youtube_context_updated.emit(payload)
+            logger.debug(
+                "YouTube context synced: %s",
+                payload.get("title") or payload.get("video_id") or "",
+            )
+        elif action == Actions.CLIP_EXPORT_REQUEST:
+            payload = msg.get("payload", {})
+            req_id = str(payload.get("request_id") or payload.get("requestId") or "")
+            self.clip_export_requested.emit(payload)
+            if self._clip_export_handler is not None:
+                try:
+                    self._clip_export_handler(payload)
+                except Exception as exc:
+                    logger.error("Error in clip export handler: %s", exc)
+            elif req_id:
+                clips_count = len(payload.get("clips", []))
+                self.send_clip_accepted(
+                    ClipExportAccepted(
+                        request_id=req_id,
+                        job_id=str(payload.get("job_id") or payload.get("jobId") or req_id),
+                        status="QUEUED",
+                        total_clips=clips_count,
+                        message="Yêu cầu xuất clip đã được LocalAgent tiếp nhận.",
+                    )
+                )
+        elif action == Actions.CLIP_EXPORT_CANCEL:
+            payload = msg.get("payload", {})
+            self.clip_export_cancelled.emit(payload)
+            if self._clip_cancel_handler is not None:
+                try:
+                    self._clip_cancel_handler(payload)
+                except Exception as exc:
+                    logger.error("Error in clip cancel handler: %s", exc)
+        elif action == Actions.OPEN_OUTPUT_FOLDER:
+            payload = msg.get("payload", {})
+            folder = str(payload.get("path") or payload.get("folder_path") or "")
+            if not folder:
+                try:
+                    from vkdub.utils.paths import workspace_root
+
+                    folder = str(workspace_root() / "exports" / "clips")
+                except Exception:
+                    folder = ""
+            self.open_output_folder_requested.emit(folder)
+            if folder:
+                self.open_output_folder(folder)
+        elif action == Actions.IMPORT_TO_STUDIO:
+            payload = msg.get("payload", {})
+            try:
+                if self._clip_import_handler is None:
+                    raise RuntimeError("Dịch vụ nhập clip chưa được khởi tạo.")
+                result = self._clip_import_handler(payload)
+                response = result if isinstance(result, dict) else {"success": bool(result)}
+                response.setdefault("success", True)
+            except Exception as exc:
+                logger.error("Error importing completed clip: %s", exc)
+                response = {"success": False, "error": str(exc)}
+            response.setdefault(
+                "request_id",
+                str(payload.get("request_id") or payload.get("requestId") or ""),
+            )
+            response.setdefault(
+                "job_id",
+                str(payload.get("job_id") or payload.get("jobId") or ""),
+            )
+            self.send_command(Actions.IMPORT_TO_STUDIO_RESULT, response)
 
     def translate_srt_sync(
         self,
@@ -660,6 +782,67 @@ class LocalAgent(QObject):
         except Exception as exc:
             logger.error("Failed to open browser URL %s: %s", target_url, exc)
             return False
+
+    def open_output_folder(self, folder_path: str | Path) -> bool:
+        """Open folder in Windows Explorer or system file manager safely."""
+        try:
+            target = Path(folder_path).resolve()
+            if not target.exists():
+                target.mkdir(parents=True, exist_ok=True)
+            if sys.platform == "win32":
+                os.startfile(str(target))
+                return True
+            elif sys.platform == "darwin":
+                import subprocess
+
+                subprocess.run(["open", str(target)], check=False)
+                return True
+            else:
+                import subprocess
+
+                subprocess.run(["xdg-open", str(target)], check=False)
+                return True
+        except Exception as exc:
+            logger.warning("Failed to open output folder %s: %s", folder_path, exc)
+            return False
+
+    def send_clip_accepted(self, accepted: ClipExportAccepted | dict[str, Any]) -> bool:
+        """Send CLIP_EXPORT_ACCEPTED notification to browser extension."""
+        payload = accepted.to_dict() if isinstance(accepted, ClipExportAccepted) else accepted
+        return self.send_command(Actions.CLIP_EXPORT_ACCEPTED, payload)
+
+    def send_clip_progress(self, progress: ClipExportProgress | dict[str, Any]) -> bool:
+        """Send CLIP_EXPORT_PROGRESS telemetry stream to browser extension."""
+        payload = progress.to_dict() if isinstance(progress, ClipExportProgress) else progress
+        return self.send_command(Actions.CLIP_EXPORT_PROGRESS, payload)
+
+    def send_clip_result(self, result: ClipExportResult | dict[str, Any]) -> bool:
+        """Send CLIP_EXPORT_RESULT report to browser extension."""
+        payload = result.to_dict() if isinstance(result, ClipExportResult) else result
+        return self.send_command(Actions.CLIP_EXPORT_RESULT, payload)
+
+    def send_clip_error(self, error: ClipExportError | dict[str, Any]) -> bool:
+        """Send CLIP_EXPORT_ERROR failure notification to browser extension."""
+        payload = error.to_dict() if isinstance(error, ClipExportError) else error
+        return self.send_command(Actions.CLIP_EXPORT_ERROR, payload)
+
+    def seek_youtube(self, seconds: float, play: bool = True, tab_id: int | None = None) -> bool:
+        """Send YOUTUBE_SEEK_TO command to browser extension."""
+        payload: dict[str, Any] = {"seconds": seconds, "time": seconds, "play": play}
+        if tab_id is not None:
+            payload["tab_id"] = tab_id
+            payload["tabId"] = tab_id
+        return self.send_command(Actions.YOUTUBE_SEEK_TO, payload)
+
+    def preview_youtube_clip(
+        self, start: float, end: float, loop: bool = False, tab_id: int | None = None
+    ) -> bool:
+        """Send YOUTUBE_PREVIEW_CLIP command to browser extension."""
+        payload: dict[str, Any] = {"start": start, "end": end, "loop": loop}
+        if tab_id is not None:
+            payload["tab_id"] = tab_id
+            payload["tabId"] = tab_id
+        return self.send_command(Actions.YOUTUBE_PREVIEW_CLIP, payload)
 
     def stop(self) -> None:
         """Shut down server and disconnect all sockets."""

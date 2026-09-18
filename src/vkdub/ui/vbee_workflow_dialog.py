@@ -34,7 +34,7 @@ class VbeeWorkflowDialog(QDialog):
         )
         super().__init__(effective_parent)
         self.controller = controller
-        self.setWindowTitle("VK Dub Studio — Tạo Voice bằng Vbee Dubbing")
+        self.setWindowTitle("KAPPAK — Tạo Voice bằng Vbee Dubbing")
         self.resize(580, 480)
         self.setMinimumSize(500, 420)
         self.setWindowModality(Qt.WindowModality.WindowModal)
