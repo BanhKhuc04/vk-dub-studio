@@ -997,6 +997,27 @@ def export_capcut():
             ffmpeg=ffmpeg,
         )
         state.export_capcut_result = str(result.path)
+
+        try:
+            from vkdub.services.discord_notifier import send_discord_message, datetime, timezone
+            now_iso = datetime.now(timezone.utc).isoformat()
+            embed = {
+                "title": "🎬 Xuất Dự Án CapCut PC Draft Thành Công!",
+                "description": f"Dự án CapCut Draft đã được tạo hoàn tất tại:\n`{result.path}`",
+                "color": 0x30D158,
+                "timestamp": now_iso,
+                "fields": [
+                    {"name": "Draft ID", "value": result.draft_id, "inline": True},
+                    {"name": "Video Track", "value": f"{result.video_segments} đoạn", "inline": True},
+                    {"name": "Phụ đề Subtitle", "value": f"{result.caption_segments} câu", "inline": True},
+                    {"name": "Master Audio", "value": "✓ Đồng bộ timeline 100%", "inline": True},
+                ],
+                "footer": {"text": "KAPPAK Studio Web · Export Service"},
+            }
+            send_discord_message(content="🎉 **[XUẤT BẢN CAPCUT THÀNH CÔNG]**", embeds=[embed])
+        except Exception as disc_err:
+            logger.debug("Discord notification error on CapCut export: %s", disc_err)
+
         return {
             "status": "ok",
             "path": str(result.path),
@@ -1115,6 +1136,26 @@ def export_mp4(req: ExportRequest):
 
     size_mb = round(output_file.stat().st_size / (1024 * 1024), 2)
     state.export_mp4_result = str(output_file)
+
+    try:
+        from vkdub.services.discord_notifier import send_discord_message, datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
+        embed = {
+            "title": "🎥 Xuất Video MP4 Hoàn Thiện Thành Công!",
+            "description": f"Video MP4 đã được render hoàn chỉnh tại:\n`{output_file}`",
+            "color": 0x0071E3,
+            "timestamp": now_iso,
+            "fields": [
+                {"name": "Tệp video", "value": output_file.name, "inline": True},
+                {"name": "Dung lượng", "value": f"{size_mb} MB", "inline": True},
+                {"name": "Vùng che mờ", "value": f"{len(state.project.masks)} vùng", "inline": True},
+            ],
+            "footer": {"text": "KAPPAK Studio Web · Render Service"},
+        }
+        send_discord_message(content="🎬 **[XUẤT BẢN VIDEO MP4 THÀNH CÔNG]**", embeds=[embed])
+    except Exception as disc_err:
+        logger.debug("Discord notification error on MP4 export: %s", disc_err)
+
     return {
         "status": "ok",
         "path": str(output_file),

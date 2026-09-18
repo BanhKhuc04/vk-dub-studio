@@ -288,7 +288,8 @@ function Preview({
   setActiveMaskId,
   onMasksChange,
   aspectMode = "auto",
-  setAspectMode
+  setAspectMode,
+  videoRef: externalVideoRef
 }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -296,7 +297,8 @@ function Preview({
   const [isMuted, setIsMuted] = useState(false);
   const [detectedAspect, setDetectedAspect] = useState(null);
 
-  const videoRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const videoRef = externalVideoRef || localVideoRef;
   const screenRef = useRef(null);
 
   const togglePlay = useCallback((e) => {
@@ -1101,11 +1103,52 @@ function Step5({
   onExportMP4,
   onExportCapCut,
   exporting,
-  approved
+  approved,
+  onSeekSubtitle,
+  selectedVoice,
+  onPreviewVoice
 }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [replaceQuery, setReplaceQuery] = useState("");
+
   const handleSubtitleChange = (id, newText) => {
     setSubtitles((prev) =>
       prev.map((item) => (item.id === id ? { ...item, target_text: newText } : item))
+    );
+  };
+
+  const handleAddCue = () => {
+    const newId = subtitles.length + 1;
+    let startStr = "00:00:00,000";
+    let endStr = "00:00:02,500";
+    if (subtitles.length > 0) {
+      startStr = subtitles[subtitles.length - 1].end_time || "00:00:00,000";
+      endStr = startStr;
+    }
+    setSubtitles((prev) => [
+      ...prev,
+      {
+        id: newId,
+        start_time: startStr,
+        end_time: endStr,
+        source_text: "Dòng phụ đề bổ sung",
+        target_text: "Câu thoại tiếng Việt bổ sung"
+      }
+    ]);
+  };
+
+  const handleDeleteCue = (id) => {
+    setSubtitles((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleReplaceAll = () => {
+    if (!searchQuery) return;
+    setSubtitles((prev) =>
+      prev.map((item) => ({
+        ...item,
+        target_text: item.target_text ? item.target_text.replaceAll(searchQuery, replaceQuery) : ""
+      }))
     );
   };
 
@@ -1116,25 +1159,11 @@ function Step5({
       desc="Kiểm tra câu từ kịch bản, chỉnh sửa nhanh và xuất video MP4 hoàn thiện hoặc dự án CapCut 1-chạm."
     >
       <div className="review-actions">
-        <button
-          onClick={() => {
-            const newId = subtitles.length + 1;
-            setSubtitles((prev) => [
-              ...prev,
-              {
-                id: newId,
-                start_time: "00:00.00",
-                end_time: "00:02.00",
-                source_text: "Dòng phụ đề mới",
-                target_text: "Câu thoại tiếng Việt mới"
-              }
-            ]);
-          }}
-        >
+        <button type="button" onClick={handleAddCue}>
           <PlusIcon size={14} /> Thêm câu
         </button>
-        <button onClick={() => alert("Chức năng tìm kiếm câu từ sẵn sàng")}>
-          <SearchIcon size={14} /> Tìm & sửa
+        <button type="button" onClick={() => setSearchOpen((v) => !v)}>
+          <SearchIcon size={14} /> {searchOpen ? "Đóng tìm kiếm" : "Tìm & sửa"}
         </button>
         <motion.button
           whileHover={{ scale: 1.02 }}
@@ -1147,13 +1176,56 @@ function Step5({
         </motion.button>
       </div>
 
+      {/* Interactive Search & Replace Bar */}
+      {searchOpen && (
+        <div className="search-replace-bar">
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="Từ cần tìm..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <input
+              type="text"
+              placeholder="Thay bằng..."
+              value={replaceQuery}
+              onChange={(e) => setReplaceQuery(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="btn blue small"
+              onClick={handleReplaceAll}
+              style={{ padding: "5px 10px", fontSize: 11 }}
+            >
+              Đổi tất cả
+            </button>
+            <button
+              type="button"
+              className="icon-only"
+              onClick={() => setSearchOpen(false)}
+              title="Đóng"
+            >
+              <CloseIcon size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Editable Subtitle List */}
       <div className="script-list">
         {subtitles.length > 0 ? (
           subtitles.map((row) => (
             <div className="script" key={row.id}>
               <span>{String(row.id).padStart(2, "0")}</span>
-              <time>{row.start_time} - {row.end_time}</time>
+              <time
+                onClick={() => onSeekSubtitle?.(row.start_time)}
+                title="Nhấp để nhảy video đến mốc này"
+              >
+                {row.start_time} - {row.end_time}
+              </time>
               <div>
                 <small style={{ color: "var(--muted)", display: "block", marginBottom: 3 }}>
                   {row.source_text}
@@ -1163,6 +1235,23 @@ function Step5({
                   value={row.target_text}
                   onChange={(e) => handleSubtitleChange(row.id, e.target.value)}
                 />
+              </div>
+              <div className="script-row-actions">
+                <button
+                  type="button"
+                  title="Nghe thử giọng câu này"
+                  onClick={() => onPreviewVoice?.(selectedVoice, row.target_text)}
+                >
+                  <VolumeIcon size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  title="Xóa câu này"
+                  onClick={() => handleDeleteCue(row.id)}
+                >
+                  <TrashIcon size={13} />
+                </button>
               </div>
             </div>
           ))
@@ -1304,6 +1393,8 @@ export default function App() {
   const [dark, setDark] = useState(false);
   const [step, setStep] = useState(1);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const videoPlayerRef = useRef(null);
 
   // Apple Dynamic Island State
   const [islandState, setIslandState] = useState({
@@ -1994,6 +2085,7 @@ export default function App() {
           onMasksChange={handleMasksChange}
           aspectMode={aspectMode}
           setAspectMode={setAspectMode}
+          videoRef={videoPlayerRef}
         />
 
         <section className="right-panel">
@@ -2054,6 +2146,24 @@ export default function App() {
                 onExportCapCut={handleExportCapCut}
                 exporting={exporting}
                 approved={approved}
+                onSeekSubtitle={(timeStr) => {
+                  if (!videoPlayerRef.current || !timeStr) return;
+                  const clean = timeStr.replace(",", ".");
+                  const parts = clean.split(":");
+                  let sec = 0;
+                  if (parts.length === 3) {
+                    sec = parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+                  } else if (parts.length === 2) {
+                    sec = parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+                  } else {
+                    sec = parseFloat(clean) || 0;
+                  }
+                  videoPlayerRef.current.currentTime = Math.max(0, sec);
+                  videoPlayerRef.current.play().catch(() => {});
+                  setTemporaryIsland({ type: "running", message: `Nhảy video đến ${timeStr}` }, 1800);
+                }}
+                selectedVoice={selectedVoice}
+                onPreviewVoice={handlePreviewVoice}
               />
             )}
           </AnimatePresence>
