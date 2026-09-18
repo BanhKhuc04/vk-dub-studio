@@ -32,3 +32,14 @@ Trạng thái thực hiện các nhiệm vụ theo `AGENT_TASK.md` và `ACCEPTAN
 | **BƯỚC 4** | Sửa references bị vỡ & kiểm thử tích hợp | **DONE** | Commit `53615c2`: Cập nhật `tests/test_manifest_and_packaging.py`, `tests/test_adversarial_challenger.py`, `scripts/export_all_ui_screenshots.py`, `frontend/`, `README.md`. |
 | **BƯỚC 5** | Kiểm tra hồi quy, build frontend & nghiệm thu | **DONE** | `npm run build` PASS (449ms); `pytest` 833 passed; `reload_extension.bat` chạy thành công đăng ký Native Host. |
 
+## Bảng Kết Quả Gap Audit Mục 7.1 (Chống Báo Cáo Khống - Ngày 19/09/2026)
+
+| Mục theo PROJECT_OVERVIEW.md | Trạng thái cũ | Trạng thái sau Audit | Lý do hạ / Bằng chứng kiểm tra thực tế |
+|---|---|---|---|
+| **1. Pipeline 5 bước Auto-Dub** | DONE [x] | **PARTIAL** | - Whisper STT & Edge TTS chạy thực tế 100% trên `sample.mp4`.<br/>- CapCut Export chạy thật 100%, xuất draft hợp lệ tại `%LOCALAPPDATA%\CapCut\...\VKDub 20260919-064656-BAE65B17` (có video xóa chữ, master-voice.mp3, draft_content.json).<br/>- **GAP:** Bước Dịch thuật (ChatGPT/Gemini) & Vbee TTS chưa tự động end-to-end độc lập do chưa có Gemini API Key và tab ChatGPT/Vbee chưa đăng nhập (pipeline tự động fallback sang kịch bản gốc để sửa tay). |
+| **2. Browser Bridge (Native Host + Extension)** | DONE [x] | **OPERATIONAL (Chờ tab)** | - Native Host & Local Agent kết nối TCP cổng 49814 thành công (PID 37112 <-> PID 29756).<br/>- API `/api/bridge/status` trả về `{"connected": true, "chatgpt": false, "vbee": false}`.<br/>- Đã chứng minh tự động reconnect khi Local Agent restart.<br/>- **GAP:** Trạng thái tab ChatGPT và Vbee đang là `false` do người dùng chưa mở/đăng nhập tab trong trình duyệt. |
+| **3. Web Studio UI Apple Glass V2** | DONE [x] | **PENDING (UI Shell Only)** | - HomeView đạt 100% bố cục và thẩm mỹ Apple Glass Female Hero V2, build Vite pass.<br/>- **GAP 1:** `RecentProjectsSection` đang dùng danh sách **mock hardcode** (`SAMPLE_PROJECTS`), chưa nối API thật từ database.<br/>- **GAP 2:** 5/6 module cards khi click (Downloader, Data Studio, Auto Video, Social, Today) chỉ hiển thị **màn hình placeholder** ("Tính năng đang được kích hoạt..."), chưa có view chức năng thật trên Web. |
+| **4. Universal Downloader (Phase 1)** | DONE [x] | **PENDING (Thiếu Dedup & Web UI)** | - `yt-dlp` tải video và lưu SQLite hoạt động trên desktop core.<br/>- **GAP 1 (Trọng yếu):** Chưa có logic kiểm tra `SELECT * FROM assets WHERE sha256_hash = ?` để phát hiện và chặn tải trùng (mới chỉ tính SHA-256 rồi lưu record mới với UUID mới).<br/>- **GAP 2:** Chưa có UI Downloader trên Web Studio (mới chỉ có placeholder). |
+| **5. Cấu trúc Repository chuẩn hóa** | DONE [x] | **DONE (100%)** | - Đã audit 64 file, dọn dẹp phân loại tách bạch `docs/`, `scripts/`, `archive/releases/`, `tests/`, `src/`.<br/>- `.gitignore` loại trừ hoàn toàn rác cache/log. 833 tests pass. Forwarding launchers hoạt động chuẩn. |
+
+
