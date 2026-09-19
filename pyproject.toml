@@ -5,9 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vk-dub-studio"
 version = "2.1.17"
-description = "Auto-dubbing pipeline for short drama & Douyin clips"
+description = "KAPPAK Personal Media Studio — Auto-dubbing, video downloading, media management & content creation platform"
+authors = [{name = "Khúc Việt Anh", email = "vanhkhuc.dev@gmail.com"}]
 requires-python = ">=3.12,<3.14"
-dependencies = ["PySide6>=6.8,<6.11", "faster-whisper>=1.2,<2", "httpx>=0.28,<1", "keyring>=25,<26", "numpy>=2,<3", "playwright>=1.40,<2"]
+dependencies = ["PySide6>=6.8,<6.11", "faster-whisper>=1.2,<2", "httpx>=0.28,<1", "keyring>=25,<26", "numpy>=2,<3", "playwright>=1.40,<2", "fastapi>=0.115.0", "uvicorn[standard]>=0.30.0", "pydantic>=2.0", "websockets>=12.0", "yt-dlp>=2024.0"]
+
+[project.urls]
+Homepage = "https://github.com/vanhkhuc-k5/vk-dub-studio"
+Repository = "https://github.com/vanhkhuc-k5/vk-dub-studio"
+Issues = "https://github.com/vanhkhuc-k5/vk-dub-studio/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "pytest-qt>=4.4,<5", "ruff>=0.11,<1", "mypy>=1.15,<2"]

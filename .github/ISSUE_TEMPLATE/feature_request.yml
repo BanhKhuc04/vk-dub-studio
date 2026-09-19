@@ -1,0 +1,56 @@
+name: "✨ Yêu cầu tính năng (Feature Request)"
+description: Đề xuất tính năng mới cho KAPPAK Studio
+labels: ["enhancement"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Title
+    validations:
+      required: true
+  - type: textarea
+    id: problem_description
+    attributes:
+      label: Problem description
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: module_affected
+    attributes:
+      label: Module affected
+      options:
+        - Auto Dub Studio
+        - Universal Downloader
+        - Data Studio
+        - Auto Video
+        - Social
+        - Today
+        - Browser Extension
+        - Desktop GUI
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives_considered
+    attributes:
+      label: Alternatives considered
+      description: "Optional"
+    validations:
+      required: false

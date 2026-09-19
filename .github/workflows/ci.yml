@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - develop
       - "fix/**"
       - "feature/**"
 
@@ -49,3 +50,6 @@ jobs:
 
       - name: Test
         run: python -m pytest -q
+
+      - name: Frontend Build Check
+        run: cd frontend && npm ci && npm run build
