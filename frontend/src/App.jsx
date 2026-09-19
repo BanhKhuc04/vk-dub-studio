@@ -8,6 +8,7 @@ import Topbar from "./components/Topbar.jsx";
 import HomeView from "./components/home/HomeView.jsx";
 import AskKappakDrawer from "./components/AskKappakDrawer.jsx";
 import DownloaderView from "./components/downloader/DownloaderView.jsx";
+import DataStudioView from "./components/data_studio/DataStudioView.jsx";
 import {
   PlayIcon, MicIcon, BlurIcon, GearIcon, ReviewIcon, FolderIcon, UploadIcon,
   DownloadIcon, MoonIcon, SunIcon, BellIcon, SparkIcon, BotIcon, CheckIcon,
@@ -2260,6 +2261,32 @@ export default function App() {
               }
             }}
             onBackHome={() => setActiveTab("home")}
+          />
+        ) : (activeTab === "data-studio" || activeTab === "projects") ? (
+          <DataStudioView
+            onNavigateHome={() => setActiveTab("home")}
+            onSendToAutoDub={(asset) => {
+              if (asset && (asset.local_path || asset.path)) {
+                const targetPath = asset.local_path || asset.path;
+                fetch("/api/projects/load", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ path: targetPath }),
+                })
+                  .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+                  .then((res) => {
+                    if (res && res.metadata) {
+                      setMetadata(res.metadata);
+                      setVideoUrl(res.video_url);
+                      setStep(1);
+                    }
+                  })
+                  .catch((err) => console.error("Error loading asset into Auto Dub:", err))
+                  .finally(() => setActiveTab("auto-dub"));
+              } else {
+                setActiveTab("auto-dub");
+              }
+            }}
           />
         ) : (
           <div className="kappak-scroll-area">

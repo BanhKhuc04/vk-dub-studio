@@ -716,6 +716,93 @@ def get_download_history():
     return {"assets": items}
 
 
+# ============================================================================
+# DATA STUDIO MODULE ENDPOINTS (PHASE 2)
+# ============================================================================
+
+@app.get("/api/data-studio/overview")
+def get_data_studio_overview():
+    """Aggregated media asset statistics and storage breakdown."""
+    try:
+        from kappak.modules.data_studio.service import get_storage_overview
+        overview = get_storage_overview()
+        return overview.to_dict()
+    except Exception as e:
+        logger.exception("Failed to get storage overview: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/data-studio/assets")
+def get_data_studio_assets(
+    collection: str = Query("all"),
+    search: str = Query(""),
+    project_id: str | None = Query(None),
+    limit: int = Query(50),
+    offset: int = Query(0),
+):
+    """Retrieve assets filtered by smart collections or search queries."""
+    try:
+        from kappak.modules.data_studio.service import list_assets
+        items = list_assets(
+            collection=collection,
+            search=search,
+            project_id=project_id,
+            limit=limit,
+            offset=offset,
+        )
+        return {"assets": items, "count": len(items)}
+    except Exception as e:
+        logger.exception("Failed to list assets: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/data-studio/duplicates")
+def get_data_studio_duplicates():
+    """Retrieve duplicate media asset groups by SHA-256."""
+    try:
+        from kappak.modules.data_studio.service import find_duplicate_assets
+        dups = find_duplicate_assets()
+        return {"duplicates": dups, "groups_count": len(dups)}
+    except Exception as e:
+        logger.exception("Failed to find duplicates: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class DeleteAssetRequest(BaseModel):
+    asset_id: str
+    delete_file: bool = False
+
+
+@app.post("/api/data-studio/assets/delete")
+def delete_data_studio_asset(req: DeleteAssetRequest):
+    """Delete an asset from the database and optionally from disk."""
+    try:
+        from kappak.modules.data_studio.service import delete_asset
+        success = delete_asset(req.asset_id, delete_file=req.delete_file)
+        if not success:
+            raise HTTPException(status_code=404, detail="Không tìm thấy tài nguyên.")
+        return {"status": "ok", "deleted_id": req.asset_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to delete asset: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/data-studio/folder-tree")
+def get_data_studio_folder_tree(project_path: str | None = Query(None)):
+    """Inspect the 8-tier folder structure for a project root."""
+    try:
+        from kappak.modules.data_studio.service import get_project_folder_tree
+        target_dir = Path(project_path) if project_path else workspace_root()
+        tree = get_project_folder_tree(target_dir)
+        return tree
+    except Exception as e:
+        logger.exception("Failed to get folder tree: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @app.post("/api/media/sample")
 def select_sample_media(orientation: str = Query("vertical")):
     """Load bundled sample video (vertical 9:16 or horizontal 16:9)."""
@@ -897,7 +984,8 @@ def start_pipeline():
     elif "NamMinh" in voice_id:
         voice_name = "Nam Minh"
 
-    output_dir = workspace_root() / "export"
+    video_stem = state.project.video_path.stem if state.project.video_path else "default"
+    output_dir = workspace_root() / "export" / video_stem
     output_dir.mkdir(parents=True, exist_ok=True)
 
     runner = PipelineRunner(
@@ -1116,12 +1204,17 @@ def save_review_subtitles(items: list[SubtitleItem]):
 
     # If translated.srt exists in export directory, update it
     export_dir = workspace_root() / "export"
-    translated_srt = export_dir / "translated.srt"
-    if translated_srt.is_file() and state.project.script:
-        try:
-            write_srt(translated_srt, state.project.script, state.project.duration_ms)
-        except Exception as e:
-            logger.debug("Failed to write updated translated.srt: %s", e)
+    candidates = [
+        export_dir / (state.project.video_path.stem if state.project.video_path else "") / "translated.srt",
+        export_dir / "translated.srt",
+    ]
+    for translated_srt in candidates:
+        if translated_srt.is_file() and state.project.script:
+            try:
+                write_srt(translated_srt, state.project.script, state.project.duration_ms)
+            except Exception as e:
+                logger.debug("Failed to write updated translated.srt: %s", e)
+
 
     return {"status": "saved", "count": len(state.subtitles)}
 

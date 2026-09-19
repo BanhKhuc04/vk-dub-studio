@@ -42,4 +42,15 @@ Trạng thái thực hiện các nhiệm vụ theo `AGENT_TASK.md` và `ACCEPTAN
 | **4. Universal Downloader (Phase 1)** | DONE [x] | **DONE (100% Verified)** | - Đã cài đặt cơ chế Deduplication 2 lớp: Pre-check theo `source_url` và Post-check theo `sha256_hash` (xóa file trùng, tái sử dụng asset cũ, báo tiến độ).<br/>- Pytest `tests/kappak/test_downloader.py` (3/3) và `tests/test_downloader_api.py` (6/6) PASS 100%.<br/>- Đã triển khai giao diện `DownloaderView.jsx` Apple Glass trên Web Studio kết nối API thật `/api/downloader/inspect`, `/api/downloader/download`, `/api/downloader/history` và nút chuyển nhanh 1-chạm sang Auto Dub Studio (đã chụp ảnh nghiệm thu UI). |
 | **5. Cấu trúc Repository chuẩn hóa** | DONE [x] | **DONE (100%)** | - Đã audit 64 file, dọn dẹp phân loại tách bạch `docs/`, `scripts/`, `archive/releases/`, `tests/`, `src/`.<br/>- `.gitignore` loại trừ hoàn toàn rác cache/log. 833 tests pass. Forwarding launchers hoạt động chuẩn. |
 
+## Bảng Tiến Độ Phase 2 — Data Studio Module
+
+| STT | Hạng mục | Trạng thái | Chi tiết kỹ thuật & Bằng chứng kiểm thử |
+|---|---|---|---|
+| 1 | **Backend Service (`src/kappak/modules/data_studio/service.py`)** | **DONE (100%)** | Quản lý tài nguyên đa phương tiện, tổng hợp thống kê dung lượng (`StorageOverview`), bộ lọc Smart Collections (`all`, `video`, `audio`, `unused`, `inbox`), quét trùng lặp SHA-256 (`find_duplicate_assets`), xóa tài nguyên an toàn và duyệt cây thư mục 8 tầng dự án (`get_project_folder_tree`). |
+| 2 | **Unit Tests (`tests/kappak/test_data_studio.py`)** | **DONE (100%)** | 2/2 tests PASS: Kiểm tra tính toán dung lượng, lọc Smart Collections, tìm kiếm, phát hiện trùng lặp SHA-256, xóa asset và duyệt cấu trúc 8 tầng. |
+| 3 | **Web API Endpoints (`src/vkdub/web/server.py`)** | **DONE (100%)** | 5 endpoints RESTful:<br/>• `GET /api/data-studio/overview`<br/>• `GET /api/data-studio/assets`<br/>• `GET /api/data-studio/duplicates`<br/>• `POST /api/data-studio/assets/delete`<br/>• `GET /api/data-studio/folder-tree` |
+| 4 | **API Integration Tests (`tests/test_data_studio_api.py`)** | **DONE (100%)** | TestClient FastAPI kiểm thử toàn bộ 5 endpoints: overview, filtering, duplicate grouping, folder tree, và deletion (PASS 100%). |
+| 5 | **Giao diện Web (`DataStudioView.jsx`)** | **DONE (100%)** | Chuẩn Apple Glass Mint Tint (`#10B981`): 4 thẻ thống kê dung lượng, tab chuyển đổi Smart Collections độ tương phản cao, bảng tài nguyên trực quan kèm nút 1-chạm sang Auto Dub Studio, chế độ xem nhóm trùng lặp SHA-256 kèm nút dọn dẹp bản sao thừa, và sơ đồ lưới cây thư mục 8 tầng (đã chụp ảnh nghiệm thu browser). |
+
+
 
