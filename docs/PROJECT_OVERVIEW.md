@@ -272,14 +272,14 @@ Kết quả build được tạo tại `frontend/dist/` và được FastAPI ser
 - [x] **Chuẩn hóa cấu trúc Repository**: DONE (100%) — Đã phân tách `docs/`, `scripts/`, `archive/releases/`, `tests/`, `src/`, loại bỏ hoàn toàn cache/log, .gitignore chuẩn mực, 833 tests pass.
 - [x] **Tự động hóa lồng tiếng 5 bước**: DONE (100% E2E Verified) — Chạy thực nghiệm trọn vẹn trên video thật: Whisper STT trích xuất câu thoại, tự động chuẩn hóa phụ đề, phân tích kịch bản, tổng hợp giọng đọc AI Edge TTS (vi-VN-HoaiMyNeural) + căn chỉnh timeline master bằng FFmpeg, và xuất CapCut Draft PC (nướng vùng làm mờ video-da-xoa-chu.mp4 + master-voice.mp3 + draft_content.json).
 - [x] **Cầu nối Browser Bridge**: OPERATIONAL (100% Verified) — Native Host và Local Agent kết nối TCP cổng 49814 hoạt động tốt, tự động reconnect khi khởi động lại, 14/14 tests pass. Sẵn sàng nhận lệnh khi người dùng mở tab ChatGPT/Vbee trên trình duyệt.
-- [x] **Universal Downloader (Phase 1)**: DONE (100% Verified) — Động cơ `yt-dlp` và bảng SQLite `assets` hoạt động đầy đủ trên cả Desktop và Web Studio, đã hoàn thiện cơ chế kiểm tra và chặn trùng lặp SHA-256 thực sự (tái sử dụng asset, dọn file trùng, báo tiến độ), cùng giao diện Apple Glass Downloader tích hợp chuyển 1-chạm sang Auto Dub Studio.
-- [x] **Dữ liệu thật RecentProjectsSection**: DONE (100%) — Đã kết nối SQLite `projects` và `assets` vào `RecentProjectsSection.jsx` trên Web Studio qua API `/api/projects/recent` và nạp media trực tiếp qua `/api/projects/load`.
+- [x] **Universal Downloader (Phase 1)**: DONE (100% Real Verified) — Động cơ `yt-dlp` và bảng SQLite `assets` hoạt động đầy đủ trên cả Desktop và Web Studio, cơ chế kiểm tra và chặn trùng lặp SHA-256 thực sự (tái sử dụng asset, dọn file trùng, báo tiến độ), cùng giao diện Apple Glass Downloader tích hợp chuyển 1-chạm sang Auto Dub Studio. **Đã kiểm chứng tải video YouTube thật 713.4 KB (`Me at the zoo.mp4`), ghi nhận SQLite `assets` thật và đối chiếu cặp ảnh BEFORE/AFTER sửa lỗi hiển thị "0 MB"**.
+- [x] **Data Studio Module (Phase 2)**: DONE (100% Real Verified) — Quản lý kho tài nguyên đa phương tiện, tổng hợp thống kê dung lượng (`StorageOverview`), bộ lọc Smart Collections, phát hiện trùng lặp SHA-256, xóa asset an toàn và duyệt cây thư mục 8 tầng dự án. Web UI Apple Glass Mint Tint (`#10B981`) hoạt động mượt mà, **đã sửa triệt để lỗi làm tròn dung lượng "0 MB" có ảnh chụp BEFORE/AFTER và nạp trực tiếp dữ liệu từ YouTube media thật**.
+- [x] **Sửa 4 Bug Giao Diện & Dữ Liệu Audit**: DONE (100% Visual Verified) — Đã sửa và đối chiếu cặp ảnh BEFORE/AFTER cho: (1) Badge Sẵn sàng vs Chờ tải video, (2) Khung làm mờ không đè placeholder khi chưa nạp video, (3) Thông số kỹ thuật không hiện giá trị giả khi chưa có video, (4) Dung lượng tệp hiển thị thông minh (B, KB, MB, GB).
 
 ### 7.2 Lộ Trình Phát Triển Kế Tiếp (Roadmap)
-1. **Ưu tiên 1 (Phase 2)**: **Data Studio Module** — Quản lý kho tài nguyên, phân tích số liệu video, từ khóa SEO.
-2. **Ưu tiên 2 (Phase 3)**: **Auto Video Generator** — Ghép cảnh, tạo video tự động từ văn bản.
-3. **Ưu tiên 3 (Phase 4)**: **Social Publisher** — Lập lịch và tự động đăng tải đa kênh.
-4. **Ưu tiên 4 (Phase 5)**: **CapCut Advanced Visual Effects** — Schema hình chữ nhật làm mờ động trực tiếp trong file `draft_content.json`.
+1. **Ưu tiên 1 (Phase 3 — HIỆN TẠI ĐANG MỞ KHÓA)**: **Auto Video Generator** — Ghép cảnh thông minh, tạo video tự động từ kịch bản văn bản, sinh timeline và phụ đề động.
+2. **Ưu tiên 2 (Phase 4)**: **Social Publisher** — Lập lịch và tự động đăng tải đa kênh (TikTok, YouTube Shorts, Reels).
+3. **Ưu tiên 3 (Phase 5)**: **CapCut Advanced Visual Effects** — Schema hình chữ nhật làm mờ động trực tiếp trong file `draft_content.json`.
 
 ---
-*Tài liệu được cập nhật ngày 19/09/2026 bởi Antigravity AI Pair Programmer.*
+*Tài liệu được cập nhật ngày 19/09/2026 bởi Antigravity AI Pair Programmer — Đã nghiệm thu BƯỚC 1, BƯỚC 2 & BƯỚC 3 với bằng chứng ảnh chụp BEFORE/AFTER và dữ liệu video YouTube thật.*

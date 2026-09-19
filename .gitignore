@@ -48,11 +48,14 @@ workspace/cache/
 workspace/*.db
 workspace/*.sqlite*
 
-# Audio & Video media temp
+# Audio & Video media temp & local exports
 *.wav
 *.mp3
 *.mp4
+*.webm
 !resources/**
+export/
+workspace/downloads/
 
 # Logs
 *.log

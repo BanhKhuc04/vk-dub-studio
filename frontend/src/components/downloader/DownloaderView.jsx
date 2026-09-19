@@ -21,6 +21,15 @@ const PLATFORMS = [
   { name: "Instagram", color: "#E4405F" },
 ];
 
+function formatFileSize(bytes) {
+  const b = Number(bytes);
+  if (!b || isNaN(b) || b <= 0) return "--";
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 export default function DownloaderView({ onOpenInDubStudio, onBackHome }) {
   const [url, setUrl] = useState("");
   const [quality, setQuality] = useState("best");
@@ -515,7 +524,7 @@ export default function DownloaderView({ onOpenInDubStudio, onBackHome }) {
                       Tải về thành công: {downloadResult.name}
                     </b>
                     <small style={{ color: "var(--text-2)", fontSize: 11 }}>
-                      {downloadResult.duration_str} · {Math.round((downloadResult.file_size || 0) / 1024 / 1024 * 10) / 10} MB · SHA-256: <code>{downloadResult.sha256_hash?.slice(0, 12)}...</code>
+                      {downloadResult.duration_str} · {formatFileSize(downloadResult.file_size)} · SHA-256: <code>{downloadResult.sha256_hash?.slice(0, 12)}...</code>
                     </small>
                   </div>
                 </div>
@@ -604,7 +613,7 @@ export default function DownloaderView({ onOpenInDubStudio, onBackHome }) {
                       {item.name}
                     </b>
                     <small style={{ color: "var(--text-2)", fontSize: 10.5 }}>
-                      {item.platform} · {item.duration_str} · {Math.round((item.file_size || 0) / 1024 / 1024 * 10) / 10} MB · {item.updated_at}
+                      {item.platform} · {item.duration_str} · {formatFileSize(item.file_size)} · {item.updated_at}
                     </small>
                   </div>
 

@@ -415,10 +415,17 @@ function Preview({
           <FolderIcon size={18} />
           <b>{metadata?.filename || "Chưa tải video — Kéo thả hoặc chọn tệp"}</b>
         </div>
-        <div className="saved">
-          <CheckIcon size={14} />
-          <span>Sẵn sàng</span>
-        </div>
+        {metadata?.filename || videoUrl ? (
+          <div className="saved">
+            <CheckIcon size={14} />
+            <span>Sẵn sàng</span>
+          </div>
+        ) : (
+          <div className="saved pending" style={{ background: "rgba(120,120,128,0.12)", color: "var(--text-3)", borderColor: "rgba(120,120,128,0.2)" }}>
+            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--text-3)", marginRight: 5 }} />
+            <span>Chờ tải video</span>
+          </div>
+        )}
       </div>
 
       <div className="video-card">
@@ -501,17 +508,19 @@ function Preview({
               </div>
             )}
 
-            {/* Interactive Canvas Overlay */}
-            <InteractiveCanvas
-              videoRef={videoRef}
-              containerRef={screenRef}
-              masks={masks}
-              activeMaskId={activeMaskId}
-              setActiveMaskId={setActiveMaskId}
-              onMasksChange={onMasksChange}
-              enabled={step === 3 || masks.length > 0}
-              videoAspectRatio={effectiveRatio}
-            />
+            {/* Interactive Canvas Overlay (ONLY when a video is loaded) */}
+            {videoUrl && (
+              <InteractiveCanvas
+                videoRef={videoRef}
+                containerRef={screenRef}
+                masks={masks}
+                activeMaskId={activeMaskId}
+                setActiveMaskId={setActiveMaskId}
+                onMasksChange={onMasksChange}
+                enabled={step === 3 || masks.length > 0}
+                videoAspectRatio={effectiveRatio}
+              />
+            )}
           </div>
         </div>
 
@@ -531,7 +540,7 @@ function Preview({
             <i style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }} />
           </div>
 
-          <span className="player-time">{formatSeconds(duration || (metadata?.duration_str ? 45 : 0))}</span>
+          <span className="player-time">{formatSeconds(duration || 0)}</span>
 
           <button onClick={toggleMute} title={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}>
             <VolumeIcon size={17} />
@@ -567,11 +576,11 @@ function Preview({
       {/* Video Metadata Cards */}
       <div className="meta">
         {[
-          [metadata?.resolution || "1080 × 1920", "Độ phân giải"],
-          [metadata?.duration_str || "00:00", "Thời lượng"],
-          [metadata?.fps ? `${metadata.fps} fps` : "30.00 fps", "Khung hình"],
-          [metadata?.size_mb ? `${metadata.size_mb} MB` : "0 MB", "Dung lượng"],
-          [metadata?.video_codec ? `${metadata.video_codec.toUpperCase()} / AAC` : "H.264 / AAC", "Định dạng"]
+          [metadata?.resolution || "--", "Độ phân giải"],
+          [metadata?.duration_str || "--", "Thời lượng"],
+          [metadata?.fps ? `${metadata.fps} fps` : "--", "Khung hình"],
+          [metadata?.size_mb ? `${metadata.size_mb} MB` : "--", "Dung lượng"],
+          [metadata?.video_codec ? `${metadata.video_codec.toUpperCase()} / AAC` : "--", "Định dạng"]
         ].map(([val, label]) => (
           <div key={label}>
             <b>{val}</b>

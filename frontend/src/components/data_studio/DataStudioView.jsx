@@ -13,6 +13,15 @@ import {
   MoreIcon
 } from "../../icons.jsx";
 
+function formatFileSize(bytes) {
+  const b = Number(bytes);
+  if (!b || isNaN(b) || b <= 0) return "--";
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 export default function DataStudioView({ onNavigateHome, onSendToAutoDub }) {
   const [activeTab, setActiveTab] = useState("all"); // 'all', 'video', 'audio', 'unused', 'duplicates', 'tree'
   const [search, setSearch] = useState("");
@@ -239,9 +248,15 @@ export default function DataStudioView({ onNavigateHome, onSendToAutoDub }) {
               Dung lượng đã dùng
             </div>
             <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text-1)", letterSpacing: "-0.02em" }}>
-              {(overview?.total_size_mb ?? 0) > 1024
-                ? `${((overview?.total_size_mb ?? 0) / 1024).toFixed(2)} GB`
-                : `${overview?.total_size_mb ?? 0} MB`}
+              {overview?.total_size_formatted || (
+                (overview?.total_size_mb ?? 0) > 1024
+                  ? `${((overview?.total_size_mb ?? 0) / 1024).toFixed(2)} GB`
+                  : (overview?.total_size_mb ?? 0) > 0
+                  ? `${overview?.total_size_mb} MB`
+                  : (overview?.total_bytes ?? 0) > 0
+                  ? `${((overview?.total_bytes ?? 0) / 1024).toFixed(1)} KB`
+                  : "0 MB"
+              )}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 6 }}>
               {(overview?.total_bytes ?? 0).toLocaleString()} bytes
@@ -446,7 +461,7 @@ export default function DataStudioView({ onNavigateHome, onSendToAutoDub }) {
                             <span>•</span>
                             <span>{asset.duration_formatted}</span>
                             <span>•</span>
-                            <span>{asset.file_size_mb} MB</span>
+                            <span>{formatFileSize(asset.file_size)}</span>
                             <span>•</span>
                             <span
                               style={{
@@ -553,7 +568,7 @@ export default function DataStudioView({ onNavigateHome, onSendToAutoDub }) {
                             SHA-256: #{dup.sha_short}
                           </span>
                           <span style={{ fontSize: 13, color: "var(--text-2)", marginLeft: 10 }}>
-                            {dup.count} bản sao • Lãng phí: {dup.wasted_mb} MB
+                            {dup.count} bản sao • Lãng phí: {formatFileSize(dup.wasted_bytes || (dup.wasted_mb * 1024 * 1024))}
                           </span>
                         </div>
                         <button

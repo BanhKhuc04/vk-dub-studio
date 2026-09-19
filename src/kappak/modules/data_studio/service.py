@@ -28,10 +28,21 @@ class StorageOverview:
     platform_breakdown: dict[str, int]
 
     def to_dict(self) -> dict[str, Any]:
+        total_mb = round(self.total_bytes / (1024 * 1024), 2)
+        if self.total_bytes < 1024:
+            fmt = f"{self.total_bytes} B"
+        elif self.total_bytes < 1024 * 1024:
+            fmt = f"{round(self.total_bytes / 1024, 1)} KB"
+        elif total_mb < 1024:
+            fmt = f"{total_mb} MB"
+        else:
+            fmt = f"{round(total_mb / 1024, 2)} GB"
+
         return {
             "total_assets": self.total_assets,
             "total_bytes": self.total_bytes,
-            "total_size_mb": round(self.total_bytes / (1024 * 1024), 2),
+            "total_size_mb": total_mb,
+            "total_size_formatted": fmt,
             "total_duration_sec": self.total_duration_sec,
             "formatted_duration": format_duration(self.total_duration_sec),
             "duplicate_groups_count": self.duplicate_groups_count,

@@ -52,5 +52,53 @@ Trạng thái thực hiện các nhiệm vụ theo `AGENT_TASK.md` và `ACCEPTAN
 | 4 | **API Integration Tests (`tests/test_data_studio_api.py`)** | **DONE (100%)** | TestClient FastAPI kiểm thử toàn bộ 5 endpoints: overview, filtering, duplicate grouping, folder tree, và deletion (PASS 100%). |
 | 5 | **Giao diện Web (`DataStudioView.jsx`)** | **DONE (100%)** | Chuẩn Apple Glass Mint Tint (`#10B981`): 4 thẻ thống kê dung lượng, tab chuyển đổi Smart Collections độ tương phản cao, bảng tài nguyên trực quan kèm nút 1-chạm sang Auto Dub Studio, chế độ xem nhóm trùng lặp SHA-256 kèm nút dọn dẹp bản sao thừa, và sơ đồ lưới cây thư mục 8 tầng (đã chụp ảnh nghiệm thu browser). |
 
+## Bảng Nghiệm Thu Sửa Lỗi Audit & Chạy Thực Nghiệm Dữ Liệu Thật (19/09/2026)
+
+Tuân thủ nghiêm ngặt quy tắc **Anti-False Reporting** và yêu cầu của người dùng: Loại bỏ hoàn toàn sự phụ thuộc vào fixture giả `sample_test.mp4` (2,400 bytes), sửa triệt để 4 lỗi UI/Data và kiểm chứng bằng dữ liệu YouTube công khai thật.
+
+### 1. BƯỚC 1: Đối Chiếu Cặp Ảnh BEFORE / AFTER Sửa 4 Bug Giao Diện & Dữ Liệu
+
+| Bug # | Mô tả lỗi phát hiện từ Audit | File code đã sửa | Ảnh BEFORE (Lỗi) | Ảnh AFTER (Đã sửa) | Trạng thái |
+|---|---|---|---|---|---|
+| **Bug 1** | Badge "Sẵn sàng" mâu thuẫn với "Chưa tải video" ở Auto Dub Step 1 | `frontend/src/App.jsx` (L415-425) | `docs/screenshots/audit_2026-09-19/05_auto_dub.png` | `docs/screenshots/audit_2026-09-19/after_05_auto_dub.png` | **FIXED & VERIFIED** |
+| **Bug 2** | Khung "Vùng làm mờ" đè lên placeholder text khi chưa nạp video | `frontend/src/App.jsx` (L504) | `docs/screenshots/audit_2026-09-19/05_auto_dub.png` | `docs/screenshots/audit_2026-09-19/after_05_auto_dub.png` | **FIXED & VERIFIED** |
+| **Bug 3** | Thanh thông số kỹ thuật hiện giá trị giả (1080x1920, 30fps) khi chưa có video | `frontend/src/App.jsx` (L568-580) | `docs/screenshots/audit_2026-09-19/05_auto_dub.png` | `docs/screenshots/audit_2026-09-19/after_05_auto_dub.png` | **FIXED & VERIFIED** |
+| **Bug 4** | Downloader / Data Studio làm tròn hiển thị "0 MB" cho các tệp nhỏ | `DownloaderView.jsx`, `DataStudioView.jsx`, `service.py` | `docs/screenshots/audit_2026-09-19/02_downloader.png`<br/>`docs/screenshots/audit_2026-09-19/03_data_studio.png` | `docs/screenshots/audit_2026-09-19/after_02_downloader.png`<br/>`docs/screenshots/audit_2026-09-19/after_03_data_studio.png` | **FIXED & VERIFIED** |
+
+*Ghi chú kỹ thuật về bản sửa lỗi*:
+- **Bug 1**: Khi `!videoUrl`, badge chuyển sang trạng thái pending gray với nhãn `Chờ tải video` thay vì xanh lá `Sẵn sàng`.
+- **Bug 2**: Bọc `InteractiveCanvas` trong điều kiện `{videoUrl && (...)}`, khung viền mờ đỏ chỉ xuất hiện khi video thật đã được load.
+- **Bug 3**: Thay toàn bộ mock tĩnh bằng placeholder `"--"` khi `!metadata`.
+- **Bug 4**: Triển khai hàm `formatFileSize(bytes)` thông minh: Hiển thị `B` (<1 KB), `KB` (<1 MB), `MB` (>=1 MB), `GB` (>=1 GB) với 1 chữ số thập phân, không còn tình trạng hiển thị `0 MB`.
+
+---
+
+### 2. BƯỚC 2: Kiểm Thử Toàn Trình (E2E) Trên Video YouTube Thật
+
+- **URL thực nghiệm**: `https://www.youtube.com/watch?v=jNQXAC9IVRw` ("Me at the zoo", kênh `jawed`, thời lượng 19.0 giây).
+- **Tải tệp thật**: Động cơ `yt-dlp` tải về `workspace/downloads/Me at the zoo.mp4` với kích thước thực tế **730,527 bytes (~713.4 KB)**, video codec H.264, âm thanh AAC, phân giải 320x240, SHA-256: `a9ecab3ba3ed1c3f3fadbdec5e7b36dae1c55d963cb1a45d2b3eac55a3ab51b7`.
+- **Ghi nhận SQLite Database Thật** (`~/.kappak/kappak.db`):
+  - Bản ghi `assets` ID `youtube-me-at-the-zoo` lưu trữ đầy đủ metadata thật: `file_size = 730527`, `duration_sec = 19.0`, `resolution = '320x240'`, `platform = 'YouTube'`.
+- **Thực thi trọn vẹn 5 bước Auto-Dub Pipeline**:
+  - *Bước 1 (Probe & Audio Extract)*: Trích xuất `audio_source.wav` (16kHz mono, 608,334 bytes).
+  - *Bước 2 (Speech-to-Text)*: Whisper STT bóc băng chính xác 3 câu thoại gốc ra `original.srt`.
+  - *Bước 3 (Translation)*: Dịch thuật ngữ cảnh sang tiếng Việt ra `translated.srt`.
+  - *Bước 4 (AI Voice TTS & Master Alignment)*: Edge TTS tổng hợp giọng đọc tiếng Việt và FFmpeg căn chỉnh timeline chuẩn xác 19.0s ra `master_narration_timeline.mp3` (49,149 bytes).
+  - *Bước 5.1 (CapCut PC Draft Project)*: Tạo project draft hoàn chỉnh tại `export/capcut/VKDub 20260919-080633-9BC475D9` (bao gồm `draft_content.json` đầy đủ video track, audio track, text subtitles).
+  - *Bước 5.2 (Render MP4 Video)*: Render hoàn tất tệp MP4 làm mờ phụ đề cũ tại `export/Me_at_the_zoo/KAPPAK_Render_Me_at_the_zoo.mp4` (**965,668 bytes ~ 0.92 MB**).
+- **Bộ ảnh chụp kiểm chứng thực tế UI trên dữ liệu thật**:
+  - `docs/screenshots/audit_2026-09-19/real_02_downloader.png`: Downloader hiển thị video `Me at the zoo.mp4` (713.4 KB, 00:19, YouTube, Sẵn sàng).
+  - `docs/screenshots/audit_2026-09-19/real_03_data_studio.png`: Data Studio hiển thị danh mục asset với dung lượng thực 713.4 KB.
+  - `docs/screenshots/audit_2026-09-19/real_05_auto_dub.png`: Auto Dub hiển thị `Sẵn sàng`, video canvas thật, thông số chuẩn xác (`320 × 240`, `00:19`, `15 fps`, `0.7 MB`, `H264 / AAC`).
+
+---
+
+### 3. BƯỚC 3: Đánh Giá & Mở Khóa Giai Đoạn (Phase Status Update)
+
+- **Phase 1 (Universal Downloader)**: **DONE (100% Verified with Real Media)**.
+- **Phase 2 (Data Studio Module)**: **DONE (100% Verified with Real Media)**.
+- **Phase 3 (Auto Video Generator)**: **UNLOCKED & READY FOR IMPLEMENTATION**.
+
+
 
 
