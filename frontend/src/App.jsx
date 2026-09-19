@@ -9,6 +9,7 @@ import HomeView from "./components/home/HomeView.jsx";
 import AskKappakDrawer from "./components/AskKappakDrawer.jsx";
 import DownloaderView from "./components/downloader/DownloaderView.jsx";
 import DataStudioView from "./components/data_studio/DataStudioView.jsx";
+import AutoVideoView from "./components/auto_video/AutoVideoView.jsx";
 import {
   PlayIcon, MicIcon, BlurIcon, GearIcon, ReviewIcon, FolderIcon, UploadIcon,
   DownloadIcon, MoonIcon, SunIcon, BellIcon, SparkIcon, BotIcon, CheckIcon,
@@ -302,10 +303,20 @@ function Preview({
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [detectedAspect, setDetectedAspect] = useState(null);
+  const [playerReady, setPlayerReady] = useState(false);
 
   const localVideoRef = useRef(null);
   const videoRef = externalVideoRef || localVideoRef;
   const screenRef = useRef(null);
+
+  // Badge "Sẵn sàng" chỉ sau khi <video> load metadata thành công
+  useEffect(() => {
+    setPlayerReady(false);
+    setDuration(0);
+    setCurrentTime(0);
+    setDetectedAspect(null);
+    setPlaying(false);
+  }, [videoUrl]);
 
   const togglePlay = useCallback((e) => {
     // If click originated on a mask or handle, do not toggle video play
@@ -338,6 +349,10 @@ function Preview({
       const h = videoRef.current.videoHeight;
       if (w > 0 && h > 0) {
         setDetectedAspect({ width: w, height: h });
+      }
+      // readyState >= 1 (HAVE_METADATA) = video đã vào player thành công
+      if (videoRef.current.readyState >= 1) {
+        setPlayerReady(true);
       }
     }
   };
@@ -415,7 +430,7 @@ function Preview({
           <FolderIcon size={18} />
           <b>{metadata?.filename || "Chưa tải video — Kéo thả hoặc chọn tệp"}</b>
         </div>
-        {metadata?.filename || videoUrl ? (
+        {playerReady ? (
           <div className="saved">
             <CheckIcon size={14} />
             <span>Sẵn sàng</span>
@@ -423,7 +438,7 @@ function Preview({
         ) : (
           <div className="saved pending" style={{ background: "rgba(120,120,128,0.12)", color: "var(--text-3)", borderColor: "rgba(120,120,128,0.2)" }}>
             <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--text-3)", marginRight: 5 }} />
-            <span>Chờ tải video</span>
+            <span>Chưa sẵn sàng</span>
           </div>
         )}
       </div>
@@ -2297,6 +2312,11 @@ export default function App() {
               }
             }}
           />
+        ) : activeTab === "auto-video" ? (
+          <AutoVideoView
+            onBackHome={() => setActiveTab("home")}
+            onOpenInDubStudio={() => setActiveTab("auto-dub")}
+          />
         ) : (
           <div className="kappak-scroll-area">
             <div className="kappak-home-container" style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -2305,9 +2325,6 @@ export default function App() {
                   <SparkIcon size={28} />
                 </div>
                 <h2 style={{ fontSize: 24, fontWeight: 700, margin: "16px 0 8px 0" }}>
-                  {activeTab === "data-studio" && "Data Studio Module"}
-                  {activeTab === "projects" && "Quản lý Dự án & Tài nguyên"}
-                  {activeTab === "auto-video" && "Tạo Video Tự động"}
                   {activeTab === "social" && "Social Media Module"}
                   {activeTab === "today" && "Today Dashboard"}
                 </h2>

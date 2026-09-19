@@ -116,9 +116,30 @@ CREATE TABLE IF NOT EXISTS tasks (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS auto_video_projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    project_id TEXT,
+    template_id TEXT DEFAULT 'blur_bg',
+    voice_id TEXT DEFAULT 'vi-VN-HoaiMyNeural',
+    voice_speed REAL DEFAULT 1.0,
+    bgm_asset_id TEXT,
+    bgm_volume REAL DEFAULT 0.15,
+    script_text TEXT DEFAULT '',
+    scenes_json TEXT DEFAULT '[]',
+    status TEXT DEFAULT 'DRAFT',
+    progress_pct REAL DEFAULT 0,
+    output_video_path TEXT,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_project ON assets(project_id);
 CREATE INDEX IF NOT EXISTS idx_assets_hash ON assets(sha256_hash);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_auto_video_status ON auto_video_projects(status);
 """
 
 

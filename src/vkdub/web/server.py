@@ -50,10 +50,17 @@ from vkdub.services.srt_validator import parse_cues, timecode_to_ms
 from vkdub.services.subtitle_service import export_ass
 from vkdub.services.voice_catalog import VBEE_DEFAULT_CATALOG, read_catalog
 from vkdub.utils.paths import data_root, workspace_root
+from kappak.modules.auto_video import (
+    AutoVideoProject,
+    AutoVideoRenderer,
+    AutoVideoService,
+    SceneSegment,
+)
 
 logger = logging.getLogger("vkdub.web")
 
 edge_tts_provider = EdgeTTSProvider()
+auto_video_service = AutoVideoService()
 
 
 class AppState:
@@ -1455,6 +1462,146 @@ def export_mp4(req: ExportRequest):
         "filename": output_file.name,
         "size_mb": size_mb,
     }
+
+
+# ==========================================
+# AUTO VIDEO GENERATOR ENDPOINTS (Phase 3)
+# ==========================================
+
+class AutoVideoParseScriptRequest(BaseModel):
+    script_text: str = ""
+
+
+class AutoVideoCreateProjectRequest(BaseModel):
+    name: str = "Video Ngắn Mới"
+    template_id: str = "blur_bg"
+    voice_id: str = "vi-VN-HoaiMyNeural"
+    voice_speed: float = 1.0
+    script_text: str = ""
+    bgm_asset_id: str | None = None
+    bgm_volume: float = 0.15
+    scenes: list[dict[str, Any]] | None = None
+
+
+@app.get("/api/auto-video/templates")
+async def get_auto_video_templates():
+    return {"templates": auto_video_service.get_templates()}
+
+
+@app.get("/api/auto-video/assets")
+async def get_auto_video_assets():
+    return {"assets": auto_video_service.list_available_assets()}
+
+
+@app.post("/api/auto-video/script/parse")
+async def parse_auto_video_script(req: AutoVideoParseScriptRequest):
+    scenes = auto_video_service.parse_script_to_scenes(req.script_text)
+    return {"scenes": [s.to_dict() for s in scenes]}
+
+
+@app.post("/api/auto-video/projects")
+async def create_auto_video_project(req: AutoVideoCreateProjectRequest):
+    proj = auto_video_service.create_project(
+        name=req.name,
+        template_id=req.template_id,
+        voice_id=req.voice_id,
+        voice_speed=req.voice_speed,
+        script_text=req.script_text,
+        bgm_asset_id=req.bgm_asset_id,
+        bgm_volume=req.bgm_volume,
+    )
+    if req.scenes:
+        proj.scenes = [SceneSegment.from_dict(s) for s in req.scenes]
+        auto_video_service.save_project(proj)
+    return {"status": "ok", "project": proj.to_dict()}
+
+
+@app.get("/api/auto-video/projects")
+async def list_auto_video_projects():
+    return {"projects": auto_video_service.list_projects()}
+
+
+@app.get("/api/auto-video/projects/{project_id}")
+async def get_auto_video_project_detail(project_id: str):
+    proj = auto_video_service.get_project(project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án Auto Video.")
+    return {"project": proj.to_dict()}
+
+
+@app.delete("/api/auto-video/projects/{project_id}")
+async def delete_auto_video_project(project_id: str):
+    ok = auto_video_service.delete_project(project_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án để xóa.")
+    return {"status": "ok"}
+
+
+@app.post("/api/auto-video/projects/{project_id}/render")
+async def render_auto_video_project(project_id: str):
+    proj = auto_video_service.get_project(project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án Auto Video.")
+    if proj.status == "RENDERING":
+        return {"status": "already_rendering", "project": proj.to_dict()}
+
+    proj.status = "RENDERING"
+    proj.progress_pct = 5.0
+    auto_video_service.save_project(proj)
+
+    def render_worker():
+        try:
+            def on_progress(pct: float, msg: str):
+                proj.progress_pct = pct
+                auto_video_service.save_project(proj)
+                run_in_async_loop(broadcast_ws({
+                    "type": "auto_video_progress",
+                    "project_id": project_id,
+                    "progress_pct": pct,
+                    "message": msg,
+                }))
+
+            on_progress(10.0, "Đang tổng hợp giọng đọc AI cho các cảnh...")
+            auto_video_service.generate_scene_voiceovers(proj, on_progress)
+
+            on_progress(40.0, "Đang dựng khung hình và hiệu ứng 9:16...")
+            renderer = AutoVideoRenderer()
+            out_file = renderer.render_project(proj, on_progress)
+
+            proj.status = "COMPLETED"
+            proj.progress_pct = 100.0
+            proj.output_video_path = str(out_file)
+            auto_video_service.save_project(proj)
+            on_progress(100.0, "🎉 Hoàn tất dựng video 9:16!")
+        except Exception as err:
+            logger.error("Lỗi khi render auto video: %s", err, exc_info=True)
+            proj.status = "FAILED"
+            proj.error_message = str(err)
+            auto_video_service.save_project(proj)
+            run_in_async_loop(broadcast_ws({
+                "type": "auto_video_failed",
+                "project_id": project_id,
+                "error": str(err),
+            }))
+
+    threading.Thread(target=render_worker, daemon=True).start()
+    return {"status": "started", "project": proj.to_dict()}
+
+
+@app.get("/api/auto-video/download/{project_id}")
+async def download_auto_video(project_id: str):
+    proj = auto_video_service.get_project(project_id)
+    if not proj or not proj.output_video_path:
+        raise HTTPException(status_code=404, detail="Không tìm thấy file video.")
+    p = Path(proj.output_video_path)
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="File video không tồn tại trên ổ đĩa.")
+    return FileResponse(
+        p,
+        media_type="video/mp4",
+        filename=p.name,
+        headers={"Content-Disposition": f'attachment; filename="{p.name}"'},
+    )
 
 
 # WebSocket for Realtime Pipeline Updates
