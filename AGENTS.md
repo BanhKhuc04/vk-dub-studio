@@ -61,3 +61,62 @@ Tài liệu này chứa các quy tắc và hướng dẫn tối cao dành cho AI
   cd frontend
   npm run dev
   ```
+
+---
+
+## 4. ROADMAP PHÁT TRIỂN (DEVELOPMENT ROADMAP)
+
+Bất kỳ AI Agent nào đọc tài liệu này phải hiểu trạng thái và hướng phát triển:
+
+### 4.1. Trạng Thái Hiện Tại (v2.1.17 — 19/09/2026)
+
+| Module | Trạng thái | Ghi chú |
+|:---|:---:|:---|
+| Auto Dub Studio (5 bước) | ✅ PRODUCTION | Pipeline hoàn chỉnh: Whisper STT → Dịch → TTS → CapCut/MP4 |
+| Universal Downloader | ✅ PRODUCTION | yt-dlp + SHA-256 dedup, Web + Desktop |
+| Data Studio | ✅ PRODUCTION | Quản lý kho tư liệu, 8-tier tree, smart collections |
+| Browser Extension v2.3.0 | ✅ PRODUCTION | YouTube/ChatGPT/Vbee adapters, Dual Bridge |
+| Ask KAPPAK AI Drawer | 🟡 UI_ONLY | Giao diện chat có sẵn, cần kết nối LLM backend |
+| Auto Video Generator | 🔴 STUB | Placeholder card, chưa có logic |
+| Social Publisher | 🔴 STUB | Placeholder card, chưa có logic |
+| Today Dashboard | 🔴 STUB | Placeholder card, chưa có logic |
+
+### 4.2. Pha Phát Triển Tiếp Theo
+
+1. **Pha 1 (Test Coverage)**: Bổ sung unit test cho Edge-TTS, VieNeu-TTS, CapCut TTS API, KAPPAK UI, Frontend React.
+2. **Pha 2 (Ask KAPPAK AI)**: Kết nối `AskKappakDrawer` với Gemini/ChatGPT API thực, streaming response, lịch sử chat SQLite.
+3. **Pha 3 (New Modules)**: Hoàn thiện 3 module STUB: Auto Video, Social, Today.
+4. **Pha 4 (Production Scale)**: Auto-update, i18n, batch processing, plugin system.
+
+---
+
+## 5. QUY CHUẨN GIT WORKFLOW
+
+### 5.1. Issue-First Development
+- Mọi thay đổi code phải tạo **GitHub Issue** trước khi bắt đầu.
+- Branch đặt tên: `feat/issue-N-mô-tả` hoặc `fix/issue-N-mô-tả`.
+
+### 5.2. Conventional Commits
+- `feat(module):` — Tính năng mới
+- `fix(module):` — Sửa lỗi
+- `docs:` — Cập nhật tài liệu
+- `chore:` — Dọn dẹp, cấu hình
+- `test:` — Thêm/sửa test
+- `refactor:` — Tái cấu trúc không đổi hành vi
+
+### 5.3. Pull Request Checklist
+Mọi PR phải kèm:
+- [ ] Tests pass: `.\.venv\Scripts\python.exe -m pytest -q`
+- [ ] Linter clean: `ruff check .`
+- [ ] Type check: `mypy`
+- [ ] Không có secrets trong code/log
+- [ ] Subprocess dùng args_list (không shell=True)
+- [ ] Trạng thái: PASS / PARTIAL / FAIL / UI_ONLY
+
+### 5.4. Branching Strategy
+- `main` ← Production releases (tag `v*`)
+- `develop` ← Integration branch
+- `feat/*`, `fix/*` ← Feature/fix branches từ `develop`
+
+### 5.5. Discord Notifications
+- Mọi CI pass/fail, release, issue → tự động gửi Discord webhook.
