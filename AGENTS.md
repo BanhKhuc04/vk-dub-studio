@@ -81,12 +81,21 @@ Bất kỳ AI Agent nào đọc tài liệu này phải hiểu trạng thái và
 | Social Publisher | 🔴 STUB | Placeholder card, chưa có logic |
 | Today Dashboard | 🔴 STUB | Placeholder card, chưa có logic |
 
-### 4.2. Pha Phát Triển Tiếp Theo
+### 4.2. Pha Phát Triển Tiếp Theo (Theo Chỉ Đạo Người Dùng)
 
-1. **Pha 1 (Test Coverage)**: Bổ sung unit test cho Edge-TTS, VieNeu-TTS, CapCut TTS API, KAPPAK UI, Frontend React.
-2. **Pha 2 (Ask KAPPAK AI)**: Kết nối `AskKappakDrawer` với Gemini/ChatGPT API thực, streaming response, lịch sử chat SQLite.
-3. **Pha 3 (New Modules)**: Hoàn thiện 3 module STUB: Auto Video, Social, Today.
-4. **Pha 4 (Production Scale)**: Auto-update, i18n, batch processing, plugin system.
+> [!IMPORTANT]
+> **ƯU TIÊN HÀNG ĐẦU HIỆN TẠI: AUTO VIDEO GENERATOR**  
+> Người dùng đã chỉ định phát triển module **Auto Video Generator** trước tiên, hoàn thiện logic tự động tạo video ngắn (Shorts/Reels/TikTok) từ kịch bản và kho tư liệu, sau đó mới phát triển tiếp các module Social Publisher và Today Dashboard.
+
+1. **Ưu Tiên 1 — Auto Video Generator (Đang triển khai)**:
+   - Backend logic: `src/kappak/modules/auto_video/` (ghép cảnh thông minh, render template dọc 9:16, chèn hook/CTA, auto-subtitles, lồng voice).
+   - Web UI: kết nối tab Auto Video trong `frontend/src/App.jsx`.
+   - Desktop UI: tích hợp vào `src/kappak/ui/`.
+   - SQLite schema: hoàn thiện bảng quản lý dự án Auto Video.
+2. **Ưu Tiên 2 — Test Coverage & Stability**: Bổ sung unit test cho Edge-TTS, VieNeu-TTS, CapCut TTS API, KAPPAK UI.
+3. **Ưu Tiên 3 — Ask KAPPAK AI**: Kết nối `AskKappakDrawer` với Gemini/ChatGPT API thực, streaming response.
+4. **Ưu Tiên 4 — Social Publisher & Today Dashboard**: Lập lịch đăng bài đa nền tảng và Dashboard quản trị tập trung.
+5. **Ưu Tiên 5 — Production Scale**: Auto-update, i18n, batch processing, marketplace.
 
 ---
 
@@ -119,4 +128,5 @@ Mọi PR phải kèm:
 - `feat/*`, `fix/*` ← Feature/fix branches từ `develop`
 
 ### 5.5. Discord Notifications
-- Mọi CI pass/fail, release, issue → tự động gửi Discord webhook.
+- Webhook URL được lưu trữ an toàn trong Windows Credential Manager (`keyring.get_password("vkdub", "discord_webhook_url")`) và tự động nạp qua `src/vkdub/services/discord_notifier.py`.
+- Mọi CI pass/fail, release, commit quan trọng, tiến độ hoàn thành các bước của pipeline → tự động gọi `send_discord_message(...)` hoặc `post_commit_push_notification(...)` để gửi trực tiếp thông báo rich embed về Discord.

@@ -21,6 +21,22 @@ DEFAULT_WEBHOOK_URL = os.environ.get(
 )
 
 
+def get_discord_webhook_url() -> str:
+    """Retrieve Discord webhook URL from environment, keyring, or default."""
+    env_url = os.environ.get("DISCORD_WEBHOOK_URL")
+    if env_url:
+        return env_url
+    try:
+        import keyring
+
+        kr_url = keyring.get_password("vkdub", "discord_webhook_url")
+        if kr_url:
+            return kr_url
+    except Exception:
+        pass
+    return DEFAULT_WEBHOOK_URL
+
+
 def send_discord_message(
     content: str = "",
     embeds: list[dict[str, Any]] | None = None,
@@ -29,7 +45,7 @@ def send_discord_message(
     avatar_url: str | None = "https://raw.githubusercontent.com/vanhkhuc-k5/vk-dub-studio/main/resources/icon.png",
 ) -> bool:
     """Send payload to Discord Webhook via HTTP POST."""
-    target_url = webhook_url or DEFAULT_WEBHOOK_URL
+    target_url = webhook_url or get_discord_webhook_url()
     if not target_url or not target_url.startswith("https://discord.com/api/webhooks/"):
         logger.warning("Discord Webhook URL không hợp lệ hoặc chưa cấu hình.")
         return False
