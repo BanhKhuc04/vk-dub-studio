@@ -66,3 +66,7 @@ app_launch.log
 frontend/node_modules/
 frontend/dist/
 test_icon.ico
+
+# AG Kit backups & local reports
+.ag-kit-backups/
+.agents/.ag-kit/
