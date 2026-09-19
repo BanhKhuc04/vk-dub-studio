@@ -428,49 +428,56 @@ function Preview({
     return { width: 16, height: 9, label: "16:9 Ngang (Mặc định)" };
   }, [detectedAspect, metadata]);
 
-  const stageRef = useRef(null);
-  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const previewRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    if (!stageRef.current) return;
+    if (!previewRef.current) return;
     const updateSize = () => {
-      if (stageRef.current) {
-        const rect = stageRef.current.getBoundingClientRect();
-        setStageSize({ width: rect.width, height: rect.height });
+      if (previewRef.current) {
+        const rect = previewRef.current.getBoundingClientRect();
+        setContainerSize({ width: rect.width, height: rect.height });
       }
     };
     updateSize();
     const ro = new ResizeObserver(() => updateSize());
-    ro.observe(stageRef.current);
+    ro.observe(previewRef.current);
     return () => ro.disconnect();
   }, []);
+
+  const isVertical = effectiveRatio.height > effectiveRatio.width;
+  const isSquare = Math.abs(effectiveRatio.width - effectiveRatio.height) < 10;
 
   const screenDimensions = useMemo(() => {
     const videoAR = (effectiveRatio.width && effectiveRatio.height)
       ? effectiveRatio.width / effectiveRatio.height
       : 16 / 9;
 
-    const availW = Math.max(120, (stageSize.width || 640) - 28);
-    const availH = Math.max(120, (stageSize.height || 360) - 20);
-    const stageAR = availW / availH;
+    // Available height in preview column: total height minus (head + toolbar + meta + player + gaps + padding)
+    const availH = Math.max(200, (containerSize.height || 700) - 280);
+    // Available width in preview column: total width minus padding
+    const availW = Math.max(280, (containerSize.width || 800) - 40);
+    const availAR = availW / availH;
 
     let w, h;
-    if (stageAR >= videoAR) {
+    if (availAR >= videoAR) {
+      // Height-constrained -> scale height to fill availH, width from aspect ratio
       h = availH;
       w = Math.round(availH * videoAR);
     } else {
+      // Width-constrained -> scale width to fill availW, height from aspect ratio
       w = availW;
       h = Math.round(availW / videoAR);
     }
 
-    return { width: w, height: h };
-  }, [stageSize, effectiveRatio]);
+    // Ensure player controls have comfortable interaction width
+    const finalW = isVertical ? Math.max(290, w) : w;
 
-  const isVertical = effectiveRatio.height > effectiveRatio.width;
-  const isSquare = Math.abs(effectiveRatio.width - effectiveRatio.height) < 10;
+    return { width: finalW, height: h };
+  }, [containerSize, effectiveRatio, isVertical]);
 
   return (
-    <section className="preview">
+    <section className="preview" ref={previewRef}>
       <div className="preview-head">
         <div className="file-title">
           <FolderIcon size={18} />
@@ -489,18 +496,23 @@ function Preview({
         )}
       </div>
 
-      <div className="video-card">
+      <div
+        className="video-card"
+        style={{
+          width: `${screenDimensions.width}px`,
+          maxWidth: "100%",
+          margin: "0 auto",
+        }}
+      >
         {/* Video Stage Frame */}
-        <div className="video-stage" ref={stageRef}>
+        <div className="video-stage">
           <div
             className={`screen ${isVertical ? "is-vertical" : isSquare ? "is-square" : "is-horizontal"} ${videoUrl ? "has-video" : "empty"}`}
             ref={screenRef}
             onClick={togglePlay}
             style={{
-              width: `${screenDimensions.width}px`,
+              width: "100%",
               height: `${screenDimensions.height}px`,
-              maxWidth: "100%",
-              maxHeight: "100%",
               margin: "0 auto",
             }}
           >
