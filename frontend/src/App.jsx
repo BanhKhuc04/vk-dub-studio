@@ -430,7 +430,6 @@ function Preview({
 
   const isVertical = effectiveRatio.height > effectiveRatio.width;
   const isSquare = Math.abs(effectiveRatio.width - effectiveRatio.height) < 10;
-  const ratioValue = effectiveRatio.width / effectiveRatio.height;
 
   return (
     <section className="preview">
@@ -461,9 +460,9 @@ function Preview({
             onClick={togglePlay}
             style={{
               aspectRatio: `${effectiveRatio.width} / ${effectiveRatio.height}`,
-              height: isVertical ? "500px" : isSquare ? "400px" : "auto",
-              width: isVertical ? `${Math.round(500 * ratioValue)}px` : isSquare ? "400px" : "100%",
-              maxHeight: isVertical ? "520px" : "460px",
+              height: isVertical ? "100%" : isSquare ? "min(100%, 480px)" : "auto",
+              width: isVertical ? "auto" : isSquare ? "min(100%, 480px)" : "100%",
+              maxHeight: "100%",
               maxWidth: "100%",
               margin: "0 auto",
             }}
