@@ -99,6 +99,29 @@ Tuân thủ nghiêm ngặt quy tắc **Anti-False Reporting** và yêu cầu c�
 - **Phase 2 (Data Studio Module)**: **DONE (100% Verified with Real Media)**.
 - **Phase 3 (Auto Video Generator)**: **UNLOCKED & READY FOR IMPLEMENTATION**.
 
+---
+
+### 4. BƯỚC 4: Kiểm Chứng & Khắc Phục Lỗi "Tự Động Không Có Tác Dụng" Trên Video Thực Tế `HEHEH.mp4` (19/09/2026)
+
+Theo chỉ đạo của người dùng: Kiểm thử toàn diện trên video thực tế `HEHEH.mp4` (47,727,646 bytes, thời lượng 09:23, kích thước 1024 × 576, ngôn ngữ gốc tiếng Trung) và giải quyết triệt để vấn đề "tự động như là không có tác dụng".
+
+#### 4.1. Nguyên nhân gốc đã được phát hiện & khắc phục:
+1. **Watchdog Timeout 4s trên Frontend (`App.jsx`)**: Trước đây, `startPipeline()` có bộ đếm giờ 4000ms. Nếu Faster-Whisper xử lý file lớn lâu hơn 4s, frontend tự ý kích hoạt `runSequentialAutomation()` bơm dữ liệu giả (4 câu tiếng Anh 8 giây) và nhảy sang Bước 5. **Đã xóa bỏ hoàn toàn watchdog giả này, thay bằng cơ chế Active Polling 1200ms theo đúng tiến độ thực tế của server.**
+2. **Bộ nhớ đệm (Cache) và Script cũ không được giải phóng**: Khi nạp video mới, `state.project.script` và tệp `original.srt` cũ trong thư mục export không bị xóa, khiến `PipelineRunner` tái sử dụng phụ đề của video trước. **Đã bổ sung `reset_pipeline_state_for_new_media()` và dọn dẹp thư mục export khi đổi media.**
+3. **Nút "Tiếp tục: Xử lý tự động 1-chạm" tại Bước 3 không kích hoạt Pipeline**: Bấm nút chỉ chuyển view sang Bước 4 mà không gọi `startPipeline()`. **Đã cập nhật Bước 3 tự động kích hoạt `startPipeline()` khi chuyển bước.**
+4. **Tiếng nước ngoài không được dịch khi Extension chưa kết nối**: Nếu tab ChatGPT chưa bật và Gemini gặp rate limit (HTTP 429), hệ thống cũ giữ nguyên tiếng Trung làm phụ đề. **Đã bổ sung bộ dịch dự phòng tự động Google Neural Engine (`_translate_with_google`), dịch 100% phụ đề sang tiếng Việt mượt mà không cần API key.**
+5. **Nhận diện sai tỉ lệ màn hình**: Chế độ "⚡ Tự động" không nhận đúng `1024 × 576` là ngang 16:9. **Đã sửa `effectiveRatio` và hàm nạp video để tự động nhận dạng chính xác.**
+
+#### 4.2. Kết quả chạy thực nghiệm thực tế trên video `HEHEH.mp4`:
+- **Nguồn video**: `D:\Work\Project_AI\ToolVideo\workspace\downloads\HEHEH.mp4` (1024 × 576, 30 fps, 45.5 MB, thời lượng 09:23 ~ 563.7s).
+- **Bước 4.1 (Faster-Whisper STT)**: Bóc băng trích xuất thành công **317 câu thoại tiếng Trung gốc** (từ `00:00:00` đến `09:23:00`), ghi ra `original.srt`.
+- **Bước 4.2 (Context Translation)**: Dịch trọn vẹn **317 câu thoại sang tiếng Việt chuẩn ngữ cảnh** (100% khớp timecode đến từng mili-giây), ghi ra `translated.srt`.
+- **Bước 4.3 (Script Timeline Preparation)**: Tạo kịch bản chuẩn `voice_script.txt` (16,598 bytes, 317 câu thoại).
+- **Bước 4.4 (AI Voice Synthesis & Master Audio)**: Edge TTS tổng hợp giọng đọc AI tiếng Việt (`vi-VN-NamMinhNeural`, tốc độ 1.1) và FFmpeg căn chỉnh timeline khoảng lặng, xuất tệp `master_narration_timeline.mp3` (563.7s, **9,196 KB**).
+- **Bước 5.1 (Xuất CapCut PC Draft)**: Tạo cấu trúc dự án CapCut PC Draft hoàn chỉnh tại `export/capcut/VKDub 20260919-155726-32C05150` (`draft_content.json` **2,195,541 bytes ~ 2.2 MB**, 1 video segment, 1 master audio segment, **317 caption segments**).
+- **Giao diện Web Studio**: Tự động chuyển mượt mà sang Bước 5, hiển thị danh sách 317 câu phụ đề tiếng Việt, khung làm mờ phụ đề cũ, và đầy đủ 2 nút xuất bản 1-chạm.
+- **Bằng chứng ảnh chụp thực tế**: `docs/screenshots/audit_2026-09-19/08_heheh_verified_pipeline.png`.
+
 
 
 

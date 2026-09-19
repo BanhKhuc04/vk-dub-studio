@@ -1,11 +1,13 @@
 """VK Dub Studio — Automatic Pipeline Runner.
 
-Coordinates 4.1 Transcription, 4.2 ChatGPT Translation, 4.3 Script Preparation,
+Coordinates 4.1 Transcription, 4.2 Translation (ChatGPT/Gemini), 4.3 Script Preparation,
 and 4.4 Vbee Voice Generation with atomic checkpoints and instant resumption.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import threading
 import time
@@ -15,6 +17,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.domain.project import Project
+from vkdub.domain.transcript import srt_timestamp
 from vkdub.media.process import find_tool
 from vkdub.media.timeline_audio import build_master_timeline_audio, get_audio_duration_ms
 from vkdub.orchestrator.checkpoint import load_checkpoint, save_checkpoint
@@ -24,12 +27,11 @@ from vkdub.orchestrator.pipeline_state import (
     SubstepInfo,
     SubstepStatus,
 )
-from vkdub.domain.transcript import srt_timestamp
+from vkdub.providers.gemini_translation import GeminiTranslationProvider
+from vkdub.services.credential_service import CredentialStore
 from vkdub.services.srt_service import parse_srt, write_srt
 from vkdub.services.srt_validator import (
-    Cue,
     align_and_fill_cues,
-    format_cues_to_srt,
     parse_cues,
     validate_and_repair_srt,
 )
@@ -146,6 +148,183 @@ class PipelineRunner(QThread):
             if getattr(fn, "__code__", None) != getattr(LocalAgent.translate_srt_sync, "__code__", None):
                 return True
         return False
+
+    def _is_gemini_ready(self) -> bool:
+        """Check if Gemini API key is available."""
+        try:
+            cred = CredentialStore()
+            key = cred.get()
+            return bool(key and len(key) > 10)
+        except Exception:
+            return False
+
+    def _translate_with_gemini(self, srt_content: str, total_cues: int) -> str:
+        """Translate SRT content using Gemini API (synchronous wrapper)."""
+        try:
+            import hashlib
+
+            from vkdub.domain.transcript import SubtitleSegment, Transcript
+
+            self.log_emitted.emit("🔄 Đang dịch bằng Gemini API...")
+            self._update_substep("4.2", SubstepStatus.RUNNING, 30, "Đang kết nối Gemini...")
+
+            cues = parse_cues(srt_content)
+            if not cues:
+                raise ValueError("No cues to translate")
+
+            # Build transcript from cues
+            segments = []
+            for i, cue in enumerate(cues):
+                segments.append(
+                    SubtitleSegment(
+                        id=i + 1,
+                        start=cue.start_ms / 1000.0,
+                        end=cue.end_ms / 1000.0,
+                        text=cue.text,
+                    )
+                )
+
+            # Generate fingerprint and cache_key for Transcript validation
+            text_content = "\n".join(c["text"] for c in [{"text": cue.text} for cue in cues])
+            fingerprint = hashlib.sha256(text_content.encode("utf-8")).hexdigest()
+            cache_key = hashlib.sha256((fingerprint + "gemini").encode()).hexdigest()
+
+            transcript = Transcript(
+                segments=tuple(segments),
+                language="zh",  # Chinese source
+                requested_language="vi",
+                duration=cues[-1].end_ms / 1000.0 if cues else 0,
+                model="gemini",
+                device="cpu",
+                fingerprint=fingerprint,
+                cache_key=cache_key,
+            )
+
+            from vkdub.services.usage_service import UsageLedger, UsageRecorder
+
+            cred = CredentialStore()
+            key = cred.get()
+            if not key:
+                raise ValueError("No Gemini API key")
+
+            ledger = UsageLedger()
+            provider = GeminiTranslationProvider(
+                key=key,
+                recorder=UsageRecorder(ledger),
+                progress=lambda pct, msg: self._update_substep(
+                    "4.2", SubstepStatus.RUNNING, 30 + int(pct * 0.5), msg or f"Gemini đang dịch... ({pct}%)"
+                ),
+            )
+
+            # Run async translation in thread pool
+            translated_texts: list[str] = []
+
+            def run_async():
+                return asyncio.run(self._async_translate_with_gemini(transcript, provider))
+
+            translated = run_async()
+
+            # Rebuild SRT with translated text
+            translated_cues = []
+            for i, (cue, trans_text) in enumerate(zip(cues, translated)):
+                translated_cues.append(
+                    f"{i + 1}\n{cue.start_raw} --> {cue.end_raw}\n{trans_text}\n"
+                )
+
+            return "\n".join(translated_cues)
+
+        except Exception as gemini_err:
+            logger.warning("Gemini translation failed: %s", gemini_err)
+            self.log_emitted.emit(f"⚠️ Gemini thất bại: {gemini_err}")
+            raise
+
+    async def _async_translate_with_gemini(self, transcript, provider):
+        """Async translation using Gemini."""
+
+        from vkdub.services.translation_service import batch_request, batches
+
+        groups = batches(transcript)
+        texts = []
+        for index, rows in enumerate(groups):
+            request = batch_request(rows, transcript.language)
+            self._update_substep(
+                "4.2", SubstepStatus.RUNNING, 40 + int(index * 50 / len(groups)),
+                f"Gemini đang dịch nhóm {index + 1}/{len(groups)}..."
+            )
+            response = await provider.translate(request)
+            for seg in response.get("segments", []):
+                texts.append(seg["translation"])
+
+            # Check cancel
+            if self.cancel_event.is_set():
+                raise InterruptedError("Translation cancelled")
+
+        return texts
+
+    def _translate_with_google(self, raw_original_srt: str, total_cues: int) -> str:
+        """Fast fallback translation using Google Translate endpoint without API keys."""
+        import urllib.parse
+        import urllib.request
+
+        from vkdub.services.srt_validator import parse_cues
+
+        cues = parse_cues(raw_original_srt)
+        if not cues:
+            return raw_original_srt
+
+        self.log_emitted.emit(f"🌐 Đang dịch tự động {len(cues)} câu thoại sang tiếng Việt qua Google Neural Engine...")
+        batch_size = 15
+        translated_cues = []
+        for i in range(0, len(cues), batch_size):
+            if self.cancel_event.is_set():
+                raise InterruptedError("Translation cancelled")
+            batch = cues[i : i + batch_size]
+            batch_text = "\n".join([c.text.strip().replace("\n", " ") for c in batch])
+            pct = min(95, 30 + int((i / len(cues)) * 65))
+            self._update_substep(
+                "4.2",
+                SubstepStatus.RUNNING,
+                pct,
+                f"Đang dịch tự động: câu {i + 1} ➔ {min(i + batch_size, len(cues))} / {len(cues)}...",
+            )
+            trans_lines = []
+            try:
+                url = (
+                    "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=vi&dt=t&q="
+                    + urllib.parse.quote(batch_text)
+                )
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    trans_text = "".join([s[0] for s in data[0] if s and len(s) > 0 and s[0]])
+                    trans_lines = [l.strip() for l in trans_text.split("\n") if l.strip()]
+            except Exception as ex:
+                logger.warning("Google batch translate error: %s", ex)
+
+            # Match 1-to-1 or fallback to individual cue translation
+            if len(trans_lines) == len(batch):
+                for cue, t_line in zip(batch, trans_lines):
+                    cue_idx = len(translated_cues) + 1
+                    translated_cues.append(f"{cue_idx}\n{cue.start_raw} --> {cue.end_raw}\n{t_line}\n")
+            else:
+                for cue in batch:
+                    cue_idx = len(translated_cues) + 1
+                    t_line = cue.text
+                    try:
+                        url = (
+                            "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=vi&dt=t&q="
+                            + urllib.parse.quote(cue.text.strip())
+                        )
+                        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req, timeout=5) as resp:
+                            data = json.loads(resp.read().decode("utf-8"))
+                            t_line = "".join([s[0] for s in data[0] if s and len(s) > 0 and s[0]])
+                    except Exception:
+                        pass
+                    translated_cues.append(f"{cue_idx}\n{cue.start_raw} --> {cue.end_raw}\n{t_line}\n")
+
+        self.log_emitted.emit(f"✓ Đã dịch xong {len(translated_cues)} câu phụ đề sang tiếng Việt!")
+        return "\n".join(translated_cues)
 
     def _is_vbee_ready(self) -> bool:
         if not self.local_agent:
@@ -400,15 +579,11 @@ class PipelineRunner(QThread):
                         )
 
                     is_chatgpt_ready = self._is_chatgpt_ready()
+                    is_gemini_ready = self._is_gemini_ready()
 
+                    raw_translated_srt = None
                     try:
-                        if not is_chatgpt_ready:
-                            self.log_emitted.emit(
-                                "ℹ Extension trình duyệt chưa mở tab ChatGPT hoặc chưa đăng nhập. "
-                                "Tự động chuẩn hóa phụ đề sang Bước 05 để bạn kiểm duyệt và chỉnh sửa trực tiếp."
-                            )
-                            raw_translated_srt = raw_original_srt
-                        else:
+                        if is_chatgpt_ready:
                             raw_translated_srt = self.local_agent.translate_srt_sync(
                                 raw_original_srt,
                                 prompt_instruction=prompt_instr,
@@ -419,15 +594,42 @@ class PipelineRunner(QThread):
                                 cancel_event=self.cancel_event,
                                 progress_callback=on_chatgpt_progress,
                             )
+                        elif is_gemini_ready:
+                            self.log_emitted.emit(
+                                "🔄 ChatGPT không khả dụng. Đang dịch bằng Gemini API..."
+                            )
+                            raw_translated_srt = self._translate_with_gemini(
+                                raw_original_srt, total_cues
+                            )
+                        else:
+                            self.log_emitted.emit(
+                                "🌐 ChatGPT/Gemini chưa kết nối. Tự động dịch sang tiếng Việt bằng Google Neural Engine..."
+                            )
+                            raw_translated_srt = self._translate_with_google(
+                                raw_original_srt, total_cues
+                            )
                     except InterruptedError:
                         self.pipeline_cancelled.emit()
                         return
                     except Exception as trans_err:
-                        self.log_emitted.emit(
-                            f"⚠️ Không nhận được phản hồi dịch từ ChatGPT ({trans_err}). "
-                            "Tự động sử dụng phụ đề gốc để tiếp tục quy trình; bạn có thể chỉnh sửa tại Bước 05."
-                        )
-                        raw_translated_srt = raw_original_srt
+                        logger.warning("Primary translation failed: %s. Trying Gemini...", trans_err)
+                        if is_gemini_ready and raw_translated_srt is None:
+                            try:
+                                self.log_emitted.emit(
+                                    f"⚠️ ChatGPT thất bại ({trans_err}). Đang thử Gemini..."
+                                )
+                                raw_translated_srt = self._translate_with_gemini(
+                                    raw_original_srt, total_cues
+                                )
+                            except Exception:
+                                pass
+                        if raw_translated_srt is None:
+                            self.log_emitted.emit(
+                                "🌐 Đang tự động dịch sang tiếng Việt bằng Google Neural Engine..."
+                            )
+                            raw_translated_srt = self._translate_with_google(
+                                raw_original_srt, total_cues
+                            )
 
                     if self.cancel_event.is_set():
                         self.pipeline_cancelled.emit()
@@ -634,7 +836,7 @@ class PipelineRunner(QThread):
                     raise ValueError("Không tìm thấy kịch bản để tạo giọng đọc Vbee.")
             import hashlib
             curr_voice_digest = hashlib.sha256(
-                f"{self.voice_name}\0{self.speed}\0{script_content}".encode("utf-8")
+                f"{self.voice_name}\0{self.speed}\0{script_content}".encode()
             ).hexdigest()
 
             hash_file = self.output_dir / ".vbee_script_hash"

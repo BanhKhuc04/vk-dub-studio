@@ -2,7 +2,7 @@ import math
 from dataclasses import asdict, dataclass
 from typing import Any
 
-MODELS = ("tiny", "base", "small", "medium", "large-v3")
+MODELS = ("tiny", "base", "small", "medium", "large-v3", "gemini")
 DEVICES = ("auto", "cpu", "cuda")
 
 

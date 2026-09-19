@@ -45,7 +45,7 @@ CREATE TABLE projects (
 - **Dữ liệu mẫu**: *Bảng hiện tại chưa có bản ghi (0 dòng).*
 
 #### Bảng: `assets`
-- **Tổng số dòng**: `2`
+- **Tổng số dòng**: `5`
 - **Schema (CREATE TABLE)**:
 ```sql
 CREATE TABLE assets (
@@ -68,9 +68,10 @@ CREATE TABLE assets (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
 );
 ```
-- **Dữ liệu mẫu đại diện (2 dòng thực tế, đã bảo vệ đường dẫn)**:
-  - `{"id": "15008be0-bb5f-4683-a308-539cb7702eb4", "name": "sample_test.mp4", "platform": "TikTok", "creator": "TestCreator", "duration_sec": 15.0, "resolution": "1920x1080", "file_size": 2400, "sha256_hash": "38865a05b9f5818eb1bc18b8bf9a0fbf7809bc59aac57b306a180d5a8da5e04c", "category": "00_Inbox", "status": "Unused"}`
-  - `{"id": "7abeb2c9-a631-4368-b379-a61c87b2c248", "name": "sample_test.mp4", "platform": "YouTube", "creator": "Creator2", "duration_sec": 15.0, "resolution": "1920x1080", "file_size": 2400, "sha256_hash": "38865a05b9f5818eb1bc18b8bf9a0fbf7809bc59aac57b306a180d5a8da5e04c", "category": "00_Inbox", "status": "Unused"}`
+- **Dữ liệu mẫu đại diện (Các bản ghi thực tế, đã bảo vệ đường dẫn)**:
+  - `{"id": "download-heheh-mp4", "name": "HEHEH.mp4", "platform": "Douyin/TikTok", "duration_sec": 563.7, "resolution": "1024x576", "file_size": 47727646, "category": "00_Inbox", "status": "Dubbed"}`
+  - `{"id": "youtube-me-at-the-zoo", "name": "Me at the zoo.mp4", "platform": "YouTube", "duration_sec": 19.1, "resolution": "1280x720", "file_size": 730527, "category": "00_Inbox", "status": "Ready"}`
+  - `{"id": "b3be84fd-c030-45a2-acf6-49eca1d9753e", "name": "Me at the zoo.webm", "platform": "YouTube", "duration_sec": 19.1, "resolution": "1280x720", "file_size": 474462, "category": "00_Inbox", "status": "Ready"}`
 
 #### Bảng: `jobs`
 - **Tổng số dòng**: `0`
@@ -358,6 +359,7 @@ Toàn bộ ảnh chụp màn hình được chụp tự động bằng browser s
 5. **Auto Dub Studio Module**: `docs/screenshots/audit_2026-09-19/05_auto_dub.png` (230.9 KB)
 6. **Social Module**: `docs/screenshots/audit_2026-09-19/06_social.png` (75.3 KB)
 7. **Today Module**: `docs/screenshots/audit_2026-09-19/07_today.png` (75.1 KB)
+8. **Auto Dub Studio — Pipeline thực tế với video `HEHEH.mp4` (Whisper bóc 317 câu thoại gốc, Dịch tiếng Việt tự động, Xuất CapCut Draft & MP4)**: `docs/screenshots/audit_2026-09-19/08_heheh_verified_pipeline.png` (185.4 KB)
 
 ---
 

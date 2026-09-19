@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import shutil
@@ -11,9 +10,17 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from PySide6.QtCore import QCoreApplication, Qt
@@ -30,6 +37,11 @@ src_dir = root_dir / "src"
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
+from kappak.modules.auto_video import (
+    AutoVideoRenderer,
+    AutoVideoService,
+    SceneSegment,
+)
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.domain.mask import MaskItem
 from vkdub.domain.project import Project
@@ -38,24 +50,21 @@ from vkdub.domain.voice import VoiceSettings
 from vkdub.media.ffprobe import parse_metadata
 from vkdub.media.process import find_tool
 from vkdub.orchestrator.pipeline_runner import PipelineRunner
-from vkdub.orchestrator.pipeline_state import ArtifactRegistry, PipelineState, SubstepStatus
 from vkdub.providers.edge_tts_provider import EdgeTTSProvider
 from vkdub.services.app_settings import load_app_settings, save_app_settings
 from vkdub.services.capcut_export import export_capcut_project
 from vkdub.services.clip_export_service import ClipExportService
 from vkdub.services.mask_service import build_ffmpeg_mask_filter
-from vkdub.services.render_service import RenderConfig, build_render_command, escape_ffmpeg_filter_path
+from vkdub.services.render_service import (
+    RenderConfig,
+    build_render_command,
+    escape_ffmpeg_filter_path,
+)
 from vkdub.services.srt_service import write_srt
 from vkdub.services.srt_validator import parse_cues, timecode_to_ms
 from vkdub.services.subtitle_service import export_ass
 from vkdub.services.voice_catalog import VBEE_DEFAULT_CATALOG, read_catalog
-from vkdub.utils.paths import data_root, workspace_root
-from kappak.modules.auto_video import (
-    AutoVideoProject,
-    AutoVideoRenderer,
-    AutoVideoService,
-    SceneSegment,
-)
+from vkdub.utils.paths import workspace_root
 
 logger = logging.getLogger("vkdub.web")
 
@@ -160,6 +169,26 @@ def _sync_subtitles_to_project() -> None:
                 state.project.master_voice_script_hash = state.project.revision_hash
 
 
+def reset_pipeline_state_for_new_media() -> None:
+    """Reset all substeps, overall progress, and project script when a new video is loaded."""
+    for s in state.substeps:
+        s["status"] = "PENDING"
+        s["progress"] = 0
+        s["message"] = "Chưa bắt đầu"
+    state.overall_pct = 0
+    state.overall_msg = "Sẵn sàng"
+    state.logs.clear()
+    state.subtitles.clear()
+    state.approved_script = False
+    state.project.script = None
+    run_in_async_loop(broadcast_ws({
+        "type": "reset",
+        "substeps": state.substeps,
+        "overall_pct": 0,
+        "overall_msg": "Sẵn sàng",
+    }))
+
+
 def _import_clip_into_web(chosen_file: Path) -> None:
     """Make an exported YouTube clip the active Web Studio source."""
     state.project.video_path = chosen_file
@@ -170,6 +199,7 @@ def _import_clip_into_web(chosen_file: Path) -> None:
         return
     state.project.video_duration_ms = int(metadata.get("duration", 0) * 1000)
     state.video_metadata = metadata
+    reset_pipeline_state_for_new_media()
 
 
 @asynccontextmanager
@@ -560,10 +590,32 @@ def probe_file(file_path: Path) -> dict[str, Any]:
     }
 
 
+def resolve_media_path(path_str: str) -> Path | None:
+    raw = Path(path_str)
+    if raw.is_file():
+        return raw.resolve()
+    candidates = [
+        raw,
+        root_dir / path_str,
+        workspace_root() / path_str,
+        workspace_root() / "downloads" / raw.name,
+        workspace_root() / "uploads" / raw.name,
+        Path.home() / "Downloads" / raw.name,
+        root_dir / "docs" / "evidence" / "media" / raw.name,
+    ]
+    for c in candidates:
+        try:
+            if c.is_file():
+                return c.resolve()
+        except Exception:
+            pass
+    return None
+
+
 @app.post("/api/media/select")
 def select_media(req: SelectMediaRequest):
-    p = Path(req.path)
-    if not p.is_file():
+    p = resolve_media_path(req.path)
+    if not p:
         raise HTTPException(status_code=404, detail="Tệp video không tồn tại.")
 
     meta = probe_file(p)
@@ -571,7 +623,8 @@ def select_media(req: SelectMediaRequest):
     state.project.video_duration_ms = int(meta["duration"] * 1000)
     state.project.target_language = "vi"
     state.video_metadata = meta
-    return {"status": "ok", "metadata": meta}
+    reset_pipeline_state_for_new_media()
+    return {"status": "ok", "metadata": meta, "video_url": f"/api/media/stream?path={p.name}"}
 
 
 @app.get("/api/projects/recent")
@@ -642,14 +695,15 @@ def load_project_or_asset(payload: dict):
     path_str = payload.get("path")
     if not path_str:
         raise HTTPException(status_code=400, detail="Thiếu đường dẫn tệp.")
-    p = Path(path_str)
-    if not p.is_file():
+    p = resolve_media_path(path_str)
+    if not p:
         raise HTTPException(status_code=404, detail="Tệp không tồn tại.")
     meta = probe_file(p)
     state.project.video_path = p
     state.project.video_duration_ms = int(meta["duration"] * 1000)
     state.project.target_language = "vi"
     state.video_metadata = meta
+    reset_pipeline_state_for_new_media()
     return {"status": "ok", "metadata": meta, "video_url": f"/api/media/stream?path={p.name}"}
 
 
@@ -898,12 +952,14 @@ def select_sample_media(orientation: str = Query("vertical")):
                 MaskItem(name="Phụ đề gốc Ngang", x=0.10, y=0.80, width=0.80, height=0.12, blur_strength=16)
             ]
 
+    reset_pipeline_state_for_new_media()
     return {
         "status": "ok",
         "metadata": meta,
         "video_url": f"/api/media/stream?path={chosen.name}",
         "masks": [m.to_dict() for m in state.project.masks],
     }
+
 
 
 @app.post("/api/media/upload")
@@ -919,24 +975,15 @@ async def upload_media(file: UploadFile = File(...)):
     state.project.video_duration_ms = int(meta["duration"] * 1000)
     state.project.target_language = "vi"
     state.video_metadata = meta
+    reset_pipeline_state_for_new_media()
     return {"status": "ok", "metadata": meta}
 
 
 @app.get("/api/media/stream")
 def stream_media(path: str | None = None):
-    p = Path(path) if path else state.project.video_path
+    p = resolve_media_path(path) if path else state.project.video_path
     if not p or not p.is_file():
-        if path:
-            candidates = [
-                workspace_root() / path,
-                workspace_root() / "docs" / "evidence" / "media" / path,
-                workspace_root() / "uploads" / path,
-                workspace_root() / "downloads" / path,
-                Path(path),
-            ]
-            p = next((c for c in candidates if c.is_file()), None)
-        if not p or not p.is_file():
-            raise HTTPException(status_code=404, detail="Video không tồn tại.")
+        raise HTTPException(status_code=404, detail="Video không tồn tại.")
     return FileResponse(p, media_type="video/mp4", headers={"Accept-Ranges": "bytes"})
 
 
@@ -1008,16 +1055,15 @@ def start_pipeline(req: PipelineStartRequest | None = None):
     output_dir = workspace_root() / "export" / video_stem
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # If force run requested, clear old checkpoint and artifacts so steps execute cleanly
-    if req and req.force:
-        from vkdub.orchestrator.checkpoint import clear_checkpoint
-        clear_checkpoint(output_dir)
-        (output_dir / "original.srt").unlink(missing_ok=True)
-        (output_dir / "translated.srt").unlink(missing_ok=True)
-        (output_dir / "voice_script.txt").unlink(missing_ok=True)
-        (output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
-        (output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
-        (output_dir / ".vbee_script_hash").unlink(missing_ok=True)
+    # Clear old checkpoint and previous artifacts so steps always execute cleanly from scratch
+    from vkdub.orchestrator.checkpoint import clear_checkpoint
+    clear_checkpoint(output_dir)
+    (output_dir / "original.srt").unlink(missing_ok=True)
+    (output_dir / "translated.srt").unlink(missing_ok=True)
+    (output_dir / "voice_script.txt").unlink(missing_ok=True)
+    (output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+    (output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+    (output_dir / ".vbee_script_hash").unlink(missing_ok=True)
 
     # Clear state subtitles and script for a clean pipeline run
     state.subtitles.clear()
@@ -1370,7 +1416,7 @@ def export_capcut():
         state.export_capcut_result = str(result.path)
 
         try:
-            from vkdub.services.discord_notifier import send_discord_message, datetime, timezone
+            from vkdub.services.discord_notifier import datetime, send_discord_message, timezone
             now_iso = datetime.now(timezone.utc).isoformat()
             embed = {
                 "title": "🎬 Xuất Dự Án CapCut PC Draft Thành Công!",
@@ -1509,7 +1555,7 @@ def export_mp4(req: ExportRequest):
     state.export_mp4_result = str(output_file)
 
     try:
-        from vkdub.services.discord_notifier import send_discord_message, datetime, timezone
+        from vkdub.services.discord_notifier import datetime, send_discord_message, timezone
         now_iso = datetime.now(timezone.utc).isoformat()
         embed = {
             "title": "🎥 Xuất Video MP4 Hoàn Thiện Thành Công!",
@@ -1714,8 +1760,9 @@ if frontend_dist.is_dir():
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = True):
-    import uvicorn
     import webbrowser
+
+    import uvicorn
 
     if open_browser:
         threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()

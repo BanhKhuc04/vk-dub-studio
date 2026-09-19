@@ -1,11 +1,10 @@
-"""Local Job Manager with SQLite persistence, thread pool execution, and restart recovery."""
+"""Local Job Manager: SQLite persistence, thread pool, restart recovery, and job cancellation."""
 
 from __future__ import annotations
 
 import concurrent.futures
 import json
 import logging
-import sqlite3
 import threading
 from collections.abc import Callable
 from datetime import datetime
@@ -29,6 +28,7 @@ class LocalJobManager:
         )
         self._lock = threading.Lock()
         self._active_futures: dict[str, concurrent.futures.Future] = {}
+        self._active_cancel_events: dict[str, threading.Event] = {}
         self._listeners: list[Callable[[Job], None]] = []
 
         # Automatic crash recovery on startup: mark orphan RUNNING jobs as ERROR
@@ -85,17 +85,22 @@ class LocalJobManager:
             )
 
         self._notify(job)
-        future = self._executor.submit(self._worker, job, handler)
+        cancel_event = threading.Event()
+        future = self._executor.submit(self._worker, job, handler, cancel_event)
         with self._lock:
             self._active_futures[job.id] = future
+            self._active_cancel_events[job.id] = cancel_event
         return job
 
     def _worker(
         self,
         job: Job,
         handler: Callable[[Job, Callable[[float, str], None]], dict[str, Any]],
+        cancel_event: threading.Event,
     ) -> None:
         def update_progress(pct: float, msg: str) -> None:
+            if cancel_event.is_set():
+                return
             job.progress_pct = round(pct, 1)
             job.message = msg
             with db_session(self.db_path) as conn:
@@ -115,20 +120,30 @@ class LocalJobManager:
         self._notify(job)
 
         try:
-            result = handler(job, update_progress)
-            job.status = JobStatus.SUCCESS
-            job.progress_pct = 100.0
-            job.result = result or {}
-            job.finished_at = datetime.now()
-            with db_session(self.db_path) as conn:
-                conn.execute(
-                    """
-                    UPDATE jobs
-                    SET status = ?, progress_pct = 100.0, result_json = ?, finished_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    (JobStatus.SUCCESS, json.dumps(job.result, ensure_ascii=False), job.id),
-                )
+            result = handler(job, update_progress, cancel_event)
+            if cancel_event.is_set():
+                job.status = JobStatus.CANCELLED
+                job.error = "Tác vụ bị hủy bởi người dùng."
+                job.finished_at = datetime.now()
+                with db_session(self.db_path) as conn:
+                    conn.execute(
+                        "UPDATE jobs SET status = ?, error = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (JobStatus.CANCELLED, job.error, job.id),
+                    )
+            else:
+                job.status = JobStatus.SUCCESS
+                job.progress_pct = 100.0
+                job.result = result or {}
+                job.finished_at = datetime.now()
+                with db_session(self.db_path) as conn:
+                    conn.execute(
+                        """
+                        UPDATE jobs
+                        SET status = ?, progress_pct = 100.0, result_json = ?, finished_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """,
+                        (JobStatus.SUCCESS, json.dumps(job.result, ensure_ascii=False), job.id),
+                    )
         except Exception as exc:
             job.status = JobStatus.ERROR
             job.error = str(exc)
@@ -146,6 +161,7 @@ class LocalJobManager:
         finally:
             with self._lock:
                 self._active_futures.pop(job.id, None)
+                self._active_cancel_events.pop(job.id, None)
             self._notify(job)
 
     def get_job(self, job_id: str) -> Job | None:
@@ -165,6 +181,25 @@ class LocalJobManager:
                 result=json.loads(row["result_json"] or "{}"),
                 error=row["error"],
             )
+
+    def cancel_job(self, job_id: str) -> bool:
+        """Cancel a running job by setting its cancellation event.
+
+        Returns True if the job was found and cancellation was requested,
+        False if the job was not found or already completed.
+        """
+        with self._lock:
+            cancel_event = self._active_cancel_events.get(job_id)
+            if cancel_event is not None:
+                cancel_event.set()
+                logger.info("Cancellation requested for job %s", job_id)
+                return True
+        return False
+
+    def get_active_job_ids(self) -> list[str]:
+        """Return list of currently running job IDs."""
+        with self._lock:
+            return list(self._active_futures.keys())
 
     def shutdown(self, wait: bool = True) -> None:
         """Gracefully shutdown worker pool."""

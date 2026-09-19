@@ -1,3 +1,8 @@
+"""QProcess-based async media tools with proper process tree cleanup."""
+
+from __future__ import annotations
+
+import logging
 import os
 import shutil
 import sys
@@ -6,6 +11,9 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 
 from vkdub.media.ffprobe import parse_metadata
+from vkdub.media.process_tree import kill_qprocess_tree
+
+logger = logging.getLogger("vkdub.media_tools")
 
 
 def find_tool(name: str) -> str | None:
@@ -154,17 +162,16 @@ class ProcessJob(QObject):
             return
         self._done = True
         self.timer.stop()
-        self.process.kill()
+        kill_qprocess_tree(self.process)
         self.failed.emit(message)
 
     def cancel(self) -> None:
         self._done = True
         self.timer.stop()
-        self.process.kill()
+        kill_qprocess_tree(self.process)
 
     def shutdown(self) -> None:
         self.cancel()
-        # Only used during application teardown, after asking the child to stop.
         if self.process.state() != QProcess.ProcessState.NotRunning:
             self.process.waitForFinished(1000)
 

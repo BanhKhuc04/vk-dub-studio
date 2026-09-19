@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -29,10 +30,13 @@ def save_checkpoint(
     substeps: list[SubstepInfo],
     metadata: dict[str, Any] | None = None,
 ) -> Path:
-    """Atomically persist pipeline checkpoint to disk."""
+    """Atomically persist pipeline checkpoint to disk.
+
+    Uses same-directory temp file and os.replace() for cross-platform atomicity.
+    """
     project_dir.mkdir(parents=True, exist_ok=True)
     target_file = checkpoint_path_for_project(project_dir)
-    temp_file = target_file.with_suffix(".tmp")
+    temp_file = project_dir / f".checkpoint_{os.getpid()}.tmp"
 
     data = {
         "state": state.value,
@@ -44,7 +48,8 @@ def save_checkpoint(
 
     try:
         temp_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        temp_file.replace(target_file)
+        # os.replace is atomic on both Windows and Unix when temp_file is in same directory
+        os.replace(temp_file, target_file)
         logger.debug(
             "Checkpoint saved successfully: state=%s, file=%s",
             state.value,
@@ -54,7 +59,10 @@ def save_checkpoint(
     except Exception as exc:
         logger.error("Failed to save checkpoint: %s", exc)
         if temp_file.exists():
-            temp_file.unlink(missing_ok=True)
+            try:
+                temp_file.unlink()
+            except OSError:
+                pass
         return target_file
 
 

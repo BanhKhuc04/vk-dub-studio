@@ -128,10 +128,7 @@ class AutoVideoRenderer:
             ]
         else:
             # Fallback aesthetic dark gradient card for scenes without assets
-            color_expr = (
-                f"color=c=0x0D1117:s={TARGET_WIDTH}x{TARGET_HEIGHT}:d={dur},"
-                f"drawbox=y=0:height=180:color=0x161B22:t=fill"
-            )
+            color_input = f"color=c=0x0D1117:s={TARGET_WIDTH}x{TARGET_HEIGHT}:d={dur}:f=psnr"
             cmd = [
                 self.ffmpeg,
                 "-y",
@@ -139,7 +136,7 @@ class AutoVideoRenderer:
                 "-f",
                 "lavfi",
                 "-i",
-                color_expr,
+                color_input,
                 *hw_args,
                 "-r",
                 str(TARGET_FPS),

@@ -1741,6 +1741,20 @@ export default function App() {
             setTimeout(() => {
               setStep(5);
             }, 1000);
+          } else if (data.type === "reset") {
+            setPipelineStatus({
+              running: false,
+              overall_pct: 0,
+              overall_msg: data.overall_msg || "Sẵn sàng",
+              substeps: (data.substeps || []).map((s) => ({
+                ...s,
+                status: "PENDING",
+                progress: 0,
+                message: s.message || "Chờ xử lý",
+              }))
+            });
+            setSubtitles([]);
+            setApproved(false);
           } else if (data.type === "failed") {
             setPipelineStatus((prev) => ({
               ...prev,
