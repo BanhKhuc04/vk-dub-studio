@@ -473,7 +473,10 @@ def test_server_status_endpoint_resilience():
     try:
         state.local_agent = None
         status = get_bridge_status()
-        assert status == {"connected": False, "chatgpt": False, "vbee": False}
+        assert status["connected"] is False
+        assert status["chatgpt"] is False
+        assert status["vbee"] is False
+        assert status["browser_name"] == "Chưa kết nối"
 
         # When state.local_agent is an actual LocalAgent instance
         agent = LocalAgent()
@@ -485,6 +488,10 @@ def test_server_status_endpoint_resilience():
 
         state.local_agent = agent
         status2 = get_bridge_status()
-        assert status2 == {"connected": True, "chatgpt": True, "vbee": True}
+        assert status2["connected"] is True
+        assert status2["chatgpt"] is True
+        assert status2["vbee"] is True
+        assert status2["chatgpt_logged_in"] is True
+        assert status2["vbee_available"] is True
     finally:
         state.local_agent = original_agent

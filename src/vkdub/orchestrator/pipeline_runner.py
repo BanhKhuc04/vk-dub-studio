@@ -534,16 +534,21 @@ class PipelineRunner(QThread):
                     clamped_lines = []
                     clamped_any = False
                     for line in script_doc.lines:
-                        if line.end_ms > self.project.duration_ms and line.start_ms < self.project.duration_ms:
+                        if line.start_ms >= self.project.duration_ms:
+                            clamped_any = True
+                            continue
+                        if line.end_ms > self.project.duration_ms:
                             clamped_lines.append(dc_replace(line, end_ms=self.project.duration_ms))
                             clamped_any = True
                         else:
                             clamped_lines.append(line)
-                    if clamped_any:
+                    if clamped_any and clamped_lines:
                         from vkdub.domain.script import ScriptDocument
-                        from vkdub.services.srt_service import script_to_srt
                         script_doc = ScriptDocument(tuple(clamped_lines))
-                        trans_srt_path.write_text(script_to_srt(script_doc), encoding="utf-8")
+                        try:
+                            write_srt(trans_srt_path, script_doc, None)
+                        except Exception as write_err:
+                            logger.warning("Could not write clamped script to srt: %s", write_err)
                         self.log_emitted.emit(
                             f"ℹ Tự động khớp thời lượng câu cuối ({script_doc.lines[-1].end_ms}ms) với thời lượng video ({self.project.duration_ms}ms)."
                         )
@@ -609,7 +614,10 @@ class PipelineRunner(QThread):
             # =======================================================
             if self.project.script and self.project.script.lines:
                 trans_srt_path = self.output_dir / "translated.srt"
-                write_srt(trans_srt_path, self.project.script, self.project.duration_ms)
+                try:
+                    write_srt(trans_srt_path, self.project.script, self.project.duration_ms)
+                except Exception:
+                    write_srt(trans_srt_path, self.project.script, None)
                 script_content = trans_srt_path.read_text(encoding="utf-8", errors="replace")
                 voice_txt_path = self.output_dir / "voice_script.txt"
                 voice_txt_path.write_text(

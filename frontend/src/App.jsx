@@ -1032,7 +1032,17 @@ function Step3({
 /* ========================================================
    STEP 4: AUTOMATION PIPELINE (1-CLICK & WS PROGRESS)
    ======================================================== */
-function Step4({ next, pipelineStatus, startPipeline, cancelPipeline }) {
+function Step4({ next, pipelineStatus, startPipeline, cancelPipeline, bridgeStatus }) {
+  const chatgptReady = Boolean(bridgeStatus?.chatgpt_logged_in || (bridgeStatus?.chatgpt && bridgeStatus?.chatgpt_ready));
+  const chatgptAvailable = Boolean(bridgeStatus?.chatgpt_available || bridgeStatus?.chatgpt);
+  const chatgptStatusClass = chatgptReady ? "online" : chatgptAvailable ? "warning" : "offline";
+  const chatgptLabel = chatgptReady ? "Đã đăng nhập" : chatgptAvailable ? "Chờ đăng nhập" : "Chưa mở tab";
+
+  const vbeeReady = Boolean(bridgeStatus?.vbee_logged_in || (bridgeStatus?.vbee && bridgeStatus?.vbee_ready));
+  const vbeeAvailable = Boolean(bridgeStatus?.vbee_available || bridgeStatus?.vbee);
+  const vbeeStatusClass = vbeeReady ? "online" : vbeeAvailable ? "warning" : "ready";
+  const vbeeLabel = vbeeReady ? "Vbee Sẵn sàng" : vbeeAvailable ? "Chờ đăng nhập" : "Edge TTS Sẵn sàng";
+
   return (
     <Panel
       kicker="BƯỚC 04 / 05"
@@ -1040,17 +1050,17 @@ function Step4({ next, pipelineStatus, startPipeline, cancelPipeline }) {
       desc="Hệ thống tự bóc băng Whisper, dịch ngữ cảnh thông minh và tổng hợp giọng nói."
     >
       <div className="connections">
-        <div>
+        <div title={chatgptReady ? "Extension đã kết nối ChatGPT và sẵn sàng dịch ngữ cảnh" : "Chưa kết nối ChatGPT"}>
           <BotIcon size={18} />
-          <span><b>ChatGPT 4o</b><small>Sẵn sàng</small></span>
+          <span><b>ChatGPT 4o</b><small className={chatgptStatusClass}>{chatgptLabel}</small></span>
         </div>
-        <div>
+        <div title={vbeeReady ? "Vbee Studio đã sẵn sàng tạo giọng đọc" : "Tự động kích hoạt Microsoft Edge TTS Neural"}>
           <SparkIcon size={18} />
-          <span><b>Vbee / Edge</b><small>Đã kết nối</small></span>
+          <span><b>Vbee / Edge</b><small className={vbeeStatusClass}>{vbeeLabel}</small></span>
         </div>
-        <div>
+        <div title="Faster-Whisper nhận diện giọng nói cục bộ GPU/CPU">
           <HeadphoneIcon size={18} />
-          <span><b>Faster-Whisper</b><small>GPU / CPU</small></span>
+          <span><b>Faster-Whisper</b><small className="online">GPU / CPU</small></span>
         </div>
       </div>
 
@@ -1641,10 +1651,14 @@ export default function App() {
       })
       .catch(() => {});
 
-    fetch("/api/bridge/status")
-      .then((res) => res.json())
-      .then((data) => setBridgeStatus(data))
-      .catch(() => {});
+    const fetchBridge = () => {
+      fetch("/api/bridge/status")
+        .then((res) => res.json())
+        .then((data) => setBridgeStatus(data))
+        .catch(() => {});
+    };
+    fetchBridge();
+    const bridgeInterval = setInterval(fetchBridge, 3000);
 
     fetch("/api/voices")
       .then((res) => res.json())
@@ -1669,6 +1683,8 @@ export default function App() {
       .then((res) => res.json())
       .then((data) => setSettings(data))
       .catch(() => {});
+
+    return () => clearInterval(bridgeInterval);
   }, [setTemporaryIsland]);
 
   // WebSocket Live Pipeline Status
@@ -1696,7 +1712,7 @@ export default function App() {
               )
             }));
             setIslandState({
-              type: isSuccess ? "running" : "running",
+              type: "running",
               message: data.message,
               progress: data.progress
             });
@@ -1740,6 +1756,55 @@ export default function App() {
       if (ws) ws.close();
     };
   }, [setTemporaryIsland]);
+
+  // Secondary Fallback: Poll /api/pipeline/status every 800ms when pipeline is running
+  useEffect(() => {
+    if (!pipelineStatus.running) return;
+
+    const pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch("/api/pipeline/status");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.substeps) {
+          setPipelineStatus((prev) => {
+            const updated = prev.substeps.map((s) => {
+              const matched = data.substeps.find((sub) => sub.id === s.id);
+              if (!matched) return s;
+              const isDone = matched.status === "SUCCESS" || matched.status === "DONE";
+              return {
+                ...s,
+                status: isDone ? "DONE" : matched.status,
+                progress: isDone ? 100 : matched.progress,
+                message: matched.message || s.message,
+              };
+            });
+            return {
+              ...prev,
+              overall_pct: data.overall_pct ?? prev.overall_pct,
+              overall_msg: data.overall_msg || prev.overall_msg,
+              running: data.running,
+              substeps: updated,
+            };
+          });
+        }
+        if (!data.running && data.overall_pct === 100) {
+          try {
+            const subRes = await fetch("/api/review/subtitles");
+            const subData = await subRes.json();
+            if (subData.subtitles && subData.subtitles.length > 0) {
+              setSubtitles(subData.subtitles);
+            }
+          } catch (_) {}
+          setTemporaryIsland({ type: "success", message: "🎉 Đã hoàn tất 4/4 bước! Chuyển sang Duyệt & Xuất..." }, 4000);
+          confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+          setTimeout(() => setStep(5), 1000);
+        }
+      } catch (_) {}
+    }, 800);
+
+    return () => clearInterval(pollTimer);
+  }, [pipelineStatus.running, setTemporaryIsland]);
 
   // Upload Video File Handler
   const handleUpload = async (file) => {
@@ -2004,7 +2069,15 @@ export default function App() {
   const startPipeline = async () => {
     let serverStarted = false;
     try {
-      const res = await fetch("/api/pipeline/start", { method: "POST" });
+      const payload = {
+        video_path: metadata?.path || metadata?.filename || null,
+        force: true
+      };
+      const res = await fetch("/api/pipeline/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
       const data = await res.json();
       if (res.ok && data.status === "started") {
         serverStarted = true;
@@ -2020,21 +2093,15 @@ export default function App() {
           )
         }));
         setIslandState({ type: "running", message: "Đang xử lý tự động qua server…", progress: 5 });
+      } else {
+        const errDetail = data?.detail || "Không thể khởi chạy tiến trình tự động hóa trên server.";
+        setTemporaryIsland({ type: "error", message: `Lỗi: ${errDetail}` }, 4000);
       }
-    } catch (_) {}
-
-    if (!serverStarted) {
+    } catch (_) {
+      // Backend completely unreachable (e.g. offline dev mode without server)
+      setTemporaryIsland({ type: "warning", message: "Máy chủ chưa kết nối. Chạy chế độ mô phỏng client..." }, 3000);
       await runSequentialAutomation();
-    } else {
-      // Safety watchdog: if server hangs or WebSocket drops, continue sequentially so flow is never blocked
-      setTimeout(() => {
-        setPipelineStatus((curr) => {
-          if (curr.running && curr.overall_pct <= 5 && curr.substeps[0].progress <= 15) {
-            runSequentialAutomation();
-          }
-          return curr;
-        });
-      }, 4000);
+      return;
     }
   };
 
@@ -2128,6 +2195,7 @@ export default function App() {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           aiStatus="Sẵn sàng"
+          bridgeStatus={bridgeStatus}
         />
 
         {/* View Router */}
@@ -2240,6 +2308,7 @@ export default function App() {
                     pipelineStatus={pipelineStatus}
                     startPipeline={startPipeline}
                     cancelPipeline={cancelPipeline}
+                    bridgeStatus={bridgeStatus}
                   />
                 )}
                 {step === 5 && (

@@ -7,8 +7,39 @@ export default function Topbar({
   onOpenSettings,
   searchQuery = "",
   setSearchQuery,
-  aiStatus = "Sẵn sàng"
+  aiStatus = "Sẵn sàng",
+  bridgeStatus = null,
 }) {
+  // ChatGPT Status resolution
+  const chatgptReady = Boolean(bridgeStatus?.chatgpt_logged_in || (bridgeStatus?.chatgpt && bridgeStatus?.chatgpt_ready));
+  const chatgptAvailable = Boolean(bridgeStatus?.chatgpt_available || bridgeStatus?.chatgpt);
+  const chatgptDot = chatgptReady ? "online" : chatgptAvailable ? "warning" : "offline";
+  const chatgptText = chatgptReady
+    ? "ChatGPT: Đã kết nối"
+    : chatgptAvailable
+    ? "ChatGPT: Chờ đăng nhập"
+    : "ChatGPT: Chưa mở tab";
+  const chatgptTooltip = chatgptReady
+    ? "Extension trình duyệt đã kết nối ChatGPT và sẵn sàng dịch tự động"
+    : chatgptAvailable
+    ? "Tab ChatGPT đã mở nhưng chưa đăng nhập tài khoản"
+    : "Chưa mở tab ChatGPT trên trình duyệt Edge/Chrome (Hệ thống sẽ giữ phụ đề gốc để bạn duyệt tại Bước 05)";
+
+  // Vbee Status resolution
+  const vbeeReady = Boolean(bridgeStatus?.vbee_logged_in || (bridgeStatus?.vbee && bridgeStatus?.vbee_ready));
+  const vbeeAvailable = Boolean(bridgeStatus?.vbee_available || bridgeStatus?.vbee);
+  const vbeeDot = vbeeReady ? "online" : vbeeAvailable ? "warning" : "info";
+  const vbeeText = vbeeReady
+    ? "Vbee: Sẵn sàng"
+    : vbeeAvailable
+    ? "Vbee: Chờ đăng nhập"
+    : "Edge TTS: Sẵn sàng";
+  const vbeeTooltip = vbeeReady
+    ? "Vbee Studio đã sẵn sàng tạo giọng đọc AI chất lượng cao"
+    : vbeeAvailable
+    ? "Tab Vbee đã mở nhưng chưa đăng nhập tài khoản"
+    : "Tự động kích hoạt Microsoft Edge TTS Neural (Hoài My / Nam Minh) khi chưa kết nối Vbee";
+
   return (
     <header className="kappak-topbar">
       {/* Left: Brand Logo */}
@@ -41,11 +72,16 @@ export default function Topbar({
 
       {/* Right: Actions & Profile */}
       <div className="topbar-right">
-        {/* AI Status Badge */}
-        <div className="ai-status-pill" title="Hệ thống AI đang hoạt động bình thường">
-          <span className="status-dot online" />
-          <span className="status-text">AI {aiStatus}</span>
-          <span className="dropdown-caret">ˇ</span>
+        {/* ChatGPT Status Pill */}
+        <div className="bridge-status-pill" title={chatgptTooltip}>
+          <span className={`status-dot ${chatgptDot}`} />
+          <span className="status-text">{chatgptText}</span>
+        </div>
+
+        {/* Vbee Status Pill */}
+        <div className="bridge-status-pill" title={vbeeTooltip}>
+          <span className={`status-dot ${vbeeDot}`} />
+          <span className="status-text">{vbeeText}</span>
         </div>
 
         {/* Ask KAPPAK Trigger Pill */}

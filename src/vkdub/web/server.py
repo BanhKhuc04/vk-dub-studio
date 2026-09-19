@@ -112,15 +112,24 @@ def run_in_async_loop(coro):
         loop = getattr(state, "main_loop", None)
         if loop and loop.is_running():
             asyncio.run_coroutine_threadsafe(coro, loop)
-        else:
-            try:
-                curr = asyncio.get_event_loop()
-                if curr.is_running():
-                    asyncio.run_coroutine_threadsafe(coro, curr)
-            except Exception:
-                pass
+            return
+        try:
+            curr = asyncio.get_running_loop()
+            if curr and curr.is_running():
+                asyncio.run_coroutine_threadsafe(coro, curr)
+                return
+        except Exception:
+            pass
+        # If no loop is active or running, close coroutine to prevent unawaited warning
+        if hasattr(coro, "close"):
+            coro.close()
     except Exception as e:
         logger.debug("Broadcast error: %s", e)
+        if hasattr(coro, "close"):
+            try:
+                coro.close()
+            except Exception:
+                pass
 
 
 def _sync_subtitles_to_project() -> None:
@@ -311,7 +320,20 @@ def get_health():
 @app.get("/api/bridge/status")
 def get_bridge_status():
     if not state.local_agent:
-        return {"connected": False, "chatgpt": False, "vbee": False}
+        return {
+            "connected": False,
+            "browser_name": "Chưa kết nối",
+            "chatgpt": False,
+            "chatgpt_ready": False,
+            "chatgpt_logged_in": False,
+            "chatgpt_available": False,
+            "chatgpt_tabs": 0,
+            "vbee": False,
+            "vbee_ready": False,
+            "vbee_logged_in": False,
+            "vbee_available": False,
+            "vbee_tabs": 0,
+        }
     agent = state.local_agent
     connected = (
         agent.is_connected()
@@ -328,10 +350,28 @@ def get_bridge_status():
         if callable(getattr(agent, "is_vbee_ready", None))
         else bool(getattr(agent, "is_vbee_ready", False))
     )
+    agent_st = getattr(agent, "status", None)
+    chatgpt_logged_in = getattr(agent_st, "chatgpt_logged_in", False) if agent_st else False
+    chatgpt_available = getattr(agent_st, "chatgpt_available", False) if agent_st else False
+    chatgpt_tabs = getattr(agent_st, "chatgpt_tabs", 0) if agent_st else 0
+    vbee_logged_in = getattr(agent_st, "vbee_logged_in", False) if agent_st else False
+    vbee_available = getattr(agent_st, "vbee_available", False) if agent_st else False
+    vbee_tabs = getattr(agent_st, "vbee_tabs", 0) if agent_st else 0
+    browser_name = getattr(agent_st, "browser_name", "Chưa kết nối") if agent_st else "Chưa kết nối"
+
     return {
         "connected": connected,
+        "browser_name": browser_name,
         "chatgpt": chatgpt,
+        "chatgpt_ready": chatgpt,
+        "chatgpt_logged_in": chatgpt_logged_in,
+        "chatgpt_available": chatgpt_available,
+        "chatgpt_tabs": chatgpt_tabs,
         "vbee": vbee,
+        "vbee_ready": vbee,
+        "vbee_logged_in": vbee_logged_in,
+        "vbee_available": vbee_available,
+        "vbee_tabs": vbee_tabs,
     }
 
 
@@ -815,17 +855,19 @@ def select_sample_media(orientation: str = Query("vertical")):
     """Load bundled sample video (vertical 9:16 or horizontal 16:9)."""
     if orientation == "vertical":
         candidates = [
+            root_dir / "docs" / "evidence" / "media" / "sample_vertical_9_16.mp4",
+            root_dir / "docs" / "evidence" / "downloads-real" / "SaveTik-verified-full-dubbed.mp4",
+            root_dir / "docs" / "evidence" / "media" / "sample.mp4",
             workspace_root() / "uploads" / "SaveDouyin_Douyin_Media_7672068956210875689_001_576p.mp4",
             workspace_root() / "uploads" / "SaveDouyin_Douyin_Media_7677967206935809332_001_576p.mp4",
             workspace_root() / "docs" / "evidence" / "media" / "sample_vertical_9_16.mp4",
-            workspace_root() / "docs" / "evidence" / "downloads-real" / "SaveTik-verified-full-dubbed.mp4",
-            workspace_root() / "docs" / "evidence" / "media" / "sample.mp4",
         ]
     else:
         candidates = [
+            root_dir / "docs" / "evidence" / "media" / "sample.mp4",
+            root_dir / "docs" / "evidence" / "downloads-real" / "first-8-seconds.mp4",
             workspace_root() / "uploads" / "2026-09-07 04-39-46.mp4",
             workspace_root() / "docs" / "evidence" / "media" / "sample.mp4",
-            workspace_root() / "docs" / "evidence" / "downloads-real" / "first-8-seconds.mp4",
         ]
 
     # Additional dynamic lookup in uploads directory
@@ -923,24 +965,35 @@ def _runner_worker(runner: PipelineRunner):
         logger.exception("Pipeline runner worker error: %s", e)
 
 
+class PipelineStartRequest(BaseModel):
+    video_path: str | None = None
+    force: bool = False
+    voice_name: str | None = None
+    speed: str | None = None
+
+
 @app.post("/api/pipeline/start")
-def start_pipeline():
-    if not state.project.video_path or not state.project.video_path.is_file():
-        # Auto-fallback to bundled sample video to allow instant testing
+def start_pipeline(req: PipelineStartRequest | None = None):
+    if req and req.video_path:
+        raw_p = Path(req.video_path)
         candidates = [
-            workspace_root() / "docs" / "evidence" / "media" / "sample_vertical_9_16.mp4",
-            workspace_root() / "docs" / "evidence" / "media" / "sample.mp4",
-            workspace_root() / "docs" / "evidence" / "downloads-real" / "first-8-seconds.mp4",
+            raw_p,
+            root_dir / req.video_path,
+            workspace_root() / req.video_path,
+            workspace_root() / "uploads" / raw_p.name,
+            root_dir / "docs" / "evidence" / "media" / raw_p.name,
         ]
-        found = next((c for c in candidates if c.is_file()), None)
-        if found:
-            state.project.video_path = found
+        found_p = next((c for c in candidates if c.is_file()), None)
+        if found_p:
+            state.project.video_path = found_p
             try:
-                state.video_metadata = probe_file(found)
+                state.video_metadata = probe_file(found_p)
+                state.project.video_duration_ms = int(state.video_metadata["duration"] * 1000)
             except Exception:
                 pass
-        else:
-            raise HTTPException(status_code=400, detail="Vui lòng chọn video trước khi chạy.")
+
+    if not state.project.video_path or not state.project.video_path.is_file():
+        raise HTTPException(status_code=400, detail="Vui lòng chọn video trước khi chạy.")
 
     # Ensure at least one mask exists
     if not state.project.masks:
@@ -950,6 +1003,25 @@ def start_pipeline():
 
     if state.active_runner and state.runner_thread and state.runner_thread.is_alive():
         raise HTTPException(status_code=409, detail="Tiến trình đang chạy.")
+
+    video_stem = state.project.video_path.stem if state.project.video_path else "default"
+    output_dir = workspace_root() / "export" / video_stem
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # If force run requested, clear old checkpoint and artifacts so steps execute cleanly
+    if req and req.force:
+        from vkdub.orchestrator.checkpoint import clear_checkpoint
+        clear_checkpoint(output_dir)
+        (output_dir / "original.srt").unlink(missing_ok=True)
+        (output_dir / "translated.srt").unlink(missing_ok=True)
+        (output_dir / "voice_script.txt").unlink(missing_ok=True)
+        (output_dir / "vbee_master_raw.mp3").unlink(missing_ok=True)
+        (output_dir / "master_narration_timeline.mp3").unlink(missing_ok=True)
+        (output_dir / ".vbee_script_hash").unlink(missing_ok=True)
+
+    # Clear state subtitles and script for a clean pipeline run
+    state.subtitles.clear()
+    state.project.script = None
 
     # Reset substeps and set step 4.1 to RUNNING immediately
     for s in state.substeps:
@@ -979,28 +1051,27 @@ def start_pipeline():
 
     settings = load_app_settings()
     voice_id = settings.selected_voice or "vbee-ngoc-huyen"
-    voice_name = "Ngọc Huyền"
-    if "tuong-vy" in voice_id:
-        voice_name = "Tường Vy"
-    elif "mai-phuong" in voice_id:
-        voice_name = "Mai Phương"
-    elif "manh-dung" in voice_id:
-        voice_name = "Mạnh Dũng"
-    elif "HoaiMy" in voice_id:
-        voice_name = "Hoài My"
-    elif "NamMinh" in voice_id:
-        voice_name = "Nam Minh"
+    voice_name = (req.voice_name if req and req.voice_name else None) or "Ngọc Huyền"
+    if not (req and req.voice_name):
+        if "tuong-vy" in voice_id:
+            voice_name = "Tường Vy"
+        elif "mai-phuong" in voice_id:
+            voice_name = "Mai Phương"
+        elif "manh-dung" in voice_id:
+            voice_name = "Mạnh Dũng"
+        elif "HoaiMy" in voice_id:
+            voice_name = "Hoài My"
+        elif "NamMinh" in voice_id:
+            voice_name = "Nam Minh"
 
-    video_stem = state.project.video_path.stem if state.project.video_path else "default"
-    output_dir = workspace_root() / "export" / video_stem
-    output_dir.mkdir(parents=True, exist_ok=True)
+    runner_speed = (req.speed if req and req.speed else None) or settings.voice_speed or "1.1x"
 
     runner = PipelineRunner(
         project=state.project,
         local_agent=state.local_agent,
         output_dir=output_dir,
         voice_name=voice_name,
-        speed=settings.voice_speed or "1.1x",
+        speed=runner_speed,
     )
 
     def on_substep_updated(step_id: str, status: Any, progress: int, message: str):
@@ -1610,6 +1681,8 @@ async def ws_pipeline(websocket: WebSocket):
     await websocket.accept()
     state.ws_clients.add(websocket)
     try:
+        if not state.main_loop or not state.main_loop.is_running():
+            state.main_loop = asyncio.get_running_loop()
         # Send initial status immediately
         await websocket.send_json({
             "type": "initial",
