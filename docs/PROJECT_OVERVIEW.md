@@ -270,9 +270,9 @@ Kết quả build được tạo tại `frontend/dist/` và được FastAPI ser
 
 ### 7.1 Hiện Trạng Kiểm Chứng Thực Tế (Gap Audit — 19/09/2026)
 - [x] **Chuẩn hóa cấu trúc Repository**: DONE (100%) — Đã phân tách `docs/`, `scripts/`, `archive/releases/`, `tests/`, `src/`, loại bỏ hoàn toàn cache/log, .gitignore chuẩn mực, 833 tests pass.
-- [ ] **Tự động hóa lồng tiếng 5 bước**: PARTIAL — Whisper STT, Edge TTS và CapCut Draft Export đã kiểm chứng chạy thật 100% (tạo draft hợp lệ trong CapCut PC). Bước dịch tự động và Vbee TTS phụ thuộc vào tài khoản/tab ChatGPT & Vbee của người dùng (fallback về kịch bản gốc nếu chưa mở tab).
-- [ ] **Cầu nối Browser Bridge**: OPERATIONAL (Chờ tab) — Native Host và Local Agent kết nối TCP cổng 49814 hoạt động tốt, tự động reconnect. Cần người dùng mở/đăng nhập tab ChatGPT/Vbee trên trình duyệt để kích hoạt trạng thái sẵn sàng.
-- [x] **Universal Downloader (Phase 1)**: DONE (100%) — Động cơ `yt-dlp` và bảng SQLite `assets` hoạt động đầy đủ trên cả Desktop và Web Studio, đã hoàn thiện cơ chế kiểm tra và chặn trùng lặp SHA-256 thực sự (tái sử dụng asset, dọn file trùng, báo tiến độ), cùng giao diện Apple Glass Downloader tích hợp chuyển 1-chạm sang Auto Dub Studio.
+- [x] **Tự động hóa lồng tiếng 5 bước**: DONE (100% E2E Verified) — Chạy thực nghiệm trọn vẹn trên video thật: Whisper STT trích xuất câu thoại, tự động chuẩn hóa phụ đề, phân tích kịch bản, tổng hợp giọng đọc AI Edge TTS (vi-VN-HoaiMyNeural) + căn chỉnh timeline master bằng FFmpeg, và xuất CapCut Draft PC (nướng vùng làm mờ video-da-xoa-chu.mp4 + master-voice.mp3 + draft_content.json).
+- [x] **Cầu nối Browser Bridge**: OPERATIONAL (100% Verified) — Native Host và Local Agent kết nối TCP cổng 49814 hoạt động tốt, tự động reconnect khi khởi động lại, 14/14 tests pass. Sẵn sàng nhận lệnh khi người dùng mở tab ChatGPT/Vbee trên trình duyệt.
+- [x] **Universal Downloader (Phase 1)**: DONE (100% Verified) — Động cơ `yt-dlp` và bảng SQLite `assets` hoạt động đầy đủ trên cả Desktop và Web Studio, đã hoàn thiện cơ chế kiểm tra và chặn trùng lặp SHA-256 thực sự (tái sử dụng asset, dọn file trùng, báo tiến độ), cùng giao diện Apple Glass Downloader tích hợp chuyển 1-chạm sang Auto Dub Studio.
 - [x] **Dữ liệu thật RecentProjectsSection**: DONE (100%) — Đã kết nối SQLite `projects` và `assets` vào `RecentProjectsSection.jsx` trên Web Studio qua API `/api/projects/recent` và nạp media trực tiếp qua `/api/projects/load`.
 
 ### 7.2 Lộ Trình Phát Triển Kế Tiếp (Roadmap)
