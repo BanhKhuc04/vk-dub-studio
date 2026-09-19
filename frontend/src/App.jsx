@@ -389,10 +389,6 @@ function Preview({
   };
 
   const effectiveRatio = useMemo(() => {
-    if (aspectMode === "9:16") return { width: 9, height: 16, label: "9:16 Dọc (TikTok/Reels)" };
-    if (aspectMode === "16:9") return { width: 16, height: 9, label: "16:9 Ngang (YouTube)" };
-    if (aspectMode === "1:1") return { width: 1, height: 1, label: "1:1 Vuông" };
-
     if (detectedAspect?.width && detectedAspect?.height) {
       const { width, height } = detectedAspect;
       return {
@@ -400,6 +396,18 @@ function Preview({
         height,
         label: height > width ? "9:16 Dọc (Tự động)" : "16:9 Ngang (Tự động)"
       };
+    }
+
+    if (metadata?.width && metadata?.height) {
+      const w = Number(metadata.width);
+      const h = Number(metadata.height);
+      if (w > 0 && h > 0) {
+        return {
+          width: w,
+          height: h,
+          label: h > w ? "9:16 Dọc (Tự động)" : "16:9 Ngang (Tự động)"
+        };
+      }
     }
 
     if (metadata?.resolution) {
@@ -418,10 +426,11 @@ function Preview({
     }
 
     return { width: 16, height: 9, label: "16:9 Ngang (Mặc định)" };
-  }, [aspectMode, detectedAspect, metadata]);
+  }, [detectedAspect, metadata]);
 
   const isVertical = effectiveRatio.height > effectiveRatio.width;
   const isSquare = Math.abs(effectiveRatio.width - effectiveRatio.height) < 10;
+  const ratioValue = effectiveRatio.width / effectiveRatio.height;
 
   return (
     <section className="preview">
@@ -444,48 +453,6 @@ function Preview({
       </div>
 
       <div className="video-card">
-        {/* Aspect Ratio Quick Switcher */}
-        <div className="aspect-switcher-bar">
-          <div className="aspect-info">
-            <span className="aspect-tag">{effectiveRatio.label}</span>
-            {metadata?.resolution && <span className="res-tag">{metadata.resolution}</span>}
-          </div>
-          <div className="aspect-pills">
-            <button
-              type="button"
-              className={`aspect-pill ${aspectMode === "auto" ? "active" : ""}`}
-              onClick={() => setAspectMode?.("auto")}
-              title="Tự động nhận diện tỉ lệ từ video"
-            >
-              ⚡ Tự động
-            </button>
-            <button
-              type="button"
-              className={`aspect-pill ${aspectMode === "9:16" ? "active" : ""}`}
-              onClick={() => setAspectMode?.("9:16")}
-              title="Khóa tỉ lệ 9:16 Dọc cho TikTok, Douyin, Reels"
-            >
-              📱 9:16 Dọc
-            </button>
-            <button
-              type="button"
-              className={`aspect-pill ${aspectMode === "16:9" ? "active" : ""}`}
-              onClick={() => setAspectMode?.("16:9")}
-              title="Khóa tỉ lệ 16:9 Ngang cho YouTube, TV"
-            >
-              💻 16:9 Ngang
-            </button>
-            <button
-              type="button"
-              className={`aspect-pill ${aspectMode === "1:1" ? "active" : ""}`}
-              onClick={() => setAspectMode?.("1:1")}
-              title="Khóa tỉ lệ 1:1 Vuông"
-            >
-              ⬛ 1:1 Vuông
-            </button>
-          </div>
-        </div>
-
         {/* Video Stage Frame */}
         <div className="video-stage">
           <div
@@ -495,12 +462,13 @@ function Preview({
             style={{
               aspectRatio: `${effectiveRatio.width} / ${effectiveRatio.height}`,
               height: isVertical ? "500px" : isSquare ? "400px" : "auto",
-              width: isVertical ? `calc(500px * (${effectiveRatio.width} / ${effectiveRatio.height}))` : isSquare ? "400px" : "100%",
+              width: isVertical ? `${Math.round(500 * ratioValue)}px` : isSquare ? "400px" : "100%",
               maxHeight: isVertical ? "520px" : "460px",
+              maxWidth: "100%",
               margin: "0 auto",
             }}
           >
-            {videoUrl ? (
+            {videoUrl && (
               <video
                 ref={videoRef}
                 src={videoUrl}
@@ -512,15 +480,6 @@ function Preview({
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
               />
-            ) : (
-              <div className="ambient-placeholder">
-                <div className="placeholder-icon-circle">
-                  <PlayIcon size={28} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Thả video vào đây hoặc chọn từ máy</div>
-                <div className="video-chip left">Chưa chọn video</div>
-                <div className="video-chip right">00:00</div>
-              </div>
             )}
 
             {/* Interactive Canvas Overlay (ONLY when a video is loaded) */}
