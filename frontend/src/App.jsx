@@ -15,7 +15,7 @@ import {
   DownloadIcon, MoonIcon, SunIcon, BellIcon, SparkIcon, BotIcon, CheckIcon,
   ChevronRightIcon, ScissorsIcon, CropIcon, WandIcon, CameraIcon, MoreIcon,
   VolumeIcon, ExpandIcon, HeadphoneIcon, EyeIcon, TrashIcon, PlusIcon,
-  SearchIcon, FileIcon, CloseIcon, ExportVideoIcon, CapCutIcon
+  SearchIcon, FileIcon, CloseIcon, ExportVideoIcon, CapCutIcon, VideoIcon
 } from "./icons.jsx";
 
 // 5-Step Pipeline Definition
@@ -428,6 +428,44 @@ function Preview({
     return { width: 16, height: 9, label: "16:9 Ngang (Mặc định)" };
   }, [detectedAspect, metadata]);
 
+  const stageRef = useRef(null);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!stageRef.current) return;
+    const updateSize = () => {
+      if (stageRef.current) {
+        const rect = stageRef.current.getBoundingClientRect();
+        setStageSize({ width: rect.width, height: rect.height });
+      }
+    };
+    updateSize();
+    const ro = new ResizeObserver(() => updateSize());
+    ro.observe(stageRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const screenDimensions = useMemo(() => {
+    const videoAR = (effectiveRatio.width && effectiveRatio.height)
+      ? effectiveRatio.width / effectiveRatio.height
+      : 16 / 9;
+
+    const availW = Math.max(120, (stageSize.width || 640) - 28);
+    const availH = Math.max(120, (stageSize.height || 360) - 20);
+    const stageAR = availW / availH;
+
+    let w, h;
+    if (stageAR >= videoAR) {
+      h = availH;
+      w = Math.round(availH * videoAR);
+    } else {
+      w = availW;
+      h = Math.round(availW / videoAR);
+    }
+
+    return { width: w, height: h };
+  }, [stageSize, effectiveRatio]);
+
   const isVertical = effectiveRatio.height > effectiveRatio.width;
   const isSquare = Math.abs(effectiveRatio.width - effectiveRatio.height) < 10;
 
@@ -453,21 +491,20 @@ function Preview({
 
       <div className="video-card">
         {/* Video Stage Frame */}
-        <div className="video-stage">
+        <div className="video-stage" ref={stageRef}>
           <div
-            className={`screen ${isVertical ? "is-vertical" : isSquare ? "is-square" : "is-horizontal"}`}
+            className={`screen ${isVertical ? "is-vertical" : isSquare ? "is-square" : "is-horizontal"} ${videoUrl ? "has-video" : "empty"}`}
             ref={screenRef}
             onClick={togglePlay}
             style={{
-              aspectRatio: `${effectiveRatio.width} / ${effectiveRatio.height}`,
-              height: isVertical ? "100%" : isSquare ? "min(100%, 480px)" : "auto",
-              width: isVertical ? "auto" : isSquare ? "min(100%, 480px)" : "100%",
-              maxHeight: "100%",
+              width: `${screenDimensions.width}px`,
+              height: `${screenDimensions.height}px`,
               maxWidth: "100%",
+              maxHeight: "100%",
               margin: "0 auto",
             }}
           >
-            {videoUrl && (
+            {videoUrl ? (
               <video
                 ref={videoRef}
                 src={videoUrl}
@@ -479,6 +516,14 @@ function Preview({
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
               />
+            ) : (
+              <div className="empty-video-stage">
+                <div className="empty-video-icon-wrap">
+                  <VideoIcon size={24} />
+                </div>
+                <div className="empty-video-text">Chưa có video</div>
+                <div className="empty-video-sub">Kéo thả hoặc chọn video ở Bước 1 để bắt đầu xem trước</div>
+              </div>
             )}
 
             {/* Interactive Canvas Overlay (ONLY when a video is loaded) */}
