@@ -1,9 +1,9 @@
 {
   "version": "2.1.18",
-  "published_at": "2026-09-23T06:26:32Z",
+  "published_at": "2026-09-23T06:52:22Z",
   "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.18/VKDubStudio-Setup-2.1.18.exe",
-  "sha256": "335e62298a507e8eb7f1f8d98c240552dffec1cdbb41fd911526b3e63f28e8df",
-  "file_size_bytes": 327049462,
+  "sha256": "9a77365fd8d446919127a4cd9d2650f3290881fb3b66f9ab0fce9a6750e4663c",
+  "file_size_bytes": 328609568,
   "changelog": [
     "VK Dub Studio v2.1.18 — Tự động ChatGPT, tải SRT về máy, nạp Voice thủ công và xuất không cần Voice",
     "Tự động dừng sau ChatGPT: Dịch ngữ cảnh tự động bằng ChatGPT, sau đó dừng chờ tải SRT và nạp voice thủ công thay vì ép gọi Vbee tự động",

@@ -36,7 +36,8 @@ datas += collect_data_files('ctranslate2')
 datas += collect_data_files('playwright')
 
 datas += [
-    (str(ROOT_DIR / 'src' / 'vkdub' / 'integrations' / 'capcut' / 'Voice.json'), 'vkdub/integrations/capcut'),
+    (str(ROOT_DIR / 'src' / 'vkdub'), 'src/vkdub'),
+    (str(ROOT_DIR / 'src' / 'vkdub'), 'vkdub'),
     (str(ROOT_DIR / 'src' / 'vkdub' / 'integrations' / 'capcut' / 'Voice.json'), 'resources'),
 ]
 
