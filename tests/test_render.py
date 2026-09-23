@@ -131,7 +131,7 @@ def test_build_render_command(tmp_path):
     vid = tmp_path / "video.mp4"
     vid.write_bytes(b"mp4data")
     speech_wav = tmp_path / "speech.wav"
-    speech_wav.write_bytes(b"wavdata")
+    speech_wav.write_bytes(b"RIFF" + b"\x00" * 300 + b"WAVE")  # 308 bytes, valid-ish
     ass_file = tmp_path / "sub.ass"
     ass_file.write_bytes(b"assdata")
 

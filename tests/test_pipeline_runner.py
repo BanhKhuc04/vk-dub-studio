@@ -103,7 +103,8 @@ def test_pipeline_runner_step_4_3_execution(qapp, tmp_path, monkeypatch):
 
     # Mock agent.generate_vbee_sync to simulate 4.4 without real browser
     mock_audio = tmp_path / "mock_vbee.mp3"
-    mock_audio.write_bytes(b"FAKE_MP3_DATA")
+    # Write at least 8KB so it passes audio size validation
+    mock_audio.write_bytes(b"FAKE_MP3_DATA" * 600)  # ~13KB
     agent.generate_vbee_sync = MagicMock(return_value=mock_audio)
 
     # Mock build_master_timeline_audio to avoid ffmpeg call
@@ -174,7 +175,7 @@ def test_pipeline_runner_voice_only_step_4_4(qapp, tmp_path, monkeypatch):
     agent = LocalAgent()
 
     mock_audio = tmp_path / "mock_vbee.mp3"
-    mock_audio.write_bytes(b"FAKE_MP3_DATA")
+    mock_audio.write_bytes(b"FAKE_MP3_DATA" * 600)  # ~13KB
     agent.generate_vbee_sync = MagicMock(return_value=mock_audio)
 
     import vkdub.orchestrator.pipeline_runner as pr_mod

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.1.17-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.1.18-blue">
   <img alt="Python" src="https://img.shields.io/badge/python-3.12-green">
   <img alt="Tests" src="https://img.shields.io/badge/tests-859_passed-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/license-Private-red">
@@ -267,7 +267,7 @@ refactor: tái cấu trúc
 ---
 
 <p align="center">
-  <strong>KAPPAK Studio v2.1.17</strong><br>
+  <strong>KAPPAK Studio v2.1.18</strong><br>
   Sản phẩm tạo bởi <a href="https://github.com/vanhkhuc-k5">vanhkhuc.dev</a><br>
   <em>Dành tặng em bé Trang Vũ ❤️</em>
 </p>

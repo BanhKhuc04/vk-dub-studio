@@ -105,6 +105,17 @@ class ExportDialog(QDialog):
         self.check_apply_masks.setChecked(True)
         opt_form.addRow(self.check_apply_masks)
 
+        self.chk_skip_voice = QCheckBox("☐ Xuất không cần voice dub (Chỉ phụ đề tiếng Việt + tiếng gốc)")
+        self.chk_skip_voice.setToolTip(
+            "Xuất video chỉ có phụ đề tiếng Việt và tiếng gốc.\n"
+            "Không cần phải import audio voice từ Vbee."
+        )
+        self.chk_skip_voice.setStyleSheet(
+            "font-size: 12px; font-weight: 700; color: #0369a1; padding: 2px 0;"
+        )
+        self.chk_skip_voice.stateChanged.connect(self._on_skip_voice_changed)
+        opt_form.addRow(self.chk_skip_voice)
+
         # Voice volume
         voice_row = QHBoxLayout()
         self.slider_voice_vol = QSlider(Qt.Orientation.Horizontal)
@@ -222,13 +233,18 @@ class ExportDialog(QDialog):
         self._set_check_state(self.lbl_script, s_ok)
 
         # Voice
-        voice_ready = proj.voice_ready
-        v_count = len(proj.current_voices())
-        v_tag = "(ĐẦY ĐỦ)" if voice_ready else "(THIẾU VOICE)"
-        self.lbl_voice.setText(
-            f"{'✓' if voice_ready else '✗'} Voice đã tạo: {v_count}/{n_lines} câu {v_tag}"
-        )
-        self._set_check_state(self.lbl_voice, voice_ready)
+        skip_voice = self.chk_skip_voice.isChecked()
+        voice_ready = proj.voice_ready or skip_voice
+        if skip_voice:
+            self.lbl_voice.setText("✓ Voice: Bỏ qua — chỉ xuất phụ đề + tiếng gốc")
+            self._set_check_state(self.lbl_voice, True)
+        else:
+            v_count = len(proj.current_voices())
+            v_tag = "(ĐẦY ĐỦ)" if proj.voice_ready else "(THIếu VOICE)"
+            self.lbl_voice.setText(
+                f"{'\u2713' if proj.voice_ready else '\u2717'} Voice đã tạo: {v_count}/{n_lines} câu {v_tag}"
+            )
+            self._set_check_state(self.lbl_voice, proj.voice_ready)
 
         # Subtitle
         sub_name = proj.subtitle_style.name
@@ -287,6 +303,12 @@ class ExportDialog(QDialog):
             "padding:6px 9px;font-size:12px;font-weight:800;"
         )
 
+    def _on_skip_voice_changed(self) -> None:
+        """Cập nhật danh sách kiểm tra khi user tick/untick chế độ bỏ qua voice."""
+        main_win = self._main_window
+        proj = main_win.project if main_win else None
+        self.update_checklist(proj)
+
     def _browse_output(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -320,6 +342,7 @@ class ExportDialog(QDialog):
             apply_masks=self.check_apply_masks.isChecked(),
             original_volume=self.slider_orig_vol.value() / 100.0,
             voice_volume=self.slider_voice_vol.value() / 100.0,
+            skip_voice=self.chk_skip_voice.isChecked(),
         )
 
         self.rendering = True

@@ -54,7 +54,7 @@ def test_local_job_manager_execution():
 
         manager = LocalJobManager(db_path=db_path, max_workers=2)
 
-        def mock_handler(job, progress_cb):
+        def mock_handler(job, progress_cb, cancel_event):
             progress_cb(50.0, "Dang xu ly...")
             time.sleep(0.05)
             return {"output_file": "final.mp4"}

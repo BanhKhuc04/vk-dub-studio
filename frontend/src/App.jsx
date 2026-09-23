@@ -1032,7 +1032,7 @@ function Step3({
 /* ========================================================
    STEP 4: AUTOMATION PIPELINE (1-CLICK & WS PROGRESS)
    ======================================================== */
-function Step4({ next, pipelineStatus, startPipeline, cancelPipeline, bridgeStatus }) {
+function Step4({ next, pipelineStatus, pipelineLogs, startPipeline, cancelPipeline, bridgeStatus }) {
   const chatgptReady = Boolean(bridgeStatus?.chatgpt_logged_in || (bridgeStatus?.chatgpt && bridgeStatus?.chatgpt_ready));
   const chatgptAvailable = Boolean(bridgeStatus?.chatgpt_available || bridgeStatus?.chatgpt);
   const chatgptStatusClass = chatgptReady ? "online" : chatgptAvailable ? "warning" : "offline";
@@ -1042,6 +1042,13 @@ function Step4({ next, pipelineStatus, startPipeline, cancelPipeline, bridgeStat
   const vbeeAvailable = Boolean(bridgeStatus?.vbee_available || bridgeStatus?.vbee);
   const vbeeStatusClass = vbeeReady ? "online" : vbeeAvailable ? "warning" : "ready";
   const vbeeLabel = vbeeReady ? "Vbee Sẵn sàng" : vbeeAvailable ? "Chờ đăng nhập" : "Edge TTS Sẵn sàng";
+
+  const logRef = useRef(null);
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [pipelineLogs]);
 
   return (
     <Panel
@@ -1113,6 +1120,23 @@ function Step4({ next, pipelineStatus, startPipeline, cancelPipeline, bridgeStat
           );
         })}
       </div>
+
+      {/* Real-time Pipeline Log */}
+      {pipelineLogs.length > 0 && (
+        <div className="pipeline-log-panel">
+          <div className="pipeline-log-header">
+            <span>📋 Tiến trình chi tiết</span>
+            <span className="log-count">{pipelineLogs.length} dòng</span>
+          </div>
+          <div className="pipeline-log-list" ref={logRef}>
+            {pipelineLogs.map((log, i) => (
+              <div key={i} className={`pipeline-log-line ${log.includes("✓") ? "log-ok" : log.includes("⚠️") || log.includes("⚠") ? "log-warn" : log.includes("❌") || log.includes("Lỗi") ? "log-err" : ""}`}>
+                {log}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginTop: "auto" }}>
         {pipelineStatus.running ? (
@@ -1488,6 +1512,7 @@ export default function App() {
   const [activeMaskId, setActiveMaskId] = useState("mask_default");
 
   const [bridgeStatus, setBridgeStatus] = useState({ connected: false, chatgpt: false, vbee: false });
+  const [pipelineLogs, setPipelineLogs] = useState([]);
   const [pipelineStatus, setPipelineStatus] = useState({
     running: false,
     overall_pct: 0,
@@ -1755,6 +1780,11 @@ export default function App() {
             });
             setSubtitles([]);
             setApproved(false);
+          } else if (data.type === "log") {
+            setPipelineLogs((prev) => {
+              const newLogs = [...prev, data.message];
+              return newLogs.slice(-200);
+            });
           } else if (data.type === "failed") {
             setPipelineStatus((prev) => ({
               ...prev,
@@ -2320,6 +2350,7 @@ export default function App() {
                     key="step4"
                     next={() => setStep(5)}
                     pipelineStatus={pipelineStatus}
+                    pipelineLogs={pipelineLogs}
                     startPipeline={startPipeline}
                     cancelPipeline={cancelPipeline}
                     bridgeStatus={bridgeStatus}

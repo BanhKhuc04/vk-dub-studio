@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vk-dub-studio"
-version = "2.1.17"
+version = "2.1.18"
 description = "KAPPAK Personal Media Studio — Auto-dubbing, video downloading, media management & content creation platform"
 authors = [{name = "Khúc Việt Anh", email = "vanhkhuc.dev@gmail.com"}]
 requires-python = ">=3.12,<3.14"

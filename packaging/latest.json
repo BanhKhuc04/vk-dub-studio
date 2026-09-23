@@ -1,14 +1,14 @@
 {
-  "version": "2.1.17",
-  "published_at": "2026-09-09T11:20:00Z",
-  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.17/VKDubStudio-Setup-2.1.17.exe",
+  "version": "2.1.18",
+  "published_at": "2026-09-23T12:00:00Z",
+  "installer_url": "https://github.com/BanhKhuc04/vk-dub-studio/releases/download/v2.1.18/VKDubStudio-Setup-2.1.18.exe",
   "sha256": "",
   "file_size_bytes": 0,
   "changelog": [
-    "VK Dub Studio v2.1.17 — Tự động quay lại Bước 04 tạo lại Vbee khi sửa / nạp lại kịch bản",
-    "Tự động quay lại Bước 04: Chuyển ngay về màn hình Automation Console khi chốt kịch bản để theo dõi tiến trình tạo giọng Vbee trực tiếp",
-    "Hủy cache voice triệt để: Xóa bỏ liên kết audio cũ và dọn dẹp các file audio stale khi câu thoại bị sửa, dịch lại hoặc nạp file SRT mới",
-    "Bắt buộc tạo mới 100% Vbee: Kiểm tra hash kịch bản (force_regen), ngăn chặn tình trạng tái sử dụng audio cũ của bản dịch trước",
-    "Đồng bộ quy trình hoàn hảo: Tự động chuyển tiếp sang Bước 05 sau khi Vbee hoàn thành để người dùng xuất CapCut ngay"
+    "VK Dub Studio v2.1.18 — Tự động ChatGPT, tải SRT về máy, nạp Voice thủ công và xuất không cần Voice",
+    "Tự động dừng sau ChatGPT: Dịch ngữ cảnh tự động bằng ChatGPT, sau đó dừng chờ tải SRT và nạp voice thủ công thay vì ép gọi Vbee tự động",
+    "Nút Tải SRT về máy: Xuất file SRT phụ đề tiếng Việt trực tiếp ra máy và tự động mở thư mục chứa để người dùng tải lên Vbee",
+    "Nút Nạp Audio Voice: Cho phép người dùng duyệt file MP3/WAV đã tạo từ Vbee để nạp vào dự án và hoàn tất bước 4",
+    "Tùy chọn Xuất không cần Voice: Bổ sung checkbox trong hộp thoại Xuất video để xuất ngay video có phụ đề tiếng Việt với âm thanh gốc 100% mà không bắt buộc phải có voice dub"
   ]
 }

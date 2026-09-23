@@ -324,6 +324,14 @@ class PipelineRunner(QThread):
                     translated_cues.append(f"{cue_idx}\n{cue.start_raw} --> {cue.end_raw}\n{t_line}\n")
 
         self.log_emitted.emit(f"✓ Đã dịch xong {len(translated_cues)} câu phụ đề sang tiếng Việt!")
+
+        # CRITICAL: Fail if translation produced no results at all
+        if not translated_cues:
+            raise ValueError(
+                "Google Translate đã thất bại hoàn toàn. Không dịch được câu nào. "
+                "Vui lòng kiểm tra kết nối internet và thử lại."
+            )
+
         return "\n".join(translated_cues)
 
     def _is_vbee_ready(self) -> bool:
@@ -581,6 +589,20 @@ class PipelineRunner(QThread):
                     is_chatgpt_ready = self._is_chatgpt_ready()
                     is_gemini_ready = self._is_gemini_ready()
 
+                    # Determine which translation method is being used
+                    if is_chatgpt_ready:
+                        self.log_emitted.emit(
+                            "→ [ChatGPT] Đang gửi phụ đề sang ChatGPT (Edge Extension đã kết nối)..."
+                        )
+                    elif is_gemini_ready:
+                        self.log_emitted.emit(
+                            "→ [Gemini] Edge Extension chưa kết nối. Dịch bằng Gemini API..."
+                        )
+                    else:
+                        self.log_emitted.emit(
+                            "→ [Google] ChatGPT/Gemini chưa kết nối. Tự động dịch bằng Google Neural Engine..."
+                        )
+
                     raw_translated_srt = None
                     try:
                         if is_chatgpt_ready:
@@ -648,6 +670,28 @@ class PipelineRunner(QThread):
                         )
                         raw_translated_srt = align_and_fill_cues(orig_cues, parsed_trans_cues)
 
+                    # ===========================================================
+                    # CRITICAL VALIDATION: Verify translation actually happened
+                    # ===========================================================
+                    final_trans_cues = parse_cues(raw_translated_srt)
+                    if final_trans_cues:
+                        orig_texts = set(c.text.strip() for c in orig_cues if c.text.strip())
+                        trans_texts = set(c.text.strip() for c in final_trans_cues if c.text.strip())
+                        identical_count = len(orig_texts & trans_texts)
+                        if identical_count > 5 and identical_count >= len(orig_texts) * 0.5 and len(orig_texts) >= 10:
+                            self.log_emitted.emit(
+                                f"❌ Cảnh báo nghiêm trọng: {identical_count}/{len(orig_texts)} câu dịch "
+                                f"giống hệt bản gốc (dịch có thể đã thất bại). Đang dừng pipeline."
+                            )
+                            raise ValueError(
+                                f"Translation failed: {identical_count}/{len(orig_texts)} cues are "
+                                f"identical to source. Please check your internet connection and retry."
+                            )
+                        self.log_emitted.emit(
+                            f"✓ Xác nhận dịch thành công: {len(final_trans_cues)} câu, "
+                            f"không trùng lặp với bản gốc."
+                        )
+
                     self.log_emitted.emit(
                         "✓ Đã nhận phản hồi từ ChatGPT. Đang kiểm tra và đối soát 100% timecode..."
                     )
@@ -666,6 +710,9 @@ class PipelineRunner(QThread):
                     trans_srt_path.write_text(final_srt_content, encoding="utf-8")
                     self.log_emitted.emit(
                         f"✓ Phụ đề dịch hợp lệ 100%: Khớp toàn bộ {total_cues} câu thoại ({range_str})."
+                    )
+                    self.log_emitted.emit(
+                        f"→ File translated.srt ({total_cues} câu) sẽ được chuyển sang Vbee / Edge TTS để tạo giọng đọc ở bước 4.4..."
                     )
 
                     # Invalidate downstream 4.4 audio artifacts since translation is fresh
@@ -798,18 +845,21 @@ class PipelineRunner(QThread):
                         "4.4",
                         SubstepStatus.WAITING,
                         0,
-                        "Chờ duyệt kịch bản tại Bước 05",
+                        "SRT sẵn sàng · Tải về → Tạo voice trên Vbee.vn → Import MP3 vào phần mềm",
                     )
                     self.state = PipelineState.SCRIPT_READY
                     self.state_changed.emit(
-                        self.state, "Dịch hoàn tất! Vui lòng duyệt kịch bản tại Bước 05 trước khi tạo giọng đọc."
+                        self.state, "Dịch hoàn tất! Tải SRT về máy → Tạo voice Vbee.vn → Import MP3."
                     )
                     self.log_emitted.emit(
-                        "⏸ [Tạm dừng duyệt kịch bản] Hệ thống dừng lại ở Bước 05 để bạn kiểm tra và chốt kịch bản trước khi tạo giọng đọc Vbee."
+                        "✅ [Bước 4.1–4.3 hoàn tất] Kịch bản tiếng Việt đã sẵn sàng!\n"
+                        "📥 Bấm 'Tải SRT về máy' để lấy file phụ đề.\n"
+                        "🎙 Sau khi tạo voice trên Vbee.vn, bấm 'Import Audio MP3' để nạp vào dự án."
                     )
                     self._save_current_checkpoint()
                     self.pipeline_completed.emit(self.artifacts)
                     return
+
 
             # =======================================================
             # 4.4 VBEE VOICE GENERATION (via Edge Extension)
@@ -899,6 +949,9 @@ class PipelineRunner(QThread):
                     is_vbee_ready = self._is_vbee_ready()
                     saved_vbee_audio = None
                     if is_vbee_ready:
+                        self.log_emitted.emit(
+                            f"→ [Vbee] Đang gửi file SRT ({num_v} câu) sang Vbee Dubbing Studio..."
+                        )
                         try:
                             saved_vbee_audio = self.local_agent.generate_vbee_sync(
                                 script_content,
@@ -911,17 +964,23 @@ class PipelineRunner(QThread):
                                     "4.4", SubstepStatus.RUNNING, pct, msg
                                 ),
                             )
+                            self.log_emitted.emit(
+                                f"✓ [Vbee] Đã nhận file audio từ Vbee: {saved_vbee_audio.name if saved_vbee_audio else 'N/A'}"
+                            )
                         except InterruptedError:
                             self.pipeline_cancelled.emit()
                             return
                         except Exception as vbee_err:
                             self.log_emitted.emit(
-                                f"⚠️ Vbee không phản hồi ({vbee_err}). Chuyển sang Microsoft Edge TTS AI tự động..."
+                                f"⚠️ [Vbee] Không phản hồi ({vbee_err}). Đang chuyển sang Microsoft Edge TTS..."
                             )
                             saved_vbee_audio = None
 
                     if not saved_vbee_audio or not saved_vbee_audio.is_file():
                         # Automatic high-quality Edge TTS fallback
+                        self.log_emitted.emit(
+                            f"→ [Edge TTS] Bắt đầu tổng hợp giọng đọc cho {num_v} câu..."
+                        )
                         from vkdub.providers.edge_tts_provider import EdgeTTSProvider
                         edge_provider = EdgeTTSProvider()
                         edge_voice = (
@@ -947,7 +1006,17 @@ class PipelineRunner(QThread):
                             )
 
                     self.artifacts.vbee_master_audio = saved_vbee_audio
-                    audio_size_kb = saved_vbee_audio.stat().st_size // 1024 if saved_vbee_audio.exists() else 0
+                    if not saved_vbee_audio or not saved_vbee_audio.is_file():
+                        raise ValueError(
+                            f"TTS không tạo được file audio. "
+                            "Vui lòng kiểm tra kết nối mạng và thử lại."
+                        )
+                    audio_size_kb = saved_vbee_audio.stat().st_size // 1024
+                    if audio_size_kb < 5:
+                        raise ValueError(
+                            f"File audio từ TTS quá nhỏ ({audio_size_kb} KB) — có thể bị lỗi. "
+                            "Vui lòng chạy lại pipeline."
+                        )
                     ffmpeg_exe = find_tool("ffmpeg")
                     if ffmpeg_exe:
                         self.log_emitted.emit(

@@ -61,11 +61,16 @@ def master_audio(tmp_path: Path) -> Path:
     """Provide a valid WAV file for master narration."""
     audio_file = tmp_path / "master_narration.wav"
     # Write canonical RIFF WAV header (44 bytes, 24kHz mono 16-bit)
+    # with at least 1KB of silence data to pass file-size validation
+    silence_size = 1024
     header = (
-        b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00"
-        b"\xc0]\x00\x00\x80\xbb\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
+        b"RIFF"
+        + (36 + silence_size).to_bytes(4, "little")
+        + b"WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00"
+        + b"\xc0]\x00\x00\x80\xbb\x00\x00\x02\x00\x10\x00data"
+        + silence_size.to_bytes(4, "little")
     )
-    audio_file.write_bytes(header)
+    audio_file.write_bytes(header + b"\x00" * silence_size)
     return audio_file
 
 

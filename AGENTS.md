@@ -68,7 +68,7 @@ Tài liệu này chứa các quy tắc và hướng dẫn tối cao dành cho AI
 
 Bất kỳ AI Agent nào đọc tài liệu này phải hiểu trạng thái và hướng phát triển:
 
-### 4.1. Trạng Thái Hiện Tại (v2.1.17 — 19/09/2026)
+### 4.1. Trạng Thái Hiện Tại (v2.1.18 — 23/09/2026)
 
 | Module | Trạng thái | Ghi chú |
 |:---|:---:|:---|

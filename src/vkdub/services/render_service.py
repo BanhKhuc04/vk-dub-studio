@@ -18,6 +18,7 @@ class RenderConfig:
     audio_codec: str = "aac"
     crf: int = 20
     preset: str = "medium"
+    skip_voice: bool = False  # Xuất không cần voice dub (chỉ phụ đề + tiếng gốc)
 
 
 def escape_ffmpeg_filter_path(path: Path) -> str:
@@ -32,7 +33,7 @@ def escape_ffmpeg_filter_path(path: Path) -> str:
 def build_render_command(
     project: Project,
     config: RenderConfig,
-    speech_wav_path: Path,
+    speech_wav_path: Path | None,
     ass_subtitle_path: Path | None,
     ffmpeg_exe: str,
     video_width: int = 1920,
@@ -43,15 +44,28 @@ def build_render_command(
     if not project.video_path or not project.video_path.is_file():
         raise ValueError("Video nguồn không tồn tại.")
 
+    if not config.skip_voice:
+        if not speech_wav_path or not speech_wav_path.is_file():
+            raise ValueError(
+                f"Không tìm thấy file audio giọng đọc: {speech_wav_path}. "
+                "Hãy chạy lại pipeline để tạo giọng đọc trước khi xuất video."
+            )
+        if speech_wav_path.stat().st_size < 200:
+            raise ValueError(
+                f"File audio giọng đọc quá nhỏ ({speech_wav_path.stat().st_size} bytes) — "
+                "có thể bị lỗi trong quá trình tạo. Hãy chạy lại pipeline."
+            )
+
     args: list[str] = [
         ffmpeg_exe,
         "-y",
         "-nostdin",
         "-i",
         str(project.video_path),
-        "-i",
-        str(speech_wav_path),
     ]
+
+    if not config.skip_voice and speech_wav_path and speech_wav_path.is_file():
+        args.extend(["-i", str(speech_wav_path)])
 
     # 1. Video Filter Chain
     vf_items: list[str] = []
@@ -69,12 +83,19 @@ def build_render_command(
         args.extend(["-vf", full_vf])
 
     # 2. Audio Filter Complex
-    af_graph = build_audio_mix_filter(
-        original_volume=config.original_volume,
-        voice_volume=config.voice_volume,
-        has_original_audio=has_original_audio,
-    )
-    args.extend(["-filter_complex", af_graph, "-map", "0:v:0", "-map", "[aout]"])
+    if config.skip_voice:
+        # Giữ tiếng gốc 100%, không mix voice dub
+        if has_original_audio:
+            args.extend(["-map", "0:v:0", "-map", "0:a:0"])
+        else:
+            args.extend(["-map", "0:v:0", "-an"])
+    else:
+        af_graph = build_audio_mix_filter(
+            original_volume=config.original_volume,
+            voice_volume=config.voice_volume,
+            has_original_audio=has_original_audio,
+        )
+        args.extend(["-filter_complex", af_graph, "-map", "0:v:0", "-map", "[aout]"])
 
     # 3. Codecs & Quality
     args.extend(

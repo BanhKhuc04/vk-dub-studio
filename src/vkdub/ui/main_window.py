@@ -226,6 +226,8 @@ class MainWindow(QMainWindow):
         self.step4_panel.import_srt_requested.connect(self._on_import_chatgpt_srt_clicked)
         self.step4_panel.continue_requested.connect(lambda: self.switch_to_step(4))
         self.step4_panel.btn_health_check.clicked.connect(self._on_health_check_clicked)
+        self.step4_panel.download_srt_requested.connect(self._on_download_srt_for_vbee)
+        self.step4_panel.import_audio_requested.connect(self._on_import_vbee_audio)
 
         # Step 5 (Review & Export) connections
         self.review.export_video_requested.connect(self.render_controller.open_export_dialog)
@@ -785,8 +787,123 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Lỗi nạp phụ đề", f"Không thể nạp file SRT: {exc}")
 
     # -------------------------------------------------------------------------
+    # H5b: Step 4.4 — Thủ công Vbee: Download SRT + Import Audio
+    # -------------------------------------------------------------------------
+    def _on_download_srt_for_vbee(self) -> None:
+        """Sao chép translated.srt về thư mục người dùng chọn để dùng với Vbee.vn."""
+        if not self.project or not self.project.video_path:
+            QMessageBox.warning(self, "Chưa có dự án", "Vui lòng chọn video và chạy pipeline trước.")
+            return
+
+        out_name = self.project.video_path.stem if self.project.video_path else "dubbing"
+        srt_source = workspace_root() / "export" / out_name / "translated.srt"
+
+        if not srt_source.is_file():
+            QMessageBox.warning(
+                self,
+                "Chưa có file SRT",
+                "Chưa tìm thấy file phụ đề đã dịch.\n"
+                "Vui lòng chạy Bước 04 (Bóc băng + Dịch) trước để tạo file SRT.",
+            )
+            return
+
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Lưu file SRT tiếng Việt cho Vbee",
+            str(Path.home() / f"{out_name}_vi.srt"),
+            "Phụ đề SRT (*.srt);;Tất cả tệp (*.*)",
+        )
+        if not save_path:
+            return
+
+        import shutil
+        try:
+            shutil.copy2(srt_source, save_path)
+            self.log(f"📥 Đã lưu file SRT tại: {save_path}")
+            QMessageBox.information(
+                self,
+                "Tải SRT thành công",
+                f"File phụ đề đã được lưu tại:\n{save_path}\n\n"
+                "Bước tiếp theo:\n"
+                "1. Truy cập vbee.vn → Dubbing Studio\n"
+                "2. Upload file SRT này và chọn giọng đọc\n"
+                "3. Tải về file MP3 kết quả\n"
+                "4. Nhấn '🎙 Import Audio MP3' để nạp vào dự án",
+            )
+            import os
+            os.startfile(str(Path(save_path).parent))
+        except Exception as exc:
+            QMessageBox.critical(self, "Lỗi lưu file", f"Không thể lưu file SRT: {exc}")
+
+    def _on_import_vbee_audio(self) -> None:
+        """Mở FileDialog chọn MP3/WAV đã tạo trên Vbee.vn và nạp vào dự án."""
+        if not self.project:
+            QMessageBox.warning(self, "Chưa có dự án", "Vui lòng chọn video trước.")
+            return
+        if not (self.project.script and self.project.script.lines):
+            QMessageBox.warning(
+                self,
+                "Chưa có kịch bản",
+                "Cần có kịch bản tiếng Việt trước khi import audio.\n"
+                "Vui lòng chạy pipeline Bước 04 trước.",
+            )
+            return
+
+        audio_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Chọn file Audio đã tạo từ Vbee.vn",
+            str(Path.home()),
+            "Audio Files (*.mp3 *.wav *.m4a *.ogg *.flac);;Tất cả tệp (*.*)",
+        )
+        if not audio_path:
+            return
+
+        try:
+            from vkdub.integrations.vbee.importer import import_vbee_master_audio
+
+            out_name = self.project.video_path.stem if self.project.video_path else "dubbing"
+            output_dir = workspace_root() / "export" / out_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            self.log(f"🎙 Đang nạp audio từ: {Path(audio_path).name}…")
+            import_vbee_master_audio(
+                project=self.project,
+                master_audio_path=Path(audio_path),
+                output_dir=output_dir,
+            )
+
+            # Cập nhật UI sau khi nạp thành công
+            if hasattr(self, "step4_panel"):
+                from vkdub.orchestrator.pipeline_state import SubstepStatus
+                self.step4_panel.update_substep(
+                    "4.4",
+                    SubstepStatus.SUCCESS,
+                    100,
+                    f"Đã import: {Path(audio_path).name}",
+                )
+                self.step4_panel.update_overall("✓ Hoàn tất", "#34d399", 100)
+                self.step4_panel.btn_continue.setEnabled(True)
+
+            if hasattr(self, "stepper"):
+                self.stepper.update_step_summary(3, "✓", "Voice đã import", "#34d399")
+
+            self.dirty = True
+            self._refresh()
+            self.log(f"✅ Đã nạp audio Vbee thành công: {Path(audio_path).name}")
+            QMessageBox.information(
+                self,
+                "Import Audio thành công",
+                f"Đã nạp file audio:\n{Path(audio_path).name}\n\n"
+                "Bạn có thể tiếp tục sang Bước 05 để duyệt kịch bản và xuất video.",
+            )
+        except Exception as exc:
+            self.log(f"❌ Lỗi import audio: {exc}")
+            QMessageBox.critical(self, "Lỗi Import Audio", f"Không thể nạp file audio:\n{exc}")
+
+    # -------------------------------------------------------------------------
     # H6 Step 4: Automated Pipeline Runner Integration
     # -------------------------------------------------------------------------
+
     def _start_pipeline_runner(self) -> None:
         if self.busy:
             return
@@ -1230,35 +1347,41 @@ class MainWindow(QMainWindow):
             if hasattr(self, "switch_to_step"):
                 self.switch_to_step(4)  # Chuyển ngay sang Bước 05 để xem kịch bản và xuất CapCut
         else:
-            # Tạm dừng ở Bước 4.3 để người dùng duyệt kịch bản
-            self.left.step4_pipeline.overall_badge.setText("✔ Đã dịch (3/4)")
-            self.left.step4_pipeline.overall_badge.setStyleSheet("color: #58a6ff; font-weight: bold;")
+            # Pipeline dừng sau 4.3 — SRT sẵn sàng, chờ user tải về và import audio
+            self.left.step4_pipeline.overall_badge.setText("⏳ Chờ Import Voice")
+            self.left.step4_pipeline.overall_badge.setStyleSheet("color: #f59e0b; font-weight: bold;")
             self.left.lbl_review_status.setText(
-                "⏳ Đã dịch xong. Vui lòng kiểm tra và duyệt kịch bản tại Bước 05."
+                "⏳ Đã dịch xong. Tải SRT → Tạo voice Vbee.vn → Import MP3 vào đây."
             )
             self.left.lbl_review_status.setStyleSheet("color: #d29922; font-weight: bold;")
             if hasattr(self, "step4_panel"):
-                self.step4_panel.update_overall("✔ Đã dịch (3/4)", "#58a6ff", 75)
-                self.step4_panel.btn_continue.setEnabled(True)
+                self.step4_panel.update_overall("⏳ Chờ Import Voice", "#f59e0b", 75)
+                # Bật 2 nút thủ công Vbee
+                self.step4_panel.set_vbee_buttons_enabled(True)
+                # btn_continue không bật ở đây — chỉ bật sau khi import audio xong
             if hasattr(self, "stepper"):
-                self.stepper.update_step_summary(3, "✓", "Đã dịch (3/4)", "#3fb950")
+                self.stepper.update_step_summary(3, "⏳", "Chờ Import Voice", "#f59e0b")
                 line_count = len(self.project.script.lines) if self.project.script else 0
                 self.stepper.update_step_summary(4, "●", f"{line_count} câu (Cần duyệt)", "#d29922")
 
             self.review_controller.bind_project()
             self._refresh()
-            if hasattr(self, "switch_to_step"):
-                self.switch_to_step(4)  # Chuyển sang Bước 5 để người dùng xem kịch bản
 
-            self.log("📋 Đã dịch xong kịch bản (3/4). Dừng lại để người dùng kiểm tra và chốt kịch bản!")
+            self.log(
+                "✅ [4.1–4.3 hoàn tất] Kịch bản tiếng Việt đã sẵn sàng!\n"
+                "📥 Bấm 'Tải SRT về máy' → Lên Vbee.vn tạo voice → Bấm 'Import Audio MP3'"
+            )
             QMessageBox.information(
                 self,
-                "Dịch kịch bản hoàn tất — Chờ duyệt",
-                "ChatGPT đã dịch xong phụ đề (3/4 bước).\n\n"
-                "👉 Hệ thống tạm dừng để bạn kiểm tra và chỉnh sửa nội dung dịch ở Bước 05 (cột bên phải).\n\n"
-                "Khi đã ưng ý, hãy nhấn nút:\n"
-                "   [ ✔ BƯỚC 5: CHỐT KỊCH BẢN & TẠO GIỌNG (VBEE) ]\n"
-                "để hệ thống tự động gửi kịch bản đã chỉnh sửa sang Vbee tạo giọng đọc!",
+                "Kịch bản sẵn sàng — Cần Import Voice",
+                "Bước 4.1 → 4.3 đã hoàn tất thành công!\n\n"
+                "Để hoàn thiện video lồng tiếng, hãy thực hiện:\n\n"
+                "  📥  Bấm 'Tải SRT về máy' để lấy file phụ đề tiếng Việt\n"
+                "  🌐  Truy cập vbee.vn → Dubbing Studio → Upload SRT\n"
+                "  🎙  Chọn giọng đọc và tải về file MP3\n"
+                "  ✅  Bấm 'Import Audio MP3' để nạp vào dự án\n\n"
+                "Hoặc tích 'Xuất không cần voice' ở bước Export\n"
+                "để xuất video chỉ có phụ đề + tiếng gốc.",
             )
 
     def _on_pipeline_failed(self, short_err: str, trace: str) -> None:

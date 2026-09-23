@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import shutil
@@ -20,7 +21,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from PySide6.QtCore import QCoreApplication, Qt
@@ -42,6 +43,7 @@ from kappak.modules.auto_video import (
     AutoVideoService,
     SceneSegment,
 )
+from kappak.services.ask_kappak_service import get_ask_service
 from vkdub.bridge.local_agent import LocalAgent
 from vkdub.domain.mask import MaskItem
 from vkdub.domain.project import Project
@@ -343,7 +345,7 @@ def get_health():
         "ffprobe": bool(ffprobe_bin),
         "ffprobe_path": ffprobe_bin,
         "local_agent": bool(state.local_agent and state.local_agent.running),
-        "version": "2.1.17",
+        "version": "2.1.18",
     }
 
 
@@ -1718,6 +1720,85 @@ async def download_auto_video(project_id: str):
         media_type="video/mp4",
         filename=p.name,
         headers={"Content-Disposition": f'attachment; filename="{p.name}"'},
+    )
+
+
+# ==========================================
+# ASK KAPPAK AI ENDPOINTS (Phase 3 — LLM Chat)
+# ==========================================
+
+class AskChatRequest(BaseModel):
+    message: str
+    model: str | None = None  # defaults to gemini-3.5-flash
+
+
+class AskChatResponse(BaseModel):
+    reply: str
+    error: str | None = None
+
+
+@app.get("/api/ask-kappak/history")
+async def get_ask_history():
+    """Return conversation history for the Ask KAPPAK drawer."""
+    svc = get_ask_service()
+    return {"history": svc.get_history_dicts()}
+
+
+@app.post("/api/ask-kappak/clear")
+async def clear_ask_history():
+    """Clear conversation history."""
+    svc = get_ask_service()
+    svc.clear_history()
+    svc.save_history()
+    return {"status": "ok"}
+
+
+@app.get("/api/ask-kappak/status")
+async def get_ask_status():
+    """Return whether Gemini API key is configured."""
+    svc = get_ask_service()
+    return {
+        "has_api_key": svc.has_api_key(),
+        "history_count": len(svc.get_history()),
+    }
+
+
+@app.post("/api/ask-kappak/chat", response_model=AskChatResponse)
+async def ask_kappak_chat(req: AskChatRequest):
+    """Non-streaming chat endpoint — returns full AI reply in one shot."""
+    svc = get_ask_service()
+    model = req.model or "gemini-3.5-flash"
+    reply, error = await svc.chat_nonstream(req.message, model=model)
+    return AskChatResponse(reply=reply, error=error)
+
+
+@app.post("/api/ask-kappak/chat-stream")
+async def ask_kappak_chat_stream(req: AskChatRequest):
+    """Streaming chat endpoint — yields Server-Sent Events with text chunks."""
+
+    svc = get_ask_service()
+    model = req.model or "gemini-3.5-flash"
+
+    async def event_generator():
+        full_text = ""
+        error_sent = False
+        async for chunk, done, error in svc.chat(req.message, model=model, stream=True):
+            if error and not error_sent:
+                yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+                error_sent = True
+            elif chunk:
+                full_text += chunk
+                yield f"event: chunk\ndata: {json.dumps({'text': chunk})}\n\n"
+            if done and not error:
+                yield f"event: done\ndata: {json.dumps({'full_text': full_text})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

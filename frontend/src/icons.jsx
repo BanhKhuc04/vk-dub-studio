@@ -67,6 +67,7 @@ export const ShareIcon = (p) => <Svg {...p}><circle cx="18" cy="5" r="3"/><circl
 export const ClockIcon = (p) => <Svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Svg>;
 export const ArrowUpIcon = (p) => <Svg {...p}><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></Svg>;
 export const ArrowRightIcon = (p) => <Svg {...p}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Svg>;
+export const EraserIcon = (p) => <Svg {...p}><path d="m7 21-4.3-4.3c-.8-.8-.8-2 0-2.8L14.6 2.2c.8-.8 2-.8 2.8 0L21 5.8c.8.8.8 2 0 2.8L9 21"/><path d="M14 6h7"/></Svg>;
 export const LightbulbIcon = (p) => <Svg {...p}><path d="M9 18h6M10 21h4M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 5.5v1.5h8v-1.5c1.5-1 3-3 3-5.5a7 7 0 0 0-7-7Z"/></Svg>;
 
 export const LogoGlyph = ({size=42}) => (

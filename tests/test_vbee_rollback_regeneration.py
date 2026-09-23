@@ -102,7 +102,7 @@ def test_pipeline_runner_target_step_4_4_forces_regeneration(qapp, tmp_path, mon
 
     def fake_generate_vbee(srt_content, target_path, **kwargs):
         generated_call["count"] += 1
-        target_path.write_bytes(b"ID3" + b"new_vbee_audio" * 200)
+        target_path.write_bytes(b"ID3" + b"new_vbee_audio" * 400)  # ~10KB
         return target_path
 
     monkeypatch.setattr(agent, "generate_vbee_sync", fake_generate_vbee)

@@ -66,7 +66,7 @@ class RenderController(QObject):
         self._temp_output = temp_dir_path / "rendering.tmp.mp4"
 
         try:
-            # 1. Build speech WAV track
+            # 1. Build speech WAV track (bỏ qua khi skip_voice=True)
             total_dur_ms = proj.duration_ms or (
                 round(self.window.preview._last_metadata.duration * 1000)
                 if self.window.preview._last_metadata
@@ -74,9 +74,13 @@ class RenderController(QObject):
             )
             self._total_duration_s = total_dur_ms / 1000.0
 
-            self.window.log("Đang tổng hợp dải âm thanh thuyết minh (WAV)…")
-            speech_wav = temp_dir_path / "speech_track.wav"
-            build_speech_track_wav(proj, speech_wav, total_dur_ms, ffmpeg=ffmpeg_exe)
+            speech_wav: Path | None = None
+            if not config.skip_voice:
+                self.window.log("Đang tổng hợp dải âm thanh thuyết minh (WAV)…")
+                speech_wav = temp_dir_path / "speech_track.wav"
+                build_speech_track_wav(proj, speech_wav, total_dur_ms, ffmpeg=ffmpeg_exe)
+            else:
+                self.window.log("⏭ Bỏ qua voice dub — xuất video với tiếng gốc + phụ đề.")
 
             # 2. Build styled ASS subtitle file if requested
             ass_path: Path | None = None
@@ -98,6 +102,7 @@ class RenderController(QObject):
                 audio_codec=config.audio_codec,
                 crf=config.crf,
                 preset=config.preset,
+                skip_voice=config.skip_voice,
             )
 
             has_audio = True
@@ -120,6 +125,7 @@ class RenderController(QObject):
                 video_height=h,
                 has_original_audio=has_audio,
             )
+
 
             self.window.log(f"Bắt đầu xuất video qua FFmpeg: {config.output_path.name}")
             self.render_started.emit()

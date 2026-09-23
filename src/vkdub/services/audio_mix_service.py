@@ -218,14 +218,21 @@ def build_audio_mix_filter(
     Inputs:
     [0:a] = original video audio
     [1:a] = generated speech track WAV
+
+    The amix filter averages inputs. With original at 15% and voice at 100%,
+    the raw average would be ~57.5% which is safe from clipping. However, we
+    add dynaudnorm for gentle peak normalization to ensure clean output.
     """
     if not has_original_audio or original_volume <= 0.001:
         # Original audio muted or not present, only use voice
         return f"[1:a]volume={voice_volume:.2f}[aout]"
 
+    # Calculate effective mix peak: if original is at P and voice is at 1.0,
+    # amix averages them. Safe headroom is preserved.
+    # Use dynaudnorm to gently normalize and prevent any residual clipping.
     filter_graph = (
         f"[0:a]volume={original_volume:.2f}[aorig];"
         f"[1:a]volume={voice_volume:.2f}[avoice];"
-        f"[aorig][avoice]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+        f"[aorig][avoice]amix=inputs=2:duration=first:dropout_transition=2,dynaudnorm=f=500:g=15:m=0.85:p=0.95[aout]"
     )
     return filter_graph

@@ -4,7 +4,7 @@ Right contextual panel for automated pipeline execution:
 - 4.1 Transcription (Whisper)
 - 4.2 ChatGPT Translation
 - 4.3 Script / Timeline Validation
-- 4.4 Vbee Voice Generation
+- 4.4 Download SRT + Import Voice Audio (manual Vbee flow)
 - Per-step state: PENDING, RUNNING, SUCCESS, FAILED
 - Overall progress with animated gradient
 - Health preflight strip with live status
@@ -372,6 +372,8 @@ class Step4AutomationPanel(QFrame):
     continue_requested = Signal()
     open_log_requested = Signal()
     import_srt_requested = Signal()
+    download_srt_requested = Signal()   # Tải translated.srt về máy để dùng với Vbee
+    import_audio_requested = Signal()   # Nạp file audio MP3/WAV đã tạo trên Vbee
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -442,7 +444,7 @@ class Step4AutomationPanel(QFrame):
             letter-spacing: 0.3px;
         """)
         header_col.addWidget(title)
-        subtitle = QLabel("Bóc băng → Dịch ngữ cảnh → Kịch bản → Voice Vbee")
+        subtitle = QLabel("Bóc băng → Dịch ngữ cảnh → Kịch bản → Tải SRT → Import Voice")
         subtitle.setStyleSheet("font-size: 12px; color: #667085;")
         header_col.addWidget(subtitle)
         header_row.addLayout(header_col, 1)
@@ -527,7 +529,7 @@ class Step4AutomationPanel(QFrame):
             ("4.1", "Bóc băng phụ đề gốc (Whisper)"),
             ("4.2", "Dịch ngữ cảnh (ChatGPT qua Edge)"),
             ("4.3", "Kiểm tra kịch bản & timeline"),
-            ("4.4", "Tạo giọng đọc (Vbee Studio)"),
+            ("4.4", "Tải SRT + Import Voice (Thủ công Vbee)"),
         ]
 
         cards_col = QVBoxLayout()
@@ -541,6 +543,49 @@ class Step4AutomationPanel(QFrame):
             cards_col.addWidget(card)
         layout.addLayout(cards_col)
         self.substep_cards = self.substeps
+
+        # Card 4.4 — Nút Download SRT và Import Audio (luôn hiển thị)
+        card44 = self.substeps["4.4"]
+        vbee_action_row = QHBoxLayout()
+        vbee_action_row.setContentsMargins(30, 4, 0, 2)
+        vbee_action_row.setSpacing(8)
+
+        self.btn_download_srt = QPushButton("📥 Tải SRT về máy")
+        self.btn_download_srt.setToolTip(
+            "Tải file phụ đề tiếng Việt đã dịch về máy tính.\n"
+            "Sau đó lên Vbee.vn để tạo voice, rồi import MP3 vào đây."
+        )
+        self.btn_download_srt.setStyleSheet("""
+            QPushButton {
+                background-color: #e0f2fe; color: #0369a1; border: 1.5px solid #0f172a;
+                border-radius: 5px; padding: 4px 12px; font-size: 11px; font-weight: 800;
+            }
+            QPushButton:hover { background-color: #bae6fd; }
+            QPushButton:disabled { background-color: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
+        """)
+        self.btn_download_srt.setEnabled(False)  # Bật sau khi 4.3 thành công
+        self.btn_download_srt.clicked.connect(self.download_srt_requested.emit)
+        vbee_action_row.addWidget(self.btn_download_srt)
+
+        self.btn_import_audio = QPushButton("🎙 Import Audio MP3")
+        self.btn_import_audio.setToolTip(
+            "Chọn file audio MP3/WAV đã tạo trên Vbee.vn hoặc bất kỳ TTS nào.\n"
+            "Phần mềm sẽ tự đồng bộ theo timeline câu thoại."
+        )
+        self.btn_import_audio.setStyleSheet("""
+            QPushButton {
+                background-color: #f0fdf4; color: #15803d; border: 1.5px solid #0f172a;
+                border-radius: 5px; padding: 4px 12px; font-size: 11px; font-weight: 800;
+            }
+            QPushButton:hover { background-color: #dcfce7; }
+            QPushButton:disabled { background-color: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
+        """)
+        self.btn_import_audio.setEnabled(False)  # Bật sau khi 4.3 thành công
+        self.btn_import_audio.clicked.connect(self.import_audio_requested.emit)
+        vbee_action_row.addWidget(self.btn_import_audio)
+
+        vbee_action_row.addStretch(1)
+        card44.layout().addLayout(vbee_action_row)
 
         # 4. Action Buttons (Start, Pause, Cancel)
         action_row = QHBoxLayout()
@@ -634,6 +679,9 @@ class Step4AutomationPanel(QFrame):
         self.lbl_est_time.setText("")
         self.update_overall("○ Sẵn sàng", "#475569", 0)
         self.btn_continue.setEnabled(False)
+        # Reset 2 nút Vbee thủ công về trạng thái disabled
+        self.btn_download_srt.setEnabled(False)
+        self.btn_import_audio.setEnabled(False)
 
     def set_running_state(self, running: bool) -> None:
         if running:
@@ -747,3 +795,17 @@ class Step4AutomationPanel(QFrame):
         else:
             self.lbl_health_vbee.setText("● Vbee: Chưa mở tab")
             self.lbl_health_vbee.setStyleSheet("color: #475569; font-size: 11px;")
+
+    def set_vbee_buttons_enabled(self, enabled: bool) -> None:
+        """Bật/tắt 2 nút Download SRT + Import Audio khi kịch bản 4.3 sẵn sàng."""
+        self.btn_download_srt.setEnabled(enabled)
+        self.btn_import_audio.setEnabled(enabled)
+        if enabled:
+            # Cập nhật card 4.4 sang trạng thái WAITING để user biết cần làm thêm
+            self.update_substep(
+                "4.4",
+                SubstepStatus.WAITING,
+                0,
+                "SRT sẵn sàng · Tải về → Tạo voice Vbee.vn → Import MP3",
+            )
+

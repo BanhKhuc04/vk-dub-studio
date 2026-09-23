@@ -6,6 +6,8 @@ import asyncio
 import logging
 import os
 import re
+import shutil
+import subprocess
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -82,6 +84,111 @@ def format_speed_label(speed: float | str) -> str:
             val = 1.1
     s = f"{val:.2f}".rstrip("0").rstrip(".")
     return f"{s}x"
+
+
+def _find_ffmpeg() -> str | None:
+    """Locate ffmpeg binary on Windows."""
+    from vkdub.media.process import find_tool
+    return find_tool("ffmpeg")
+
+
+def strip_vbee_watermark(raw_audio_path: Path, output_path: Path) -> Path:
+    """Remove Vbee watermark audio (intro advertisement) from downloaded MP3.
+
+    Vbee free accounts prepend ~2-3s of branding/watermark audio. This function
+    uses FFmpeg to strip the first ~3 seconds (watermark intro) and removes
+    trailing silence from the end. Falls back to direct copy if FFmpeg is unavailable.
+    """
+    import uuid as _uuid
+
+    ffmpeg_bin = _find_ffmpeg()
+    if not ffmpeg_bin:
+        logger.warning("FFmpeg not found — skipping Vbee watermark removal")
+        if raw_audio_path.resolve() != output_path.resolve():
+            shutil.copy2(raw_audio_path, output_path)
+        return output_path
+
+    raw_audio_path = raw_audio_path.resolve()
+    output_path = output_path.resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    temp_clean = output_path.parent / f".vbee_clean_{_uuid.uuid4().hex[:8]}.mp3"
+
+    # Probe the total audio duration so we can trim both start and end accurately
+    try:
+        probe_result = subprocess.run(
+            [ffmpeg_bin, "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", str(raw_audio_path)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+            creationflags=0x08000000 if os.name == "nt" else 0,
+        )
+        total_duration_s = float(probe_result.stdout.strip() or "0")
+    except Exception:
+        total_duration_s = 0.0
+
+    # Strip intro watermark: cut first 3 seconds
+    # Strip trailing silence: remove last 0.5 seconds (outro/trailing silence)
+    intro_skip_s = 3.0
+    outro_trim_s = 0.5
+    if total_duration_s > intro_skip_s + outro_trim_s:
+        trim_duration_s = total_duration_s - intro_skip_s - outro_trim_s
+    else:
+        # Fallback if file is too short
+        trim_duration_s = max(total_duration_s - intro_skip_s, 1.0)
+        outro_trim_s = 0.0
+
+    cmd = [
+        ffmpeg_bin, "-y", "-nostdin",
+        "-i", str(raw_audio_path),
+        "-ss", f"{intro_skip_s:.3f}",
+        "-t", f"{trim_duration_s:.3f}",
+        "-af", f"silenceremove=start_periods=1:start_duration=0.1:"
+                f"start_threshold=-50dB:detection=peak,"
+                f"areverse,silenceremove=start_periods=1:start_duration=0.1:"
+                f"start_threshold=-50dB:detection=peak,areverse",
+        "-c:a", "libmp3lame", "-q:a", "2",
+        str(temp_clean),
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            creationflags=0x08000000 if os.name == "nt" else 0,
+        )
+        if result.returncode == 0 and temp_clean.is_file() and temp_clean.stat().st_size > 4096:
+            temp_clean.replace(output_path)
+            saved_bytes = raw_audio_path.stat().st_size - output_path.stat().st_size
+            logger.info(
+                "Vbee watermark removed: %s → %s (saved %d bytes, trimmed %.1fs intro + %.1fs outro)",
+                raw_audio_path.name,
+                output_path.name,
+                saved_bytes,
+                intro_skip_s,
+                outro_trim_s,
+            )
+        else:
+            logger.warning(
+                "Vbee watermark removal failed (ffmpeg rc=%d): %s",
+                result.returncode,
+                result.stderr.strip()[-200:] if result.stderr else "no stderr",
+            )
+            if raw_audio_path.resolve() != output_path.resolve():
+                shutil.copy2(raw_audio_path, output_path)
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.warning("Vbee watermark removal error: %s", exc)
+        if raw_audio_path.resolve() != output_path.resolve():
+            shutil.copy2(raw_audio_path, output_path)
+
+    return output_path
 
 
 class VbeeBrowserAutomation:

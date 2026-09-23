@@ -104,8 +104,13 @@ class VbeeExtensionProvider:
                 progress_callback=progress_callback,
             ),
         )
-        progress_callback(90, "Đã nhận âm thanh từ Vbee!")
-        return Path(saved_audio)
+        # Strip Vbee watermark audio (intro/outro advertisement)
+        progress_callback(85, "Đang loại bỏ watermark Vbee khỏi audio…")
+        from vkdub.integrations.vbee.automation import strip_vbee_watermark
+        cleaned_vbee_path = target_dir / f"vbee_clean_{raw_vbee_path.name}"
+        cleaned = strip_vbee_watermark(Path(saved_audio), cleaned_vbee_path)
+        progress_callback(95, "Đã nhận âm thanh từ Vbee!")
+        return cleaned
 
     async def close(self) -> None:
         pass
@@ -225,10 +230,17 @@ class VbeeBrowserProvider:
                 progress_callback(90, "Đang tải file âm thanh kết quả…")
                 check_cancel()
                 logger.info("[VBEE][DOWNLOAD] Bắt đầu tải file âm thanh từ dòng công việc…")
-                audio_path = await automation.download_from_job_row(
+                raw_audio_path = await automation.download_from_job_row(
                     job_row=job_row,
                     target_dir=target_dir,
                 )
+
+                # Strip Vbee watermark audio (intro/outro advertisement) before using
+                progress_callback(93, "Đang loại bỏ watermark Vbee khỏi audio…")
+                logger.info("[VBEE][WATERMARK] Loại bỏ watermark audio Vbee: %s", raw_audio_path.name)
+                from vkdub.integrations.vbee.automation import strip_vbee_watermark
+                cleaned_path = target_dir / raw_audio_path.name
+                audio_path = strip_vbee_watermark(raw_audio_path, cleaned_path)
 
                 progress_callback(95, "Tải file hoàn tất!")
                 completed = True
