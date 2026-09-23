@@ -238,12 +238,11 @@ def update_manifest(installer_path: Path) -> Path:
         "sha256": sha256,
         "file_size_bytes": file_size,
         "changelog": [
-            f"VK Dub Studio v{__version__} — Khắc phục triệt để lỗi 'Cần cập nhật CapCut' khi mở dự án",
-            "Tự động nhận diện phiên bản CapCut thực tế trên máy tính để tạo dự án tương thích 100%, không bao giờ bị hỏi cập nhật",
-            "Tự động đồng bộ và sửa toàn bộ các dự án VKDub cũ trong CapCut để mở được ngay lập tức",
-            "Hạ phiên bản template cơ sở xuống CapCut 3.0+ đảm bảo tương thích mọi bản CapCut cũ và mới",
-            "Vá lỗi Vbee & tự động dò tìm FFmpeg/ffprobe trong thư mục ứng dụng",
-            "Cập nhật an toàn bằng bộ cài đầy đủ qua HTTPS với xác thực mã băm SHA-256",
+            f"VK Dub Studio v{__version__} — Tự động ChatGPT, tải SRT về máy, nạp Voice thủ công và xuất không cần Voice",
+            "Tự động dừng sau ChatGPT: Dịch ngữ cảnh tự động bằng ChatGPT, sau đó dừng chờ tải SRT và nạp voice thủ công thay vì ép gọi Vbee tự động",
+            "Nút Tải SRT về máy: Xuất file SRT phụ đề tiếng Việt trực tiếp ra máy và tự động mở thư mục chứa để người dùng tải lên Vbee",
+            "Nút Nạp Audio Voice: Cho phép người dùng duyệt file MP3/WAV đã tạo từ Vbee để nạp vào dự án và hoàn tất bước 4",
+            "Tùy chọn Xuất không cần Voice: Bổ sung checkbox trong hộp thoại Xuất video để xuất ngay video có phụ đề tiếng Việt với âm thanh gốc 100% mà không bắt buộc phải có voice dub",
         ],
     }
 
